@@ -41,6 +41,14 @@ describe("Operation", () => {
     expect(messages(op)).toContain("path placeholder {part_id} has no binding");
   });
 
+  it("accepts fixed query values that do not collide with bound ones", () => {
+    const op = rawOperation({ id: "get_item" });
+    expect(messages({ ...op, mapping: { ...op.mapping, fixedQuery: { beta: "true" } } })).toEqual([]);
+    expect(messages({ ...op, mapping: { ...op.mapping, fixedQuery: { limit: "10" } } })).toContain(
+      'query parameter "limit" is both fixed and bound',
+    );
+  });
+
   it("rejects an optional path parameter", () => {
     const op = rawOperation({ id: "get_item" });
     op.input.required = [];

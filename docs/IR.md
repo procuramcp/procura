@@ -27,7 +27,7 @@ Toolset    { id, sourceId, name, tools: ToolBinding[] }   // curated per tenant
 | `title`, `description` | As ingested; toolsets override them for agents |
 | `input` | JSON Schema 2020-12, root `type: object`, self-contained (`$defs`) |
 | `output` | Schema of the success response, if known |
-| `mapping` | `kind: "http"`: method, path template, one binding per input property, body binding, response decode |
+| `mapping` | `kind: "http"`: method, path template, one binding per input property, optional `fixedQuery` (always-sent query values), body binding, response decode |
 | `sideEffect` | `{ class: read/write/destructive, basis, reason }` |
 | `auth` | Overrides `defaultAuth` when present |
 | `provenance` | `{ kind: spec/introspection/inferred/verified, sourceRef, originalId }` |

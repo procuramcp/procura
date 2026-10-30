@@ -96,7 +96,9 @@ export function mapOpenApi(raw: unknown, options: MapOpenApiOptions = {}): MapOp
   const defaultAuth = mapSecurityRequirement(doc.security ?? [], schemes, "#/security", diagnostics);
 
   const sourceId = options.sourceId ?? slugify(doc.info.title);
-  const converter = new SchemaConverter(doc, dialect);
+  const converter = new SchemaConverter(doc, dialect, (code, message, pointer) =>
+    diagnostics.push({ severity: "warning", code, message, pointer }),
+  );
   const usedIds = new Set<string>();
   const operations: Operation[] = [];
 
@@ -189,12 +191,21 @@ type OperationContext = {
 };
 
 function mapOperation(ctx: OperationContext) {
-  const { doc, converter, path, method, pointer } = ctx;
+  const { doc, converter, method, pointer } = ctx;
   const op = deref(doc, ctx.raw, OaOperation, pointer).value;
-  const id = uniqueName(operationIdFrom(op.operationId, method, path), ctx.usedIds);
+  const key = splitPathKey(ctx.path);
+  const path = key.template;
+  const id = uniqueName(operationIdFrom(op.operationId, method, ctx.path), ctx.usedIds);
   const penalties = new Set<Penalty>();
   const note = (severity: Diagnostic["severity"], code: string, message: string, at = pointer) =>
     ctx.diagnostics.push({ severity, code, message, pointer: at, operationId: id });
+
+  if (key.fragment !== undefined) {
+    note("info", "path_key_fragment", `path key "${ctx.path}" has a fragment (#${key.fragment}); it is a label only and is not sent`);
+  }
+  if (key.fixedQuery !== undefined) {
+    note("warning", "path_key_query", `path key "${ctx.path}" contains a query; sent as fixed query parameters ${JSON.stringify(key.fixedQuery)}`);
+  }
 
   // Parameters: path-item level first, overridden by operation level (same name + location).
   const merged = new Map<string, { param: OaParameter; pointer: string }>();
@@ -228,6 +239,10 @@ function mapOperation(ctx: OperationContext) {
     }
     if (param.in === "path" && !placeholders.includes(param.name)) {
       note("warning", "unused_path_parameter", `path parameter "${param.name}" is not in the path template; dropped`, pp);
+      continue;
+    }
+    if (param.in === "query" && key.fixedQuery && Object.hasOwn(key.fixedQuery, param.name)) {
+      note("warning", "fixed_query_parameter", `query parameter "${param.name}" is fixed by the path key; not exposed as input`, pp);
       continue;
     }
     let base = propertyNameFrom(param.name);
@@ -309,10 +324,12 @@ function mapOperation(ctx: OperationContext) {
       method,
       pathTemplate: path,
       parameters,
+      ...(key.fixedQuery ? { fixedQuery: key.fixedQuery } : {}),
       ...(body ? { body } : {}),
       response: response.mapping,
     },
-    sideEffect: classifyHttpOperation({ method, name: op.operationId ?? id, pathTemplate: path }),
+    // The fragment (e.g. Box's "#remove_shared_link") often names the action, so it counts as a name hint.
+    sideEffect: classifyHttpOperation({ method, name: [op.operationId ?? id, key.fragment ?? ""].join(" "), pathTemplate: path }),
     ...(auth !== undefined ? { auth } : {}),
     provenance: { kind: "spec" as const, sourceRef: pointer, ...(op.operationId ? { originalId: op.operationId } : {}) },
     confidence,
@@ -398,6 +415,26 @@ function resolveBaseUrl(doc: OpenApiDocument, options: MapOpenApiOptions, diagno
   const checked = BaseUrl.safeParse(url);
   if (!checked.success) return error("invalid_base_url", `base URL "${url}" is not allowed: ${checked.error.issues.map((i) => i.message).join(", ")}`);
   return checked.data;
+}
+
+/**
+ * OpenAPI path keys may not contain a query or fragment, but real specs do:
+ * Box labels variants of one endpoint with `#fragment`, OpenAI adds `?beta=true`.
+ * The fragment is never sent; literal query pairs become fixed query parameters.
+ */
+export function splitPathKey(key: string): { template: string; fixedQuery?: Record<string, string>; fragment?: string } {
+  const hashAt = key.indexOf("#");
+  const fragment = hashAt >= 0 ? key.slice(hashAt + 1) : undefined;
+  const withoutFragment = hashAt >= 0 ? key.slice(0, hashAt) : key;
+  const queryAt = withoutFragment.indexOf("?");
+  const template = queryAt >= 0 ? withoutFragment.slice(0, queryAt) : withoutFragment;
+  const result: { template: string; fixedQuery?: Record<string, string>; fragment?: string } = { template: template || "/" };
+  if (queryAt >= 0) {
+    const pairs = [...new URLSearchParams(withoutFragment.slice(queryAt + 1))];
+    if (pairs.length > 0) result.fixedQuery = Object.fromEntries(pairs);
+  }
+  if (fragment) result.fragment = fragment;
+  return result;
 }
 
 function pickRequestMediaType(types: string[]): string | undefined {

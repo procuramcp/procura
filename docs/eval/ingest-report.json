@@ -4,8 +4,8 @@
     "mapped": 12,
     "rejected": 1,
     "operationsInDocuments": 1342,
-    "operationsInIr": 1315,
-    "operationsSkipped": 26,
+    "operationsInIr": 1341,
+    "operationsSkipped": 0,
     "operationsInRejectedDocuments": 1
   },
   "documents": [
@@ -113,26 +113,26 @@
       },
       "operations": {
         "document": 297,
-        "ir": 278,
-        "skipped": 19
+        "ir": 297,
+        "skipped": 0
       },
       "diagnostics": {
         "warningsByCode": {
           "binary_request_body": 4,
           "response_media_type_unspecified": 6
         },
-        "errorsByCode": {
-          "ir_validation_failed": 19
-        },
-        "infosByCode": {}
+        "errorsByCode": {},
+        "infosByCode": {
+          "path_key_fragment": 19
+        }
       },
       "sideEffects": {
         "classCounts": {
-          "read": 123,
-          "write": 110,
-          "destructive": 45
+          "read": 129,
+          "write": 120,
+          "destructive": 48
         },
-        "nameHeuristicEscalations": 2
+        "nameHeuristicEscalations": 5
       },
       "confidence": {
         "mean": 0.895,
@@ -140,19 +140,19 @@
       },
       "schemas": {
         "input": {
-          "total": 278,
-          "strictAjvCompiles": 278
+          "total": 297,
+          "strictAjvCompiles": 297
         },
         "output": {
-          "total": 228,
-          "strictAjvCompiles": 228
+          "total": 247,
+          "strictAjvCompiles": 247
         }
       },
-      "compactIrBytes": 3009493,
+      "compactIrBytes": 3716280,
       "topDiagnostics": [
         {
-          "code": "ir_validation_failed",
-          "severity": "error",
+          "code": "path_key_fragment",
+          "severity": "info",
           "count": 19
         },
         {
@@ -166,58 +166,7 @@
           "count": 4
         }
       ],
-      "errorSamples": [
-        {
-          "code": "ir_validation_failed",
-          "operationId": "get_files_id_get_shared_link",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "get_folders_id_get_shared_link",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "get_shared_items_app_items",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "get_shared_items_folders",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "get_shared_items_web_links",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "get_web_links_id_get_shared_link",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "post_metadata_templates_schema_classifications",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "post_oauth2_token_refresh",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "put_files_id_add_shared_link",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "put_files_id_remove_shared_link",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        }
-      ]
+      "errorSamples": []
     },
     {
       "id": "discord-v10",
@@ -237,6 +186,7 @@
       "diagnostics": {
         "warningsByCode": {
           "binary_request_body": 3,
+          "empty_enum": 2,
           "unsupported_oauth_flow": 1
         },
         "errorsByCode": {},
@@ -257,19 +207,24 @@
       "schemas": {
         "input": {
           "total": 250,
-          "strictAjvCompiles": 248
+          "strictAjvCompiles": 250
         },
         "output": {
           "total": 189,
           "strictAjvCompiles": 189
         }
       },
-      "compactIrBytes": 3246415,
+      "compactIrBytes": 3246395,
       "topDiagnostics": [
         {
           "code": "binary_request_body",
           "severity": "warning",
           "count": 3
+        },
+        {
+          "code": "empty_enum",
+          "severity": "warning",
+          "count": 2
         },
         {
           "code": "unsupported_oauth_flow",
@@ -549,43 +504,43 @@
       },
       "operations": {
         "document": 376,
-        "ir": 369,
-        "skipped": 7
+        "ir": 376,
+        "skipped": 0
       },
       "diagnostics": {
         "warningsByCode": {
           "binary_request_body": 9,
+          "path_key_query": 7,
           "response_media_type_unspecified": 9,
+          "unknown_schema_keyword": 1,
           "wildcard_media_type": 1
         },
-        "errorsByCode": {
-          "ir_validation_failed": 7
-        },
+        "errorsByCode": {},
         "infosByCode": {}
       },
       "sideEffects": {
         "classCounts": {
-          "read": 163,
-          "write": 153,
-          "destructive": 53
+          "read": 165,
+          "write": 157,
+          "destructive": 54
         },
         "nameHeuristicEscalations": 0
       },
       "confidence": {
-        "mean": 0.892,
+        "mean": 0.893,
         "min": 0.7
       },
       "schemas": {
         "input": {
-          "total": 369,
-          "strictAjvCompiles": 369
+          "total": 376,
+          "strictAjvCompiles": 376
         },
         "output": {
-          "total": 360,
-          "strictAjvCompiles": 359
+          "total": 367,
+          "strictAjvCompiles": 367
         }
       },
-      "compactIrBytes": 5108873,
+      "compactIrBytes": 6317643,
       "topDiagnostics": [
         {
           "code": "binary_request_body",
@@ -598,9 +553,14 @@
           "count": 9
         },
         {
-          "code": "ir_validation_failed",
-          "severity": "error",
+          "code": "path_key_query",
+          "severity": "warning",
           "count": 7
+        },
+        {
+          "code": "unknown_schema_keyword",
+          "severity": "warning",
+          "count": 1
         },
         {
           "code": "wildcard_media_type",
@@ -608,43 +568,7 @@
           "count": 1
         }
       ],
-      "errorSamples": [
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_cancel_response",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_compactconversation",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_create_response",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_delete_response",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_get_response",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_getinputtokencounts",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        },
-        {
-          "code": "ir_validation_failed",
-          "operationId": "beta_list_input_items",
-          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
-        }
-      ]
+      "errorSamples": []
     },
     {
       "id": "swagger-petstore-v3",

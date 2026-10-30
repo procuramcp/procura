@@ -93,4 +93,36 @@ describe("SchemaConverter (OpenAPI 3.0 → JSON Schema 2020-12)", () => {
     expect(() => convert({ $ref: "other.yaml#/X" })).toThrow(/external \$ref/);
     expect(() => convert({ $ref: "#/components/schemas/Missing" })).toThrow(/not found/);
   });
+
+  it("drops keywords that are not JSON Schema and reports each once", () => {
+    const notes: string[] = [];
+    const c = new SchemaConverter(doc({}), "3.0", (code, message) => notes.push(`${code}: ${message}`));
+    const out = c.convert(
+      { type: "object", optional: true, properties: { a: { type: "string", optional: true }, b: { $id: "x", type: "string" } } },
+      "output",
+      "#/test",
+      new Set(),
+    );
+    expect(out).toEqual({ type: "object", properties: { a: { type: "string" }, b: { type: "string" } } });
+    expect(notes).toEqual([
+      'unknown_schema_keyword: "optional" is not a JSON Schema 2020-12 keyword; dropped (first seen here)',
+      'unknown_schema_keyword: "$id" is not a JSON Schema 2020-12 keyword; dropped (first seen here)',
+    ]);
+  });
+
+  it("drops an empty enum, which would accept nothing", () => {
+    const notes: string[] = [];
+    const c = new SchemaConverter(doc({ Status: { type: "string", enum: ["a", "b"] } }), "3.1", (code) => notes.push(code));
+    const out = c.convert({ type: "string", enum: [], allOf: [{ $ref: "#/components/schemas/Status" }] }, "input", "#/test", new Set());
+    expect(out).toEqual({ type: "string", allOf: [{ $ref: "#/$defs/Status" }] });
+    expect(notes).toEqual(["empty_enum"]);
+  });
+
+  it("converts contentSchema as a schema", () => {
+    expect(convert({ type: "string", contentMediaType: "application/json", contentSchema: { type: "object", nullable: true } }).root).toEqual({
+      type: "string",
+      contentMediaType: "application/json",
+      contentSchema: { type: ["object", "null"] },
+    });
+  });
 });
