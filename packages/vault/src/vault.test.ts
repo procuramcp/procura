@@ -8,7 +8,7 @@ import { Vault } from "./vault.ts";
 
 const A = TenantId.parse("tenant-a");
 const B = TenantId.parse("tenant-b");
-const SECRET = "sk_live_correct-horse-battery-staple";
+const SECRET = "fake-test-secret-correct-horse-battery-staple";
 
 let store: InMemoryVaultStore;
 let wrapper: LocalKeyWrapper;
