@@ -159,3 +159,25 @@ planning handoff are not repeated here unless implementation added something.
   style lints (`strictTypes`, `strictRequired`) are off because they reject valid schemas.
 - **Rejected:** Pulling a large share of APIs.guru (skews toward one conversion pipeline, and
   repository bloat); fetching at eval time (non-deterministic, needs network in CI).
+
+## D-018 Hosting: one container image, hosted first, self-host next
+
+- **Decision:** The MCP server, runtime, vault, and GraphQL API ship as one Node container image.
+  We run our hosted deployment from that image on a container platform; the web UI (Next.js) stays
+  on Vercel. Self-hosting uses the same image with `docker compose` (milestone 2b, right after
+  tenancy and OAuth exist).
+- **Requirements kept minimal:** Postgres and a master key (or a KMS) are the only required
+  dependencies. Redis, Neon, and Vercel are choices for our deployment, not dependencies of the
+  code. All configuration is environment variables validated with Zod at startup.
+- **Why a container rather than serverless functions:** MCP sessions, streaming responses, and
+  per-tenant throttling are simpler in a long-running process, and a container platform can give
+  a stable egress IP, which matters for upstreams that rate-limit per IP (Intervals.icu). The
+  same image is then the self-host artifact for free.
+- **Why offer self-hosting:** users' upstream credentials never leave their infrastructure, they
+  don't share our egress IP or quotas, and it keeps the architecture honest about its adapter
+  boundaries.
+- **Parked:** a hybrid mode where we host the UI and configuration and a user-run runner holds
+  credentials and calls upstream APIs. Strongest privacy story, but it needs a secure
+  runner-to-control-plane channel; revisit if users ask for it.
+- **Open:** which container platform for our deployment (Fly.io, Cloud Run, Railway, or similar),
+  and Neon/Upstash free-tier limits. Decide in milestone 2 against current pricing and limits.
