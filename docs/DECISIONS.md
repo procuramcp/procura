@@ -143,3 +143,11 @@ planning handoff are not repeated here unless implementation added something.
 - **Open:** Which throughput settings to expose. Current plan: automatic limits from upstream hints
   and `Retry-After`/rate-limit headers, a few advanced settings (requests per minute, concurrency,
   read cache time), and metrics to judge whether more are worth adding.
+
+## D-017 Ingest eval corpus is a fixed, redistributable snapshot
+
+- **Decision:** `packages/eval/corpus/manifest.json` pins a vendored corpus by URL, SHA-256, and
+  retrieval date. The corpus mixes OpenAPI 3.0/3.1 plus one Swagger 2.0 document and reuses the
+  existing Intervals.icu fixture by path.
+- **Why:** Eval output must be deterministic and fully offline. Pinning exact bytes makes report
+  diffs meaningful and keeps `pnpm eval:ingest` reproducible in CI and local runs.

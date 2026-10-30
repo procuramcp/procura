@@ -1,0 +1,613 @@
+{
+  "summary": {
+    "corpusEntries": 12,
+    "mapped": 11,
+    "rejected": 1,
+    "operationsInDocuments": 2165,
+    "operationsInIr": 986,
+    "operationsSkipped": 1179
+  },
+  "documents": [
+    {
+      "id": "apisguru-listennotes-v2",
+      "file": "apisguru/listennotes_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/listennotes.com/2.0/openapi.yaml",
+      "license": "CC0-1.0",
+      "sha256": "51b15eb0e703c26eece40c964245c0434cb0e8ff7a419be2cd6fd9dcebd93216",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 24,
+        "ir": 24,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 20,
+          "write": 3,
+          "destructive": 1
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 24,
+          "strictAjvCompiles": 24
+        },
+        "output": {
+          "total": 24,
+          "strictAjvCompiles": 24
+        }
+      },
+      "compactIrBytes": 196445,
+      "topDiagnostics": []
+    },
+    {
+      "id": "apisguru-urlbox-v1",
+      "file": "apisguru/urlbox_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/urlbox.io/v1/openapi.yaml",
+      "license": "CC0-1.0",
+      "sha256": "803c92283eeb122de18f87dd8b390c933c4fb4f94da78ea8e5c16e12517bd8ba",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 1,
+        "ir": 1,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 0,
+          "write": 1,
+          "destructive": 0
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 1,
+          "strictAjvCompiles": 0
+        },
+        "output": {
+          "total": 1,
+          "strictAjvCompiles": 1
+        }
+      },
+      "compactIrBytes": 3871,
+      "topDiagnostics": []
+    },
+    {
+      "id": "intervals-icu",
+      "file": "../../ingest/fixtures/intervals-icu/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/yerzhansa/intervals-icu-api/main/openapi.json",
+      "license": "MIT",
+      "sha256": "f067e5e8ce21aaeb6fa959a72f7a3404d13871ba16baa1488ccb54c5e7ad07b2",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 148,
+        "ir": 148,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "auth_conjunction_unsatisfiable": 1,
+          "response_media_type_unspecified": 17,
+          "wildcard_media_type": 131
+        },
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 79,
+          "write": 55,
+          "destructive": 14
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.8,
+        "min": 0.8
+      },
+      "schemas": {
+        "input": {
+          "total": 148,
+          "strictAjvCompiles": 148
+        },
+        "output": {
+          "total": 131,
+          "strictAjvCompiles": 131
+        }
+      },
+      "compactIrBytes": 886838,
+      "topDiagnostics": [
+        {
+          "code": "wildcard_media_type",
+          "severity": "warning",
+          "count": 131
+        },
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 17
+        },
+        {
+          "code": "auth_conjunction_unsatisfiable",
+          "severity": "warning",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "kubernetes-openapi-v2",
+      "file": "kubernetes/swagger.json",
+      "sourceUrl": "https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/openapi-spec/swagger.json",
+      "license": "Apache-2.0",
+      "sha256": "93fe8c3c3b388e5e1a6e9396ed264d8c0c1b89b1659e30f46db20883e6cd96f4",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "rejected",
+        "fatalCode": "unsupported_version"
+      },
+      "operations": {
+        "document": 1172,
+        "ir": 0,
+        "skipped": 1172
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {
+          "unsupported_version": 1
+        },
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 0,
+          "write": 0,
+          "destructive": 0
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": null,
+      "schemas": {
+        "input": {
+          "total": 0,
+          "strictAjvCompiles": 0
+        },
+        "output": {
+          "total": 0,
+          "strictAjvCompiles": 0
+        }
+      },
+      "compactIrBytes": 0,
+      "topDiagnostics": [
+        {
+          "code": "unsupported_version",
+          "severity": "error",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "openai-openapi",
+      "file": "openai/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/main/openapi.yaml",
+      "license": "MIT",
+      "sha256": "aea81bdac8b83352defafcacf548fe859b5005716e64d3e25e6c79489fddd756",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 376,
+        "ir": 369,
+        "skipped": 7
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 9,
+          "response_media_type_unspecified": 9,
+          "wildcard_media_type": 1
+        },
+        "errorsByCode": {
+          "ir_validation_failed": 7
+        },
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 163,
+          "write": 153,
+          "destructive": 53
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.892,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 369,
+          "strictAjvCompiles": 345
+        },
+        "output": {
+          "total": 360,
+          "strictAjvCompiles": 329
+        }
+      },
+      "compactIrBytes": 5108873,
+      "topDiagnostics": [
+        {
+          "code": "binary_request_body",
+          "severity": "warning",
+          "count": 9
+        },
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 9
+        },
+        {
+          "code": "ir_validation_failed",
+          "severity": "error",
+          "count": 7
+        },
+        {
+          "code": "wildcard_media_type",
+          "severity": "warning",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "twilio-accounts-v1-json",
+      "file": "twilio/twilio_accounts_v1.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_accounts_v1.json",
+      "license": "MIT",
+      "sha256": "a21ff11add2e8ce407423bd6841744de9ae0bc21ca28054150c61ae4e8f0f684",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 20,
+        "ir": 20,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 6,
+          "write": 10,
+          "destructive": 4
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 20,
+          "strictAjvCompiles": 20
+        },
+        "output": {
+          "total": 16,
+          "strictAjvCompiles": 16
+        }
+      },
+      "compactIrBytes": 42452,
+      "topDiagnostics": []
+    },
+    {
+      "id": "twilio-api-v2010-json",
+      "file": "twilio/twilio_api_v2010.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+      "license": "MIT",
+      "sha256": "bfdf249a129819af274d6bdc7672156ea3416ad48670a6f0544def6ef386ba87",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 197,
+        "ir": 197,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "no_success_response": 1
+        },
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 101,
+          "write": 64,
+          "destructive": 32
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.899,
+        "min": 0.8
+      },
+      "schemas": {
+        "input": {
+          "total": 197,
+          "strictAjvCompiles": 197
+        },
+        "output": {
+          "total": 164,
+          "strictAjvCompiles": 99
+        }
+      },
+      "compactIrBytes": 1037120,
+      "topDiagnostics": [
+        {
+          "code": "no_success_response",
+          "severity": "warning",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "twilio-conversations-v2-yaml",
+      "file": "twilio/twilio_conversations_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_conversations_v2.yaml",
+      "license": "MIT",
+      "sha256": "5c3ce298f390c070f5ec02a0001609583318dc4481661ec4904c421290980ace",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 22,
+        "ir": 22,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 10,
+          "write": 10,
+          "destructive": 2
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 22,
+          "strictAjvCompiles": 22
+        },
+        "output": {
+          "total": 22,
+          "strictAjvCompiles": 22
+        }
+      },
+      "compactIrBytes": 159894,
+      "topDiagnostics": []
+    },
+    {
+      "id": "twilio-sync-v1-yaml",
+      "file": "twilio/twilio_sync_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_sync_v1.yaml",
+      "license": "MIT",
+      "sha256": "48d7c85e2c09231688d6b5d3ef3a2da4e7517a01e6675683940ed4e40153eb2d",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 48,
+        "ir": 48,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 20,
+          "write": 18,
+          "destructive": 10
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 48,
+          "strictAjvCompiles": 48
+        },
+        "output": {
+          "total": 38,
+          "strictAjvCompiles": 18
+        }
+      },
+      "compactIrBytes": 172157,
+      "topDiagnostics": []
+    },
+    {
+      "id": "twilio-taskrouter-v1-yaml",
+      "file": "twilio/twilio_taskrouter_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_taskrouter_v1.yaml",
+      "license": "MIT",
+      "sha256": "1553e1e453f481135210531b01610d7ca0e6dae273c030d9566e0848cf9d7491",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 61,
+        "ir": 61,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 36,
+          "write": 18,
+          "destructive": 7
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 61,
+          "strictAjvCompiles": 61
+        },
+        "output": {
+          "total": 54,
+          "strictAjvCompiles": 20
+        }
+      },
+      "compactIrBytes": 295477,
+      "topDiagnostics": []
+    },
+    {
+      "id": "twilio-verify-v2-json",
+      "file": "twilio/twilio_verify_v2.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_verify_v2.json",
+      "license": "MIT",
+      "sha256": "bee888a5f4c53e422604cafbd610ffe23b46db5789dab9ef516980a188e480bb",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 57,
+        "ir": 57,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 24,
+          "write": 25,
+          "destructive": 8
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 57,
+          "strictAjvCompiles": 57
+        },
+        "output": {
+          "total": 49,
+          "strictAjvCompiles": 32
+        }
+      },
+      "compactIrBytes": 239597,
+      "topDiagnostics": []
+    },
+    {
+      "id": "twilio-video-v1-json",
+      "file": "twilio/twilio_video_v1.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_video_v1.json",
+      "license": "MIT",
+      "sha256": "162f62d432a227cb5aab8da45af7bbfceca5569feff4e26529504583946d1383",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 39,
+        "ir": 39,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 22,
+          "write": 13,
+          "destructive": 4
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 39,
+          "strictAjvCompiles": 39
+        },
+        "output": {
+          "total": 35,
+          "strictAjvCompiles": 17
+        }
+      },
+      "compactIrBytes": 189616,
+      "topDiagnostics": []
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "entries": [
+    {
+      "id": "apisguru-listennotes-v2",
+      "file": "apisguru/listennotes_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/listennotes.com/2.0/openapi.yaml",
+      "license": "CC0-1.0",
+      "sha256": "51b15eb0e703c26eece40c964245c0434cb0e8ff7a419be2cd6fd9dcebd93216",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "apisguru-urlbox-v1",
+      "file": "apisguru/urlbox_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/urlbox.io/v1/openapi.yaml",
+      "license": "CC0-1.0",
+      "sha256": "803c92283eeb122de18f87dd8b390c933c4fb4f94da78ea8e5c16e12517bd8ba",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "intervals-icu",
+      "file": "../../ingest/fixtures/intervals-icu/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/yerzhansa/intervals-icu-api/main/openapi.json",
+      "license": "MIT",
+      "sha256": "f067e5e8ce21aaeb6fa959a72f7a3404d13871ba16baa1488ccb54c5e7ad07b2",
+      "retrievedOn": "2026-10-30",
+      "notes": "Reuses the ingest fixture by path; not duplicated in eval/corpus."
+    },
+    {
+      "id": "kubernetes-openapi-v2",
+      "file": "kubernetes/swagger.json",
+      "sourceUrl": "https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/openapi-spec/swagger.json",
+      "license": "Apache-2.0",
+      "sha256": "93fe8c3c3b388e5e1a6e9396ed264d8c0c1b89b1659e30f46db20883e6cd96f4",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "openai-openapi",
+      "file": "openai/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/main/openapi.yaml",
+      "license": "MIT",
+      "sha256": "aea81bdac8b83352defafcacf548fe859b5005716e64d3e25e6c79489fddd756",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-accounts-v1-json",
+      "file": "twilio/twilio_accounts_v1.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_accounts_v1.json",
+      "license": "MIT",
+      "sha256": "a21ff11add2e8ce407423bd6841744de9ae0bc21ca28054150c61ae4e8f0f684",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-api-v2010-json",
+      "file": "twilio/twilio_api_v2010.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+      "license": "MIT",
+      "sha256": "bfdf249a129819af274d6bdc7672156ea3416ad48670a6f0544def6ef386ba87",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-conversations-v2-yaml",
+      "file": "twilio/twilio_conversations_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_conversations_v2.yaml",
+      "license": "MIT",
+      "sha256": "5c3ce298f390c070f5ec02a0001609583318dc4481661ec4904c421290980ace",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-sync-v1-yaml",
+      "file": "twilio/twilio_sync_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_sync_v1.yaml",
+      "license": "MIT",
+      "sha256": "48d7c85e2c09231688d6b5d3ef3a2da4e7517a01e6675683940ed4e40153eb2d",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-taskrouter-v1-yaml",
+      "file": "twilio/twilio_taskrouter_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_taskrouter_v1.yaml",
+      "license": "MIT",
+      "sha256": "1553e1e453f481135210531b01610d7ca0e6dae273c030d9566e0848cf9d7491",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-verify-v2-json",
+      "file": "twilio/twilio_verify_v2.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_verify_v2.json",
+      "license": "MIT",
+      "sha256": "bee888a5f4c53e422604cafbd610ffe23b46db5789dab9ef516980a188e480bb",
+      "retrievedOn": "2026-10-30"
+    },
+    {
+      "id": "twilio-video-v1-json",
+      "file": "twilio/twilio_video_v1.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_video_v1.json",
+      "license": "MIT",
+      "sha256": "162f62d432a227cb5aab8da45af7bbfceca5569feff4e26529504583946d1383",
+      "retrievedOn": "2026-10-30"
+    }
+  ]
+}
