@@ -16,7 +16,7 @@ Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted fi
 | `packages/eval` | Offline eval of the ingestor over a corpus of public API descriptions. | ✅ |
 | `packages/vault` | Envelope-encrypted credential storage (per-tenant data keys, master key or KMS). | ✅ |
 | `packages/runtime` | Runs a tool call: input validation, auth, egress rules, throttling, audit. | ✅ |
-| `packages/db`, `api`, `mcp`, `web`, `backtest` | Added with their milestones | — |
+| `packages/db`, `api`, `mcp`, `web` | Added with their milestones | — |
 
 Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
 [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/sources/`](docs/sources/) (per-API findings).
@@ -46,5 +46,8 @@ To call Intervals.icu with your own key: copy `.env.example` to `.env`, set `INT
 
 ## Data and secrets
 
-Never commit secrets, `.env` files, or real training/wellness data. Fixtures are synthetic or
-public API descriptions. Analyzer output is training-load guidance, not medical advice.
+Never commit secrets, `.env` files, or real personal data from any API. Fixtures are synthetic
+or public API descriptions.
+
+cairnmcp returns each API's output as-is. It doesn't analyze or interpret data; that belongs to
+whatever agent or app consumes the tools.

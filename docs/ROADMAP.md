@@ -11,7 +11,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 | 3 | Curation UI, side-effect classification review, egress hardening | — |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
-| 6 | Analyzer tool pack: detector, backtest, `get_recent_flags`, `explain_flag` | — |
+| 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
 | 7 | Docs: architecture diagram, threat model, decisions doc, eval report | Ingest eval started (`packages/eval`) |
 | — | Hybrid runner: hosted control plane, credential-holding runner in the user's infra | Parked until users ask (D-018) |
 
