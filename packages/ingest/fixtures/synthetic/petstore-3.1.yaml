@@ -1,0 +1,87 @@
+# Synthetic OpenAPI 3.1 document for mapper tests. Not a real API.
+openapi: 3.1.0
+info:
+  title: Synthetic Pet Store
+  version: "2.0"
+servers:
+  - url: https://{region}.pets.example.com/v2
+    variables:
+      region:
+        default: eu
+security:
+  - oauth: [pets:read]
+components:
+  securitySchemes:
+    oauth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+          scopes:
+            pets:read: Read pets
+            pets:write: Change pets
+  parameters:
+    PetId:
+      name: petId
+      in: path
+      required: true
+      schema: { type: string }
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, readOnly: true }
+        name: { type: string }
+        tag: { type: [string, "null"] }
+        parent: { $ref: "#/components/schemas/Pet", description: "The parent pet, if known" }
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List pets
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, maximum: 100 } }
+        - { name: Accept, in: header, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Pet" } }
+    post:
+      operationId: createPet
+      summary: Create a pet
+      security:
+        - oauth: [pets:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Pet" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+  /pets/{petId}:
+    parameters:
+      - $ref: "#/components/parameters/PetId"
+    delete:
+      operationId: deletePet
+      summary: Delete a pet
+      responses:
+        "204": { description: deleted }
+    get:
+      operationId: getPet
+      summary: Get a pet
+      parameters:
+        - { name: petId, in: query, schema: { type: string }, description: "Also a query param, to force a name collision" }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }

@@ -1,0 +1,296 @@
+GET    /api/v1/activity/{id}
+       get_activity [read] (id, intervals?) → schema/json c=0.8
+PUT    /api/v1/activity/{id}
+       update_activity [write] (id, body:application/json) → schema/json c=0.8
+DELETE /api/v1/activity/{id}
+       delete_activity [destructive] (id) → schema/json c=0.8
+GET    /api/v1/activity/{id}/best-efforts
+       find_best_efforts [read] (id, stream, duration?, distance?, count?, minValue?, excludeIntervals?, startIndex?, endIndex?) → schema/json c=0.8
+PUT    /api/v1/activity/{id}/delete-intervals
+       delete_intervals [destructive*] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/activity/{id}/file
+       download_activity_file [read] (id) → untyped/auto c=0.8
+GET    /api/v1/activity/{id}/fit-file
+       download_activity_fit_file [read] (id, power?, hr?) → untyped/auto c=0.8
+GET    /api/v1/activity/{id}/gap-histogram
+       get_gap_histogram [read] (id) → schema/json c=0.8
+GET    /api/v1/activity/{id}/gpx-file
+       download_activity_gpx_file [read] (id, power?, hr?) → untyped/auto c=0.8
+GET    /api/v1/activity/{id}/hr-curve{ext}
+       get_activity_hr_curve [read] (id, ext) → schema/json c=0.8
+GET    /api/v1/activity/{id}/hr-histogram
+       get_hr_histogram [read] (id, bucketSize?) → schema/json c=0.8
+GET    /api/v1/activity/{id}/hr-load-model
+       get_hr_training_load_model [read] (id) → schema/json c=0.8
+GET    /api/v1/activity/{id}/interval-stats
+       get_interval_stats [read] (id, start_index, end_index) → schema/json c=0.8
+GET    /api/v1/activity/{id}/intervals
+       get_intervals [read] (id) → schema/json c=0.8
+PUT    /api/v1/activity/{id}/intervals
+       update_intervals [write] (id, all?, body:application/json) → schema/json c=0.8
+PUT    /api/v1/activity/{id}/intervals/{intervalId}
+       update_interval [write] (id, intervalId, body:application/json) → schema/json c=0.8
+GET    /api/v1/activity/{id}/map
+       get_activity_map [read] (id, bounds?, boundsOnly?, weather?) → schema/json c=0.8
+GET    /api/v1/activity/{id}/messages
+       list_activity_messages [read] (id, sinceId?, limit?) → schema/json c=0.8
+POST   /api/v1/activity/{id}/messages
+       send_activity_message [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/activity/{id}/pace-curve{ext}
+       get_activity_pace_curve [read] (id, gap?, ext) → schema/json c=0.8
+GET    /api/v1/activity/{id}/pace-histogram
+       get_pace_histogram [read] (id) → schema/json c=0.8
+GET    /api/v1/activity/{id}/power-curves{ext}
+       list_activity_power_curves_1 [read] (id, ext, types?, fatigue?) → schema/json c=0.8
+GET    /api/v1/activity/{id}/power-curve{ext}
+       get_activity_power_curve [read] (id, ext, fatigue?) → schema/json c=0.8
+GET    /api/v1/activity/{id}/power-histogram
+       get_power_histogram [read] (id, bucketSize?) → schema/json c=0.8
+GET    /api/v1/activity/{id}/power-spike-model
+       get_activity_power_spike_model [read] (id) → schema/json c=0.8
+GET    /api/v1/activity/{id}/power-vs-hr{ext}
+       get_power_vs_hr [read] (id, ext) → schema/json c=0.8
+GET    /api/v1/activity/{id}/segments
+       get_activity_segments [read] (id) → schema/json c=0.8
+PUT    /api/v1/activity/{id}/split-interval
+       split_interval [write] (id, splitAt) → schema/json c=0.8
+PUT    /api/v1/activity/{id}/streams
+       update_activity_streams [write] (id, body:application/json) → schema/json c=0.8
+PUT    /api/v1/activity/{id}/streams.csv
+       upload_activity_streams_csv [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/activity/{id}/streams{ext}
+       get_activity_streams [read] (id, ext, types?, includeDefaults?) → schema/json c=0.8
+GET    /api/v1/activity/{id}/time-at-hr
+       get_time_at_hr [read] (id) → schema/json c=0.8
+DELETE /api/v1/activity/{id}/tombstone
+       delete_tombstone [destructive] (id) → untyped/auto c=0.8
+GET    /api/v1/activity/{id}/weather-summary
+       get_activity_weather_summary [read] (id, start_index?, end_index?, descr_config?) → schema/json c=0.8
+PUT    /api/v1/athlete-plans
+       update_athlete_plans [write] (body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{athleteId}/activities/{ids}
+       get_activities [read] (athleteId, ids, intervals?) → schema/json c=0.8
+GET    /api/v1/athlete/{athleteId}/sport-settings
+       list_settings [read] (athleteId) → schema/json c=0.8
+PUT    /api/v1/athlete/{athleteId}/sport-settings
+       update_settings_multi [write] (athleteId, recalcHrZones, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{athleteId}/sport-settings
+       create_settings [write] (athleteId, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{athleteId}/sport-settings/{id}
+       get_settings_1 [read] (athleteId, id) → schema/json c=0.8
+PUT    /api/v1/athlete/{athleteId}/sport-settings/{id}
+       update_settings [write] (athleteId, id, recalcHrZones, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{athleteId}/sport-settings/{id}
+       delete_settings [destructive] (athleteId, id) → schema/json c=0.8
+PUT    /api/v1/athlete/{athleteId}/sport-settings/{id}/apply
+       apply_to_activities [write] (athleteId, id) → schema/json c=0.8
+GET    /api/v1/athlete/{athleteId}/sport-settings/{id}/matching-activities
+       list_matching_activities [read] (athleteId, id) → schema/json c=0.8
+GET    /api/v1/athlete/{athleteId}/sport-settings/{id}/pace_distances
+       list_pace_distances_for_sport [read] (athleteId, id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}
+       get_athlete [read] (id) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}
+       update_athlete [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activities
+       list_activities [read] (id, oldest, newest?, route_id?, limit?, fields?) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/activities
+       upload_activity [write] (id, name?, description?, device_name?, external_id?, paired_event_id?, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activities-around
+       list_activities_around [read] (id, activity_id, route_id?, limit?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activities.csv
+       download_activities_as_csv [read] (id) → untyped/auto c=0.8
+GET    /api/v1/athlete/{id}/activities/interval-search
+       search_for_intervals [read] (id, minSecs, maxSecs, minIntensity, maxIntensity, type?, minReps?, maxReps?, limit?) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/activities/manual
+       create_manual_activity [write] (id, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/activities/manual/bulk
+       create_multiple_manual_activities [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activities/search
+       search_for_activities [read] (id, q, limit?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activities/search-full
+       search_for_activities_full [read] (id, q, limit?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activity-hr-curves{ext}
+       list_activity_hr_curves [read] (id, ext, oldest, newest, filters?, secs?, type?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activity-pace-curves{ext}
+       list_activity_pace_curves [read] (id, ext, oldest, newest, type?, filters?, distances?, gap?) → untyped/auto c=0.8
+GET    /api/v1/athlete/{id}/activity-power-curves{ext}
+       list_activity_power_curves [read] (id, ext, oldest, newest, filters?, secs?, type?, fatigue?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/activity-tags
+       list_tags_2 [read] (id) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/apply-plan-changes
+       apply_current_plan_changes [write] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/athlete-summary{ext}
+       get_athlete_summary [read] (id, ext, start?, end?, tags?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/chats
+       list_chats [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/connections
+       get_athlete_connections [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/custom-item
+       list_custom_items [read] (id) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/custom-item
+       create_custom_item [write] (id, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/custom-item-indexes
+       update_custom_item_indexes [write] (id, body:application/json) → untyped/auto c=0.8
+GET    /api/v1/athlete/{id}/custom-item/{itemId}
+       get_custom_item [read] (id, itemId) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/custom-item/{itemId}
+       update_custom_item [write] (id, itemId, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/custom-item/{itemId}
+       delete_custom_item [destructive] (id, itemId) → untyped/auto c=0.8
+POST   /api/v1/athlete/{id}/custom-item/{itemId}/image
+       update_custom_item_image [write] (id, itemId, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/download-fit-files
+       download_activity_fit_files [write] (id, power?, hr?, ids) → untyped/auto c=0.8
+POST   /api/v1/athlete/{id}/download-workout{ext}
+       download_workout_for_athlete [write] (id, ext, body:application/json) → untyped/auto c=0.8
+POST   /api/v1/athlete/{id}/duplicate-events
+       duplicate_events [write] (id, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/duplicate-workouts
+       duplicate_workouts [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/event-tags
+       list_tags_1 [read] (id) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/events
+       update_events [write] (id, oldest, newest, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/events
+       create_event [write] (id, upsertOnUid, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/events
+       delete_events [destructive] (id, oldest, newest?, createdById?, category) → untyped/auto c=0.8
+POST   /api/v1/athlete/{id}/events/apply-plan
+       apply_plan [write] (id, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/events/bulk
+       create_multiple_events [write] (id, upsert?, upsertOnUid, updatePlanApplied, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/events/bulk-delete
+       delete_events_bulk [destructive*] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/events/{eventId}
+       show_event [read] (id, eventId) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/events/{eventId}
+       update_event [write] (id, eventId, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/events/{eventId}
+       delete_event [destructive] (id, eventId, others?, notBefore?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/events/{eventId}/download{ext}
+       download_workout_1 [read] (id, eventId, ext) → untyped/auto c=0.8
+POST   /api/v1/athlete/{id}/events/{eventId}/mark-done
+       mark_event_as_done [write] (id, eventId) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/events{format}
+       list_events [read] (id, format, oldest?, newest?, category?, limit?, calendar_id?, ext?, powerRange?, hrRange?, paceRange?, locale?, resolve?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/fitness-model-events
+       list_fitness_model_events [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/folders
+       list_folders [read] (id) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/folders
+       create_folder [write] (id, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/folders/{folderId}
+       update_folder [write] (id, folderId, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/folders/{folderId}
+       delete_folder [destructive] (id, folderId) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/folders/{folderId}/import-workout
+       import_workout_file [write] (id, folderId, athleteId?, type, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/folders/{folderId}/shared-with
+       list_folder_shared_with [read] (id, folderId) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/folders/{folderId}/shared-with
+       update_folder_shared_with [write] (id, folderId, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/folders/{folderId}/workouts
+       update_plan_workouts [write] (id, folderId, oldest, newest, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/gear
+       create_gear [write] (id, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/gear/{gearId}
+       update_gear [write] (id, gearId, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/gear/{gearId}
+       delete_gear [destructive] (id, gearId) → untyped/auto c=0.8
+GET    /api/v1/athlete/{id}/gear/{gearId}/calc
+       calc_distance_etc [read] (id, gearId) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/gear/{gearId}/reminder
+       create_reminder [write] (id, gearId, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/gear/{gearId}/reminder/{reminderId}
+       update_reminder [write] (id, gearId, reminderId, reset, snoozeDays, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/gear/{gearId}/reminder/{reminderId}
+       delete_reminder [destructive] (id, gearId, reminderId) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/gear/{gearId}/replace
+       replace_gear [write] (id, gearId, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/gear{ext}
+       list_gear [read] (id, ext) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/groups
+       list_groups [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/hr-curves{ext}
+       list_athlete_hr_curves [read] (id, ext, newest?, curves?, type?, subMaxEfforts?, now?, filters?, f1, f2, f3) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/mmp-model
+       get_athlete_mmp_model [read] (id, type) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/pace-curves{ext}
+       list_athlete_pace_curves [read] (id, ext, newest?, curves?, type?, includeRanks?, subMaxEfforts?, now?, gap?, pmType?, filters?, f1, f2, f3) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/power-curves{ext}
+       list_athlete_power_curves [read] (id, ext, newest?, curves?, type, includeRanks?, subMaxEfforts?, now?, pmType?, filters?, f1, f2, f3) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/power-hr-curve
+       get_power_hr_curve [read] (id, start, end, type?, filters?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/profile
+       get_athlete_profile [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/routes
+       list_athlete_routes [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/routes/{route_id}
+       get_athlete_route [read] (id, route_id, includePath?) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/routes/{route_id}
+       update_athlete_route [write] (id, route_id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/routes/{route_id}/similarity/{other_id}
+       check_merge [read] (id, route_id, other_id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/settings/{deviceClass}
+       get_settings [read] (id, deviceClass) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/training-plan
+       get_athlete_training_plan [read] (id) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/training-plan
+       update_athlete_plan [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/weather-config
+       get_weather_config [read] (id) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/weather-config
+       update_weather_config [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/weather-forecast
+       get_forecast [read] (id) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/wellness
+       update_wellness_1 [write] (id, body:application/json) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/wellness
+       upload_wellness [write] (id, ignoreMissingFields?, body:application/json) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/wellness-bulk
+       update_wellness_bulk [write] (id, body:application/json) → untyped/auto c=0.8
+GET    /api/v1/athlete/{id}/wellness/{date}
+       get_record [read] (id, date) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/wellness/{date}
+       update_wellness [write] (id, date, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/wellness{ext}
+       list_wellness_records [read] (id, ext, oldest?, newest?, cols?, fields?) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/workout-tags
+       list_tags [read] (id) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/workouts
+       list_workouts [read] (id) → schema/json c=0.8
+POST   /api/v1/athlete/{id}/workouts
+       create_workout [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/workouts.zip
+       download_workouts [read] (id, ext, oldest, newest, powerRange?, hrRange?, paceRange?, locale?) → untyped/auto c=0.8
+POST   /api/v1/athlete/{id}/workouts/bulk
+       create_multiple_workouts [write] (id, body:application/json) → schema/json c=0.8
+GET    /api/v1/athlete/{id}/workouts/{workoutId}
+       show_workout [read] (id, workoutId) → schema/json c=0.8
+PUT    /api/v1/athlete/{id}/workouts/{workoutId}
+       update_workout [write] (id, workoutId, body:application/json) → schema/json c=0.8
+DELETE /api/v1/athlete/{id}/workouts/{workoutId}
+       delete_workout [destructive] (id, workoutId, others?) → schema/json c=0.8
+GET    /api/v1/athletes
+       list_athletes [read] (ext_id_prefix?) → schema/json c=0.8
+POST   /api/v1/chats/send-message
+       send_message [write] (body:application/json) → schema/json c=0.8
+GET    /api/v1/chats/{id}
+       show_chat [read] (id) → schema/json c=0.8
+GET    /api/v1/chats/{id}/messages
+       list_messages [read] (id, beforeId?, limit?) → schema/json c=0.8
+PUT    /api/v1/chats/{id}/messages/{msgId}
+       update_message [write] (id, msgId, body:application/json) → schema/json c=0.8
+DELETE /api/v1/chats/{id}/messages/{msgId}
+       delete_message [destructive] (id, msgId) → schema/json c=0.8
+PUT    /api/v1/chats/{id}/messages/{msgId}/seen
+       update_last_seen_message_id [write] (id, msgId) → schema/json c=0.8
+DELETE /api/v1/disconnect-app
+       disconnect_app [destructive] () → untyped/auto c=0.8
+POST   /api/v1/download-workout{ext}
+       download_workout [write] (ext, body:application/json) → untyped/auto c=0.8
+GET    /api/v1/pace_distances
+       list_pace_distances [read] () → schema/json c=0.8
+GET    /api/v1/shared-event/{id}
+       get_shared_event [read] (id, fullCourse?) → schema/json c=0.8

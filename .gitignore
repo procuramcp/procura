@@ -1,0 +1,16 @@
+node_modules/
+out/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Secrets: never commit. Use .env.example for documented, empty placeholders.
+.env
+.env.*
+!.env.example
+
+# Real training/wellness exports stay local.
+data/
+exports/
+*.fit
+*.fit.gz

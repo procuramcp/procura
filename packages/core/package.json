@@ -1,0 +1,16 @@
+{
+  "name": "@cairnmcp/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure domain logic and the source-agnostic IR. No database, network, or clock access.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.purity.json"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

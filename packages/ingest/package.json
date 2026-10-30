@@ -1,0 +1,22 @@
+{
+  "name": "@cairnmcp/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ingestors that turn API descriptions into the cairnmcp IR.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "ir:dump": "node scripts/dump-ir.ts"
+  },
+  "dependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0"
+  }
+}
