@@ -114,9 +114,32 @@ planning handoff are not repeated here unless implementation added something.
 - **Why:** Removes a whole class of downgrade mistakes. Full egress policy (private ranges,
   DNS rebinding, redirects) is a runtime concern (milestone 3).
 
-## D-015 Toolsets pin inputs; any policy issue fails the whole toolset
+## D-015 Toolsets pin inputs; structural issues fail the whole toolset
+
+*Policy checks in the original version were removed by D-016.*
 
 - **Decision:** A tool binding can pin input values (hidden from the agent), e.g. Intervals.icu
   athlete `id`. `resolveToolset` returns either all tools or a list of issues, never a partial set.
-- **Why:** Pinning narrows what an agent can reach. Failing closed means a bad edit can't quietly
-  serve a different set of tools than the one reviewed.
+- **Why:** Pinning narrows what an agent can reach. Failing closed on structural issues (unknown
+  operation, pin for a missing input) means a broken edit can't quietly serve a different set of
+  tools than the one reviewed.
+
+## D-016 Self-service hosting; read-only is the only default restriction
+
+- **Decision:** Self-service hosting is in scope (replacing the handoff's "no public signup / no
+  strangers' credentials" non-goal), starting with one user. The product goal is to make hosting an
+  MCP server as easy as possible; cairnmcp's job is to make it secure and to offer throughput
+  settings. A new toolset enables only read operations (`defaultToolset`). That is the only
+  restriction: users can enable any write, destructive, or unverified tool directly, with no
+  further opt-in. `ToolsetPolicy` and its checks are removed; each tool's `enabled` flag is the
+  only switch.
+- **Why:** Gates add friction and duplicate what MCP clients already do with tool annotations.
+  Read-only is a sensible starting point until there is user feedback.
+- **Unchanged:** Side-effect labels and the rule that heuristics can't downgrade them (D-005).
+  They now inform users and clients instead of blocking anything. Credential encryption, tenant
+  isolation, the audit log of writes, and egress hardening protect users without restricting them.
+- **Consequence:** Storing other people's upstream credentials makes the vault, envelope
+  encryption, and isolation tests critical. The threat model (milestone 7) must cover them.
+- **Open:** Which throughput settings to expose. Current plan: automatic limits from upstream hints
+  and `Retry-After`/rate-limit headers, a few advanced settings (requests per minute, concurrency,
+  read cache time), and metrics to judge whether more are worth adding.

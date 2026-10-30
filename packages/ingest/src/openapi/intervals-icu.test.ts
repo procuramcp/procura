@@ -1,7 +1,7 @@
 // Validates the OpenAPI mapper against the real Intervals.icu API description.
 // See fixtures/intervals-icu/PROVENANCE.md for where the fixture came from.
 import { readFileSync } from "node:fs";
-import { IrDocument, resolveToolset, Toolset, type Operation } from "@cairnmcp/core";
+import { defaultToolset, IrDocument, resolveToolset, Toolset, type Operation } from "@cairnmcp/core";
 import { beforeAll, describe, expect, it } from "vitest";
 import { strictAjv } from "../test-support.ts";
 import { ingestOpenApiText } from "./ingest.ts";
@@ -123,18 +123,32 @@ describe("Intervals.icu OpenAPI → IR", () => {
     });
   });
 
-  it("a default toolset can pin the athlete id and refuses writes", () => {
+  it("the default toolset enables the 79 read tools and resolves", () => {
+    const ts = defaultToolset(result.ir, { id: "intervals-default", name: "Intervals.icu" });
+    expect(ts.tools).toHaveLength(148);
+    const r = resolveToolset(ts, result.ir);
+    expect(r.ok && r.tools.length).toBe(79);
+    expect(r.ok && r.tools.every((t) => t.annotations.readOnlyHint)).toBe(true);
+  });
+
+  it("a user-curated toolset can pin the athlete id and enable writes", () => {
     const toolset = Toolset.parse({
-      id: "intervals-readonly",
+      id: "intervals-mine",
       sourceId: "intervals-icu",
-      name: "Intervals.icu (read-only)",
+      name: "Intervals.icu",
       tools: [
         { operationId: "list_activities", name: "list_activities", description: "List my activities between two dates.", pinnedInputs: { id: "0" } },
-        { operationId: "update_activity", name: "update_activity", description: "Update an activity." },
+        // The activity id is a real input here, so it is not pinned.
+        { operationId: "update_activity", name: "update_activity", description: "Update one of my activities by id." },
       ],
     });
     const r = resolveToolset(toolset, result.ir);
-    expect(r).toMatchObject({ ok: false, issues: [{ code: "writes_not_allowed", toolName: "update_activity" }] });
+    if (!r.ok) throw new Error(JSON.stringify(r.issues));
+    expect(r.tools.map((t) => [t.name, t.annotations.readOnlyHint])).toEqual([
+      ["list_activities", true],
+      ["update_activity", false],
+    ]);
+    expect(Object.keys(r.tools[0]!.inputSchema["properties"] as object)).not.toContain("id");
   });
 
   it("matches the reviewed operation summary", async () => {

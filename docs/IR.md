@@ -5,7 +5,7 @@ evals) reads only the IR. Source: `packages/core/src/ir/`.
 
 ```
 IrDocument { irVersion: 1, source: Source, operations: Operation[] }
-Toolset    { id, sourceId, name, policy, tools: ToolBinding[] }   // curated per tenant
+Toolset    { id, sourceId, name, tools: ToolBinding[] }   // curated per tenant
 ```
 
 ## Source
@@ -38,15 +38,17 @@ Invariants enforced by the schema (not just documented):
 - Every input property has exactly one binding, and every binding has a property.
 - Path placeholders and path bindings match one to one; path parameters are required.
 - All `$ref`s point into the schema's own `$defs` and resolve.
-- A non-curated `sideEffect` can't be less severe than the HTTP method implies.
+- A non-curated `sideEffect` can't be less severe than the HTTP method implies. Labels inform
+  users and MCP clients; they never block a tool.
 - Operation ids are unique; auth requirements name existing schemes.
 
 ## Toolset
 
-`policy` defaults to `{ allowWrites: false, allowDestructive: false, allowUnverified: false }`.
-`allowDestructive` requires `allowWrites`. `resolveToolset(toolset, ir)` checks each enabled
-tool against policy and returns either every tool, ready to serve (input schema with pinned
-inputs removed, MCP annotations), or a list of issues.
+Each tool binding has an `enabled` flag; that is the only switch. `defaultToolset(ir, …)` offers
+every operation as a tool and enables only reads. Users can enable anything else directly
+(DECISIONS D-016). `resolveToolset(toolset, ir)` returns either every enabled tool, ready to serve
+(input schema with pinned inputs removed, MCP annotations), or a list of structural issues
+(unknown operation, pin for a missing input, wrong source).
 
 ## Example: Intervals.icu `list_activities`
 

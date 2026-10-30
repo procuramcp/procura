@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { IrDocument } from "./document.ts";
 import { rawDocument, rawOperation } from "./test-helpers.ts";
-import { resolveToolset, Toolset, ToolsetPolicy } from "./toolset.ts";
+import { defaultToolset, resolveToolset, Toolset } from "./toolset.ts";
 
 const ir = IrDocument.parse(
   rawDocument([
@@ -20,21 +20,27 @@ const tool = (operationId: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-const toolset = (tools: unknown[], policy?: unknown) =>
-  Toolset.parse({ id: "demo", sourceId: "example", name: "Demo", tools, ...(policy ? { policy } : {}) });
+const toolset = (tools: unknown[]) => Toolset.parse({ id: "demo", sourceId: "example", name: "Demo", tools });
 
 const issueCodes = (ts: Toolset) => {
   const r = resolveToolset(ts, ir);
   return r.ok ? [] : r.issues.map((i) => i.code);
 };
 
-describe("ToolsetPolicy", () => {
-  it("defaults to read-only, no destructive, no unverified", () => {
-    expect(toolset([]).policy).toEqual({ allowWrites: false, allowDestructive: false, allowUnverified: false });
+describe("defaultToolset", () => {
+  const ts = defaultToolset(ir, { id: "default", name: "Default" });
+
+  it("offers every operation as a tool", () => {
+    expect(ts.tools.map((t) => t.name)).toEqual(ir.operations.map((o) => o.id));
   });
 
-  it("does not allow destructive without writes", () => {
-    expect(ToolsetPolicy.safeParse({ allowDestructive: true }).success).toBe(false);
+  it("enables only read operations (the one safety default)", () => {
+    expect(ts.tools.filter((t) => t.enabled).map((t) => t.name)).toEqual(["get_item", "guess_item"]);
+  });
+
+  it("resolves cleanly", () => {
+    const r = resolveToolset(ts, ir);
+    expect(r.ok && r.tools.map((t) => t.name)).toEqual(["get_item", "guess_item"]);
   });
 });
 
@@ -51,27 +57,17 @@ describe("Toolset", () => {
 });
 
 describe("resolveToolset", () => {
-  it("serves read tools under the default policy", () => {
+  it("serves read tools", () => {
     const r = resolveToolset(toolset([tool("get_item")]), ir);
     expect(r.ok).toBe(true);
   });
 
-  it("refuses writes unless allowed", () => {
-    expect(issueCodes(toolset([tool("update_item")]))).toEqual(["writes_not_allowed"]);
-    expect(issueCodes(toolset([tool("update_item")], { allowWrites: true }))).toEqual([]);
+  it("serves any tool the user enables, whatever its side effect or provenance", () => {
+    const r = resolveToolset(toolset([tool("update_item"), tool("create_item"), tool("delete_item"), tool("guess_item")]), ir);
+    expect(r.ok && r.tools.map((t) => t.name)).toEqual(["update_item", "create_item", "delete_item", "guess_item"]);
   });
 
-  it("refuses destructive operations unless explicitly allowed", () => {
-    expect(issueCodes(toolset([tool("delete_item")], { allowWrites: true }))).toEqual(["destructive_not_allowed"]);
-    expect(issueCodes(toolset([tool("delete_item")], { allowWrites: true, allowDestructive: true }))).toEqual([]);
-  });
-
-  it("refuses inferred operations unless allowed", () => {
-    expect(issueCodes(toolset([tool("guess_item")]))).toEqual(["unverified_not_allowed"]);
-    expect(issueCodes(toolset([tool("guess_item")], { allowUnverified: true }))).toEqual([]);
-  });
-
-  it("skips disabled tools, so a disabled write needs no opt-in", () => {
+  it("skips disabled tools", () => {
     const r = resolveToolset(toolset([tool("get_item"), tool("delete_item", { enabled: false })]), ir);
     expect(r.ok && r.tools.map((t) => t.name)).toEqual(["get_item"]);
   });
@@ -103,10 +99,7 @@ describe("resolveToolset", () => {
 
   it("derives MCP annotations, always setting destructiveHint", () => {
     const r = resolveToolset(
-      toolset(
-        [tool("get_item"), tool("update_item"), tool("create_item"), tool("delete_item")],
-        { allowWrites: true, allowDestructive: true },
-      ),
+      toolset([tool("get_item"), tool("update_item"), tool("create_item"), tool("delete_item")]),
       ir,
     );
     if (!r.ok) throw new Error("expected ok");
