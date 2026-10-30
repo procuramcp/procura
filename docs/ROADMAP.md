@@ -6,10 +6,10 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 | | Milestone | Status |
 | --- | --- | --- |
 | 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
-| 2 | Tenancy (RLS plus isolation tests), MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | — |
+| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | — |
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | — |
-| 3b | Custom and on-behalf-of upstream auth; external identity providers for the MCP endpoint; private-network targets for self-hosted deployments (D-022) | — |
+| 3b | Custom and on-behalf-of upstream auth; external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
 | 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
@@ -18,7 +18,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 
 ## Milestone 2: design rules
 
-Cheap now, expensive to retrofit (D-022):
+Cheap now, expensive to retrofit (D-022, D-023):
 
 - **Caller identity reaches the runtime.** `invoke` and the credential lookup receive who is calling
   (user id, token claims), even though today's credential providers ignore it. On-behalf-of calls
@@ -26,6 +26,13 @@ Cheap now, expensive to retrofit (D-022):
 - **Token checking is separate from token issuing.** The MCP endpoint validates tokens as an
   OAuth resource server (with protected-resource metadata, RFC 9728). The embedded authorization
   server is one issuer it trusts; a company's own identity provider can be another.
+- **cairnmcp authorizes every call itself** (D-023). A token resolves to tenant, user, and role;
+  each member has access per toolset (`use` for reads, `use_writes` to also call write and
+  destructive tools that the toolset enables). Checked on `tools/list` (hide what the caller can't
+  use) and again on `tools/call` (never trust that the client only calls what it was shown).
+- **The audit log records who.** Every entry carries the acting user, not just the tenant.
+- **Isolation tests cover members too:** a member without access to a toolset can't list or call
+  its tools, and a read-only member can't call a write tool even if they know its name.
 
 ## Milestone 2b: self-host
 
@@ -57,5 +64,10 @@ For teams exposing internal APIs, often from an OpenAPI document they already ge
 - **mTLS client certificates** (self-host only), set on the egress connection.
 - **Egress policy by deployment:** hosted stays public-internet-only; self-hosted can allow named
   private hosts explicitly. Never "allow everything".
+- **Claim-based policies:** identity-provider groups or roles map to toolsets and tools (e.g.
+  `eng-oncall` may call write tools; everyone else reads), and policies can constrain arguments per
+  caller (e.g. only these project ids), extending what pinned inputs do for everyone today. Start
+  with simple declarative rules; if they aren't enough, use an established engine (Cedar or OPA)
+  rather than a home-grown one.
 - Out of scope: interactive per-request login (browser sessions, MFA prompts), which agents can't
   complete.

@@ -268,3 +268,25 @@ planning handoff are not repeated here unless implementation added something.
 - **Why not now:** No user needs it yet; milestone 2 only has to avoid closing the door.
 - **Out of scope:** auth that needs a human per request (interactive SSO, MFA prompts).
 
+## D-023 cairnmcp enforces its own authorization; permissions only narrow
+
+- **Decision:** cairnmcp is both an authenticator (who is calling) and a policy enforcement point
+  (what they may do through cairnmcp). The upstream API remains the authority over its own data.
+  A caller's effective permission is the overlap of the two: cairnmcp can narrow what the
+  upstream allows, never widen it.
+- **What cairnmcp decides:** which tenant a token reaches (RLS); which toolsets a member can use
+  and whether they may call write tools (milestone 2); which tools exist and are enabled;
+  which argument values are fixed (pinned inputs) or, later, constrained per caller (3b); which
+  hosts may be called (egress). Every check happens on each call, not only when tools are listed.
+- **Why it matters most with shared credentials:** when cairnmcp calls the upstream with one
+  service-account key, the upstream can't tell users apart, so cairnmcp's checks are the only
+  per-user limit. Without them any caller could make cairnmcp do anything the shared key allows
+  (a confused deputy). On-behalf-of calls (D-022) let the upstream enforce per-user permissions
+  too; cairnmcp's checks still apply on top.
+- **Scope of the first version (milestone 2):** per-member, per-toolset access with two levels
+  (`use`, `use_writes`), and the acting user in every audit entry. Claim-based policies and
+  per-caller argument constraints come in 3b.
+- **Rejected:** relying on the upstream alone (fails with shared credentials); relying on MCP
+  clients to only call listed tools (clients are untrusted); writing a policy language (use Cedar
+  or OPA if declarative rules stop being enough).
+
