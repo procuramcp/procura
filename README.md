@@ -24,7 +24,8 @@ Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROAD
 
 ## Develop
 
-Requires Node ≥ 22.18 and pnpm 10.
+Requires Node ≥ 22.18 (Node 24 LTS recommended; `.nvmrc` pins it) and pnpm 10. Scripts run
+TypeScript directly, which older Node versions can't do; `pnpm install` refuses to run on them.
 
 ```bash
 pnpm install
