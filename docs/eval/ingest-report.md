@@ -32,6 +32,9 @@ Rejected: 1
 Top diagnostics:
 - none
 
+Error samples:
+- none
+
 ## apisguru-urlbox-v1
 
 - file: `apisguru/urlbox_v1.yaml`
@@ -43,6 +46,9 @@ Top diagnostics:
 - compact IR bytes: 3871
 
 Top diagnostics:
+- none
+
+Error samples:
 - none
 
 ## intervals-icu
@@ -60,6 +66,9 @@ Top diagnostics:
 - warning response_media_type_unspecified: 17
 - warning auth_conjunction_unsatisfiable: 1
 
+Error samples:
+- none
+
 ## kubernetes-openapi-v2
 
 - file: `kubernetes/swagger.json`
@@ -72,6 +81,9 @@ Top diagnostics:
 
 Top diagnostics:
 - error unsupported_version: 1
+
+Error samples:
+- unsupported_version: Swagger 2.0 is not supported; convert to OpenAPI 3 first
 
 ## openai-openapi
 
@@ -89,6 +101,15 @@ Top diagnostics:
 - error ir_validation_failed: 7
 - warning wildcard_media_type: 1
 
+Error samples:
+- ir_validation_failed (beta_cancel_response): mapped operation failed IR validation: must start with / and contain no query or fragment
+- ir_validation_failed (beta_compactconversation): mapped operation failed IR validation: must start with / and contain no query or fragment
+- ir_validation_failed (beta_create_response): mapped operation failed IR validation: must start with / and contain no query or fragment
+- ir_validation_failed (beta_delete_response): mapped operation failed IR validation: must start with / and contain no query or fragment
+- ir_validation_failed (beta_get_response): mapped operation failed IR validation: must start with / and contain no query or fragment
+- ir_validation_failed (beta_getinputtokencounts): mapped operation failed IR validation: must start with / and contain no query or fragment
+- ir_validation_failed (beta_list_input_items): mapped operation failed IR validation: must start with / and contain no query or fragment
+
 ## twilio-accounts-v1-json
 
 - file: `twilio/twilio_accounts_v1.json`
@@ -100,6 +121,9 @@ Top diagnostics:
 - compact IR bytes: 42452
 
 Top diagnostics:
+- none
+
+Error samples:
 - none
 
 ## twilio-api-v2010-json
@@ -115,6 +139,9 @@ Top diagnostics:
 Top diagnostics:
 - warning no_success_response: 1
 
+Error samples:
+- none
+
 ## twilio-conversations-v2-yaml
 
 - file: `twilio/twilio_conversations_v2.yaml`
@@ -126,6 +153,9 @@ Top diagnostics:
 - compact IR bytes: 159894
 
 Top diagnostics:
+- none
+
+Error samples:
 - none
 
 ## twilio-sync-v1-yaml
@@ -141,6 +171,9 @@ Top diagnostics:
 Top diagnostics:
 - none
 
+Error samples:
+- none
+
 ## twilio-taskrouter-v1-yaml
 
 - file: `twilio/twilio_taskrouter_v1.yaml`
@@ -152,6 +185,9 @@ Top diagnostics:
 - compact IR bytes: 295477
 
 Top diagnostics:
+- none
+
+Error samples:
 - none
 
 ## twilio-verify-v2-json
@@ -167,6 +203,9 @@ Top diagnostics:
 Top diagnostics:
 - none
 
+Error samples:
+- none
+
 ## twilio-video-v1-json
 
 - file: `twilio/twilio_video_v1.json`
@@ -178,4 +217,7 @@ Top diagnostics:
 - compact IR bytes: 189616
 
 Top diagnostics:
+- none
+
+Error samples:
 - none

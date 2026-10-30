@@ -36,6 +36,7 @@ export type IngestEvalDocumentResult = {
   };
   compactIrBytes: number;
   topDiagnostics: Array<{ code: string; severity: Diagnostic["severity"]; count: number }>;
+  errorSamples: Array<{ code: string; operationId?: string; message: string }>;
 };
 
 export type IngestEvalReport = {
@@ -113,6 +114,7 @@ function evaluateEntry(entry: CorpusEntry, manifestPath: string): IngestEvalDocu
       },
       compactIrBytes: 0,
       topDiagnostics: rankDiagnostics(ingest.diagnostics),
+      errorSamples: sampleErrors(ingest.diagnostics),
     };
   }
 
@@ -151,6 +153,7 @@ function evaluateEntry(entry: CorpusEntry, manifestPath: string): IngestEvalDocu
     schemas: schemaStats,
     compactIrBytes: Buffer.byteLength(JSON.stringify(ingest.ir), "utf8"),
     topDiagnostics: rankDiagnostics(ingest.diagnostics),
+    errorSamples: sampleErrors(ingest.diagnostics),
   };
 }
 
@@ -244,6 +247,14 @@ function rankDiagnostics(diagnostics: Diagnostic[]) {
     .slice(0, 5);
 }
 
+function sampleErrors(diagnostics: Diagnostic[]): Array<{ code: string; operationId?: string; message: string }> {
+  return diagnostics
+    .filter((d) => d.severity === "error")
+    .sort((a, b) => a.code.localeCompare(b.code) || (a.operationId ?? "").localeCompare(b.operationId ?? "") || a.message.localeCompare(b.message))
+    .slice(0, 10)
+    .map((d) => ({ code: d.code, ...(d.operationId ? { operationId: d.operationId } : {}), message: d.message }));
+}
+
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -286,6 +297,14 @@ export function renderMarkdownReport(report: IngestEvalReport): string {
     if (doc.topDiagnostics.length === 0) lines.push("- none");
     else {
       for (const diag of doc.topDiagnostics) lines.push(`- ${diag.severity} ${diag.code}: ${diag.count}`);
+    }
+    lines.push("");
+    lines.push("Error samples:");
+    if (doc.errorSamples.length === 0) lines.push("- none");
+    else {
+      for (const sample of doc.errorSamples) {
+        lines.push(`- ${sample.code}${sample.operationId ? ` (${sample.operationId})` : ""}: ${sample.message}`);
+      }
     }
   }
 

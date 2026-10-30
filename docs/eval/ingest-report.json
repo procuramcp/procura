@@ -51,7 +51,8 @@
         }
       },
       "compactIrBytes": 196445,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "apisguru-urlbox-v1",
@@ -96,7 +97,8 @@
         }
       },
       "compactIrBytes": 3871,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "intervals-icu",
@@ -161,7 +163,8 @@
           "severity": "warning",
           "count": 1
         }
-      ]
+      ],
+      "errorSamples": []
     },
     {
       "id": "kubernetes-openapi-v2",
@@ -211,6 +214,12 @@
           "code": "unsupported_version",
           "severity": "error",
           "count": 1
+        }
+      ],
+      "errorSamples": [
+        {
+          "code": "unsupported_version",
+          "message": "Swagger 2.0 is not supported; convert to OpenAPI 3 first"
         }
       ]
     },
@@ -284,6 +293,43 @@
           "severity": "warning",
           "count": 1
         }
+      ],
+      "errorSamples": [
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_cancel_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_compactconversation",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_create_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_delete_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_get_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_getinputtokencounts",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_list_input_items",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        }
       ]
     },
     {
@@ -329,7 +375,8 @@
         }
       },
       "compactIrBytes": 42452,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "twilio-api-v2010-json",
@@ -382,7 +429,8 @@
           "severity": "warning",
           "count": 1
         }
-      ]
+      ],
+      "errorSamples": []
     },
     {
       "id": "twilio-conversations-v2-yaml",
@@ -427,7 +475,8 @@
         }
       },
       "compactIrBytes": 159894,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "twilio-sync-v1-yaml",
@@ -472,7 +521,8 @@
         }
       },
       "compactIrBytes": 172157,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "twilio-taskrouter-v1-yaml",
@@ -517,7 +567,8 @@
         }
       },
       "compactIrBytes": 295477,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "twilio-verify-v2-json",
@@ -562,7 +613,8 @@
         }
       },
       "compactIrBytes": 239597,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     },
     {
       "id": "twilio-video-v1-json",
@@ -607,7 +659,8 @@
         }
       },
       "compactIrBytes": 189616,
-      "topDiagnostics": []
+      "topDiagnostics": [],
+      "errorSamples": []
     }
   ]
 }
