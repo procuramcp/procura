@@ -78,19 +78,52 @@ if (!all.ok) {
   process.exit(1);
 }
 const activities = Array.isArray(all.data) ? (all.data as Array<Record<string, unknown>>) : [];
+// Activities synced from Strava come back as stubs (Strava's API terms): no type, duration, or load.
+const isStub = (a: Record<string, unknown>) => a["type"] === undefined && a["moving_time"] === undefined;
 console.log(`OK: HTTP ${all.status}, ${activities.length} activities`);
 for (const a of activities.slice(0, 10)) {
+  if (isStub(a)) {
+    console.log(`  ${String(a["start_date_local"] ?? "?").slice(0, 10)}  (stub, likely from Strava: details not available via the API)`);
+    continue;
+  }
   const minutes = typeof a["moving_time"] === "number" ? Math.round(a["moving_time"] / 60) : "?";
   console.log(`  ${String(a["start_date_local"] ?? "?").slice(0, 10)}  ${String(a["type"] ?? "?").padEnd(16)} ${String(minutes).padStart(4)} min  load ${a["icu_training_load"] ?? "-"}`);
 }
+const stub = activities.find(isStub);
+if (stub) console.log(`  Stub field names: ${Object.keys(stub).sort().join(", ")}`);
 
-// 5. Settle an open question: does `fields` accept repeated values (what the spec implies)?
-const wanted = ["id", "type", "start_date_local"];
-const narrowed = await runtime.invoke({ tenantId, source, tool, args: { oldest, limit: 3, fields: wanted } });
-if (narrowed.ok && Array.isArray(narrowed.data) && narrowed.data.length > 0) {
-  const keys = Object.keys(narrowed.data[0] as object).sort();
-  const honored = keys.every((k) => wanted.includes(k));
-  console.log(`\n"fields" sent as fields=id&fields=type&…: ${honored ? "honored ✅" : `ignored ❌ (got ${keys.length} fields)`}`);
+// 5. Settle an open question: how does Intervals.icu want the `fields` list encoded?
+//    The spec implies repeated values (fields=a&fields=b); its description says comma-separated.
+//    Compare the same full (non-stub) activity with and without `fields`, in both encodings.
+const sample = activities.find((a) => !isStub(a));
+if (!sample) {
+  console.log('\n"fields" check skipped: no non-stub activities in range.');
 } else {
-  console.log(`\n"fields" check skipped (${narrowed.ok ? "no activities in range" : narrowed.error.kind})`);
+  const wanted = ["id", "type", "start_date_local"];
+  const fullCount = Object.keys(sample).length;
+  const commaTool = toolWithFieldsExplode(false);
+  console.log(`\n"fields" check (a full activity has ${fullCount} fields; asked for ${wanted.length}):`);
+  for (const [label, t] of [["repeated  fields=id&fields=type&…", tool], ["comma     fields=id,type,…", commaTool]] as const) {
+    const r = await runtime.invoke({ tenantId, source, tool: t, args: { oldest, limit: 10, fields: wanted } });
+    const same = r.ok && Array.isArray(r.data) ? (r.data as Array<Record<string, unknown>>).find((a) => a["id"] === sample["id"]) : undefined;
+    if (!same) {
+      console.log(`  ${label}: inconclusive (${r.ok ? "activity not in response" : r.error.kind})`);
+      continue;
+    }
+    const keys = Object.keys(same);
+    const honored = keys.length < fullCount && keys.every((k) => wanted.includes(k));
+    console.log(`  ${label}: ${honored ? "honored ✅" : "ignored ❌"} (${keys.length} fields${honored ? "" : `: ${keys.slice(0, 8).join(", ")}${keys.length > 8 ? ", …" : ""}`})`);
+  }
+}
+
+/** Same tool, with the `fields` parameter serialized comma-separated instead of repeated. */
+function toolWithFieldsExplode(explode: boolean) {
+  const op = tool.operation;
+  return {
+    ...tool,
+    operation: {
+      ...op,
+      mapping: { ...op.mapping, parameters: op.mapping.parameters.map((p) => (p.wireName === "fields" ? { ...p, explode } : p)) },
+    },
+  };
 }
