@@ -13,6 +13,7 @@ const COMPONENT_PREFIX = "#/components/schemas/";
 
 // Keywords whose value is a schema, a map of schemas, or a list of schemas.
 const SCHEMA_KEYS = new Set([
+  "contentSchema",
   "items",
   "additionalProperties",
   "not",
@@ -27,12 +28,51 @@ const SCHEMA_KEYS = new Set([
 const SCHEMA_MAP_KEYS = new Set(["properties", "patternProperties", "dependentSchemas", "$defs"]);
 const SCHEMA_LIST_KEYS = new Set(["allOf", "anyOf", "oneOf", "prefixItems"]);
 
-// OpenAPI-only keywords that have no meaning in JSON Schema 2020-12.
+// OpenAPI-only keywords, converted or dropped silently because their meaning is known.
 const DROPPED_KEYS = new Set(["discriminator", "xml", "externalDocs", "nullable", "example"]);
+
+// Every other keyword kept in IR schemas: JSON Schema 2020-12 vocabularies, minus
+// `$id`, `$schema`, `$anchor` and `$dynamic*`, which would change how refs resolve.
+const DATA_KEYS = new Set([
+  "$comment",
+  "type",
+  "enum",
+  "const",
+  "multipleOf",
+  "maximum",
+  "exclusiveMaximum",
+  "minimum",
+  "exclusiveMinimum",
+  "maxLength",
+  "minLength",
+  "pattern",
+  "maxItems",
+  "minItems",
+  "uniqueItems",
+  "maxContains",
+  "minContains",
+  "maxProperties",
+  "minProperties",
+  "required",
+  "dependentRequired",
+  "title",
+  "description",
+  "default",
+  "deprecated",
+  "readOnly",
+  "writeOnly",
+  "examples",
+  "format",
+  "contentEncoding",
+  "contentMediaType",
+]);
 
 const MAX_INLINE_DEPTH = 32;
 
 type Schema = Record<string, unknown> | boolean;
+
+/** Reports something the converter changed. Called at most once per code and keyword. */
+export type ConversionNote = (code: string, message: string, pointer: string) => void;
 
 /**
  * Converts OpenAPI schemas to self-contained JSON Schema 2020-12.
@@ -46,10 +86,20 @@ export class SchemaConverter {
   readonly #doc: unknown;
   readonly #dialect: OasDialect;
   readonly #components = new Map<string, { schema: Schema; refs: Set<string> }>();
+  readonly #note: ConversionNote;
+  readonly #noted = new Set<string>();
 
-  constructor(doc: unknown, dialect: OasDialect) {
+  constructor(doc: unknown, dialect: OasDialect, note: ConversionNote = () => {}) {
     this.#doc = doc;
     this.#dialect = dialect;
+    this.#note = note;
+  }
+
+  #noteOnce(code: string, key: string, message: string, pointer: string): void {
+    const id = `${code}:${key}`;
+    if (this.#noted.has(id)) return;
+    this.#noted.add(id);
+    this.#note(code, message, pointer);
   }
 
   /** Convert one schema; component names it references are added to `refs`. */
@@ -112,8 +162,18 @@ export class SchemaConverter {
         );
       } else if (SCHEMA_LIST_KEYS.has(key) && Array.isArray(value)) {
         out[key] = value.map((v, i) => this.#node(v, direction, `${at}/${i}`, refs, depth));
-      } else {
+      } else if (key === "enum" && Array.isArray(value) && value.length === 0) {
+        // Matches nothing, so it is always a spec bug; usually another keyword carries the values.
+        this.#noteOnce("empty_enum", at, "empty enum would accept no value; dropped", at);
+      } else if (DATA_KEYS.has(key)) {
         out[key] = value;
+      } else {
+        this.#noteOnce(
+          "unknown_schema_keyword",
+          key,
+          `"${key}" is not a JSON Schema 2020-12 keyword; dropped (first seen here)`,
+          at,
+        );
       }
     }
 

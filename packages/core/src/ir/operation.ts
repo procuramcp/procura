@@ -77,6 +77,12 @@ export const HttpMapping = z.object({
   /** Relative to `Source.baseUrl`, starting with `/`, with `{name}` placeholders. */
   pathTemplate: z.string().regex(/^\/[^?#]*$/, "must start with / and contain no query or fragment"),
   parameters: z.array(ParameterBinding),
+  /**
+   * Query parameters always sent with fixed values, not supplied by the agent.
+   * Comes from specs that put a literal query in the path key (OpenAI uses
+   * `/responses?beta=true`).
+   */
+  fixedQuery: z.record(z.string().min(1), z.string()).optional(),
   body: BodyBinding.optional(),
   response: ResponseMapping,
 });
@@ -150,6 +156,12 @@ function checkBindings(op: OperationShape, ctx: z.RefinementCtx): void {
   }
   for (const name of declared) {
     if (!seen.has(name)) ctx.addIssue({ code: "custom", path: ["input"], message: `input property "${name}" is not bound` });
+  }
+
+  for (const p of mapping.parameters) {
+    if (p.in === "query" && mapping.fixedQuery && Object.hasOwn(mapping.fixedQuery, p.wireName)) {
+      ctx.addIssue({ code: "custom", path: ["mapping"], message: `query parameter "${p.wireName}" is both fixed and bound` });
+    }
   }
 
   const placeholders = [...mapping.pathTemplate.matchAll(/\{([^}]+)\}/g)].map((m) => m[1] ?? "");

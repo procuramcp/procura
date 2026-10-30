@@ -8,14 +8,14 @@ Rejected: 1
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | apisguru-listennotes-v2 | mapped | 24 | 24 | 0 | 0 | 0 | 0.900 | 24/24 | 24/24 | 196445 |
 | apisguru-urlbox-v1 | mapped | 1 | 1 | 0 | 0 | 0 | 0.900 | 1/1 | 1/1 | 3871 |
-| box-v2 | mapped | 297 | 278 | 19 | 10 | 19 | 0.895 | 278/278 | 228/228 | 3009493 |
-| discord-v10 | mapped | 250 | 250 | 0 | 4 | 0 | 0.898 | 248/250 | 189/189 | 3246415 |
+| box-v2 | mapped | 297 | 297 | 0 | 10 | 0 | 0.895 | 297/297 | 247/247 | 3716280 |
+| discord-v10 | mapped | 250 | 250 | 0 | 6 | 0 | 0.898 | 250/250 | 189/189 | 3246395 |
 | intervals-icu | mapped | 148 | 148 | 0 | 149 | 0 | 0.800 | 148/148 | 131/131 | 886838 |
 | oai-petstore-expanded-v3-0 | mapped | 4 | 4 | 0 | 0 | 0 | 0.900 | 4/4 | 3/3 | 6180 |
 | oai-petstore-minimal-swagger-2-0 | rejected (unsupported_version) | 1 | 0 | 0 | 0 | 1 | - | 0/0 | 0/0 | 0 |
 | oai-uspto-v3-0 | mapped | 3 | 3 | 0 | 0 | 0 | 0.900 | 3/3 | 3/3 | 6287 |
 | oai-webhook-example-v3-1 | mapped | 0 | 0 | 0 | 0 | 0 | - | 0/0 | 0/0 | 499 |
-| openai-openapi | mapped | 376 | 369 | 7 | 19 | 7 | 0.892 | 369/369 | 359/360 | 5108873 |
+| openai-openapi | mapped | 376 | 376 | 0 | 27 | 0 | 0.893 | 376/376 | 367/367 | 6317643 |
 | swagger-petstore-v3 | mapped | 19 | 19 | 0 | 16 | 0 | 0.863 | 19/19 | 14/14 | 27736 |
 | twilio-api-v2010-json | mapped | 197 | 197 | 0 | 1 | 0 | 0.899 | 197/197 | 164/164 | 1037120 |
 | twilio-conversations-v2-yaml | mapped | 22 | 22 | 0 | 0 | 0 | 0.900 | 22/22 | 22/22 | 159894 |
@@ -56,28 +56,19 @@ Error samples:
 
 - file: `box/openapi.json`
 - outcome: mapped
-- operations: 278/297 mapped (skipped 19)
-- side effects: read 123, write 110, destructive 45 (name escalations 2)
+- operations: 297/297 mapped (skipped 0)
+- side effects: read 129, write 120, destructive 48 (name escalations 5)
 - confidence: mean 0.895, min 0.700
-- strict Ajv: input 278/278, output 228/228
-- compact IR bytes: 3009493
+- strict Ajv: input 297/297, output 247/247
+- compact IR bytes: 3716280
 
 Top diagnostics:
-- error ir_validation_failed: 19
+- info path_key_fragment: 19
 - warning response_media_type_unspecified: 6
 - warning binary_request_body: 4
 
 Error samples:
-- ir_validation_failed (get_files_id_get_shared_link): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (get_folders_id_get_shared_link): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (get_shared_items_app_items): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (get_shared_items_folders): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (get_shared_items_web_links): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (get_web_links_id_get_shared_link): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (post_metadata_templates_schema_classifications): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (post_oauth2_token_refresh): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (put_files_id_add_shared_link): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (put_files_id_remove_shared_link): mapped operation failed IR validation: must start with / and contain no query or fragment
+- none
 
 ## discord-v10
 
@@ -86,11 +77,12 @@ Error samples:
 - operations: 250/250 mapped (skipped 0)
 - side effects: read 107, write 101, destructive 42 (name escalations 2)
 - confidence: mean 0.898, min 0.700
-- strict Ajv: input 248/250, output 189/189
-- compact IR bytes: 3246415
+- strict Ajv: input 250/250, output 189/189
+- compact IR bytes: 3246395
 
 Top diagnostics:
 - warning binary_request_body: 3
+- warning empty_enum: 2
 - warning unsupported_oauth_flow: 1
 
 Error samples:
@@ -182,26 +174,21 @@ Error samples:
 
 - file: `openai/openapi.yaml`
 - outcome: mapped
-- operations: 369/376 mapped (skipped 7)
-- side effects: read 163, write 153, destructive 53 (name escalations 0)
-- confidence: mean 0.892, min 0.700
-- strict Ajv: input 369/369, output 359/360
-- compact IR bytes: 5108873
+- operations: 376/376 mapped (skipped 0)
+- side effects: read 165, write 157, destructive 54 (name escalations 0)
+- confidence: mean 0.893, min 0.700
+- strict Ajv: input 376/376, output 367/367
+- compact IR bytes: 6317643
 
 Top diagnostics:
 - warning binary_request_body: 9
 - warning response_media_type_unspecified: 9
-- error ir_validation_failed: 7
+- warning path_key_query: 7
+- warning unknown_schema_keyword: 1
 - warning wildcard_media_type: 1
 
 Error samples:
-- ir_validation_failed (beta_cancel_response): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (beta_compactconversation): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (beta_create_response): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (beta_delete_response): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (beta_get_response): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (beta_getinputtokencounts): mapped operation failed IR validation: must start with / and contain no query or fragment
-- ir_validation_failed (beta_list_input_items): mapped operation failed IR validation: must start with / and contain no query or fragment
+- none
 
 ## swagger-petstore-v3
 

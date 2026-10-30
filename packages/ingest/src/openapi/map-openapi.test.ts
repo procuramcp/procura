@@ -3,7 +3,7 @@ import type { Operation } from "@cairnmcp/core";
 import { describe, expect, it } from "vitest";
 import { strictAjv } from "../test-support.ts";
 import { ingestOpenApiText } from "./ingest.ts";
-import { mapOpenApi, OPENAPI_CONFIDENCE } from "./map-openapi.ts";
+import { mapOpenApi, OPENAPI_CONFIDENCE, splitPathKey } from "./map-openapi.ts";
 
 const minimal = (paths: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
   openapi: "3.0.3",
@@ -144,6 +144,62 @@ describe("mapOpenApi: operations", () => {
       }),
     );
     expect(opById(r.ir.operations, "x").mapping.response.status).toBe("default");
+  });
+});
+
+describe("path keys with a query or fragment (seen in OpenAI and Box specs)", () => {
+  it("splits a path key", () => {
+    expect(splitPathKey("/responses?beta=true")).toEqual({ template: "/responses", fixedQuery: { beta: "true" } });
+    expect(splitPathKey("/files/{file_id}#add_shared_link")).toEqual({ template: "/files/{file_id}", fragment: "add_shared_link" });
+    expect(splitPathKey("/a?x=1&y=two%20words#v2")).toEqual({ template: "/a", fixedQuery: { x: "1", y: "two words" }, fragment: "v2" });
+    expect(splitPathKey("/plain/{id}")).toEqual({ template: "/plain/{id}" });
+  });
+
+  const r = mapOk(
+    minimal({
+      "/responses": { post: { operationId: "createResponse", responses: { "200": { description: "ok" } } } },
+      "/responses?beta=true": {
+        post: {
+          operationId: "beta_createResponse",
+          parameters: [{ name: "beta", in: "query", schema: { type: "string" } }],
+          responses: { "200": { description: "ok" } },
+        },
+      },
+      "/files/{file_id}#get_shared_link": {
+        get: {
+          operationId: "get_files_id#get_shared_link",
+          parameters: [{ name: "file_id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "ok" } },
+        },
+      },
+      "/files/{file_id}#remove_shared_link": {
+        put: {
+          operationId: "updateFile",
+          parameters: [{ name: "file_id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "ok" } },
+        },
+      },
+    }),
+  );
+
+  it("keeps every operation", () => {
+    expect(r.ir.operations.map((o) => [o.id, o.mapping.pathTemplate])).toEqual([
+      ["create_response", "/responses"],
+      ["beta_create_response", "/responses"],
+      ["get_files_id_get_shared_link", "/files/{file_id}"],
+      ["update_file", "/files/{file_id}"],
+    ]);
+  });
+
+  it("sends a literal query as fixed values, not agent input", () => {
+    const op = opById(r.ir.operations, "beta_create_response");
+    expect(op.mapping.fixedQuery).toEqual({ beta: "true" });
+    expect(op.mapping.parameters).toEqual([]);
+    expect(r.diagnostics.map((d) => d.code)).toEqual(expect.arrayContaining(["path_key_query", "fixed_query_parameter", "path_key_fragment"]));
+  });
+
+  it("uses the fragment as a naming hint for side effects", () => {
+    expect(opById(r.ir.operations, "update_file").sideEffect).toMatchObject({ class: "destructive", basis: "name_heuristic" });
   });
 });
 
