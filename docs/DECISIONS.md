@@ -244,3 +244,27 @@ planning handoff are not repeated here unless implementation added something.
   `API_KEY` username, athlete `0`) are curation data. Until the curation UI stores them per tenant,
   they live in `examples/<api>/` and `docs/sources/<api>.md`, never in `packages/` or the root
   `.env.example`.
+
+## D-022 Custom upstream auth and caller identity: plan now, build in 3b
+
+- **Context:** A team wants internal MCP access to an API they already wrap with a generated
+  TypeScript client, behind custom auth. "Custom auth" is two separate connections: who may call
+  cairnmcp (inbound), and how cairnmcp calls their API (outbound).
+- **Decision:**
+  - Ingest from the OpenAPI document the client was generated from, through the existing
+    ingestor. A TypeScript-types ingestor is possible but lower fidelity (types don't capture
+    paths, auth, or side effects well).
+  - Don't execute operations through the team's client code. The HTTP mapping plus an auth
+    extension covers the realistic cases without tying the runtime to their code.
+  - Add a `custom` auth scheme kind to the IR in 3b (an IR version bump), resolved by named
+    providers: declarative kinds everywhere, custom-code kinds on self-hosted deployments only.
+  - Support on-behalf-of calls via token exchange (RFC 8693): credentials derived per call from
+    the caller's identity instead of stored in the vault.
+  - Make the egress policy depend on deployment: hosted is public-only; self-hosted may name
+    private hosts.
+- **Applied now (milestone 2):** pass caller identity into the runtime and credential lookup, and
+  keep token validation (resource server) separate from token issuing (authorization server).
+  Both are cheap now and expensive to retrofit.
+- **Why not now:** No user needs it yet; milestone 2 only has to avoid closing the door.
+- **Out of scope:** auth that needs a human per request (interactive SSO, MFA prompts).
+
