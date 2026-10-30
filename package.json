@@ -13,7 +13,7 @@
     "check": "pnpm typecheck && pnpm test",
     "ir:dump": "pnpm --filter @cairnmcp/ingest ir:dump",
     "eval:ingest": "pnpm --filter @cairnmcp/eval eval:ingest",
-    "try:intervals": "pnpm --filter @cairnmcp/runtime try:intervals"
+    "example:intervals": "pnpm --filter @cairnmcp/example-intervals-icu start"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

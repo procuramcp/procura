@@ -4,7 +4,8 @@ A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs t
 ingests an API description, curates a safe set of operations, and serves them as a remote
 MCP server, on our hosting or yours.
 
-Status: milestone 1 done (IR, OpenAPI ingestor, vault, runtime, live Intervals.icu call).
+Status: milestone 1 done (IR, OpenAPI ingestor, vault, runtime, a live call to Intervals.icu as the
+first example API).
 Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted first; self-hosting with one container image follows (see the roadmap).
 
 ## Layout
@@ -40,9 +41,11 @@ pnpm ir:dump
 `pnpm check` runs typecheck and tests. `pnpm ir:dump` writes the Intervals.icu IR and its
 diagnostics to `out/` (gitignored).
 
-To call Intervals.icu with your own key: copy `.env.example` to `.env`, set `INTERVALS_API_KEY`
-(and optionally `INTERVALS_ATHLETE_ID`; it defaults to `0`, the key's own athlete), then run
-`pnpm try:intervals`. It only reads, and prints a summary.
+## Examples
+
+`examples/intervals-icu/` calls Intervals.icu with your own API key, through the whole pipeline.
+Copy its `.env.example` to `.env` in that folder, set `INTERVALS_API_KEY`, then run
+`pnpm example:intervals`. It only reads, and prints a summary.
 
 ## Data and secrets
 

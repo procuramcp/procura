@@ -240,3 +240,7 @@ planning handoff are not repeated here unless implementation added something.
   as designed; they don't change what it returns.
 - **Why:** Keeps cairnmcp general-purpose. An analysis product is built on top of it as a
   consumer, like any other agent or app.
+- **No source-specific code or settings in the product:** facts about one API (Intervals.icu's
+  `API_KEY` username, athlete `0`) are curation data. Until the curation UI stores them per tenant,
+  they live in `examples/<api>/` and `docs/sources/<api>.md`, never in `packages/` or the root
+  `.env.example`.
