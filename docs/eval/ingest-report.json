@@ -1,0 +1,828 @@
+{
+  "summary": {
+    "corpusEntries": 13,
+    "mapped": 12,
+    "rejected": 1,
+    "operationsInDocuments": 1342,
+    "operationsInIr": 1315,
+    "operationsSkipped": 26,
+    "operationsInRejectedDocuments": 1
+  },
+  "documents": [
+    {
+      "id": "apisguru-listennotes-v2",
+      "file": "apisguru/listennotes_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/listennotes.com/2.0/openapi.yaml",
+      "license": "CC0-1.0",
+      "sha256": "51b15eb0e703c26eece40c964245c0434cb0e8ff7a419be2cd6fd9dcebd93216",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 24,
+        "ir": 24,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 20,
+          "write": 3,
+          "destructive": 1
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 24,
+          "strictAjvCompiles": 24
+        },
+        "output": {
+          "total": 24,
+          "strictAjvCompiles": 24
+        }
+      },
+      "compactIrBytes": 196445,
+      "topDiagnostics": [],
+      "errorSamples": []
+    },
+    {
+      "id": "apisguru-urlbox-v1",
+      "file": "apisguru/urlbox_v1.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/urlbox.io/v1/openapi.yaml",
+      "license": "CC0-1.0",
+      "sha256": "803c92283eeb122de18f87dd8b390c933c4fb4f94da78ea8e5c16e12517bd8ba",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 1,
+        "ir": 1,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 0,
+          "write": 1,
+          "destructive": 0
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 1,
+          "strictAjvCompiles": 1
+        },
+        "output": {
+          "total": 1,
+          "strictAjvCompiles": 1
+        }
+      },
+      "compactIrBytes": 3871,
+      "topDiagnostics": [],
+      "errorSamples": []
+    },
+    {
+      "id": "box-v2",
+      "file": "box/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/box/box-openapi/main/openapi.json",
+      "license": "Apache-2.0",
+      "sha256": "47cdf4bcbc7cdebcb042f155f13a8413bf913678489bd15b263b65f49e841ba1",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 297,
+        "ir": 278,
+        "skipped": 19
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 4,
+          "response_media_type_unspecified": 6
+        },
+        "errorsByCode": {
+          "ir_validation_failed": 19
+        },
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 123,
+          "write": 110,
+          "destructive": 45
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.895,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 278,
+          "strictAjvCompiles": 278
+        },
+        "output": {
+          "total": 228,
+          "strictAjvCompiles": 228
+        }
+      },
+      "compactIrBytes": 3009493,
+      "topDiagnostics": [
+        {
+          "code": "ir_validation_failed",
+          "severity": "error",
+          "count": 19
+        },
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 6
+        },
+        {
+          "code": "binary_request_body",
+          "severity": "warning",
+          "count": 4
+        }
+      ],
+      "errorSamples": [
+        {
+          "code": "ir_validation_failed",
+          "operationId": "get_files_id_get_shared_link",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "get_folders_id_get_shared_link",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "get_shared_items_app_items",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "get_shared_items_folders",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "get_shared_items_web_links",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "get_web_links_id_get_shared_link",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "post_metadata_templates_schema_classifications",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "post_oauth2_token_refresh",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "put_files_id_add_shared_link",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "put_files_id_remove_shared_link",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        }
+      ]
+    },
+    {
+      "id": "discord-v10",
+      "file": "discord/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
+      "license": "MIT",
+      "sha256": "281a2bff563d77a19e51fc3bf8bbe3ebcef28e3dc86684ae395b06ac51ba7484",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 250,
+        "ir": 250,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 3,
+          "unsupported_oauth_flow": 1
+        },
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 107,
+          "write": 101,
+          "destructive": 42
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.898,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 250,
+          "strictAjvCompiles": 248
+        },
+        "output": {
+          "total": 189,
+          "strictAjvCompiles": 189
+        }
+      },
+      "compactIrBytes": 3246415,
+      "topDiagnostics": [
+        {
+          "code": "binary_request_body",
+          "severity": "warning",
+          "count": 3
+        },
+        {
+          "code": "unsupported_oauth_flow",
+          "severity": "warning",
+          "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
+    {
+      "id": "intervals-icu",
+      "file": "../../ingest/fixtures/intervals-icu/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/yerzhansa/intervals-icu-api/main/openapi.json",
+      "license": "MIT",
+      "sha256": "f067e5e8ce21aaeb6fa959a72f7a3404d13871ba16baa1488ccb54c5e7ad07b2",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 148,
+        "ir": 148,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "auth_conjunction_unsatisfiable": 1,
+          "response_media_type_unspecified": 17,
+          "wildcard_media_type": 131
+        },
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 79,
+          "write": 55,
+          "destructive": 14
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.8,
+        "min": 0.8
+      },
+      "schemas": {
+        "input": {
+          "total": 148,
+          "strictAjvCompiles": 148
+        },
+        "output": {
+          "total": 131,
+          "strictAjvCompiles": 131
+        }
+      },
+      "compactIrBytes": 886838,
+      "topDiagnostics": [
+        {
+          "code": "wildcard_media_type",
+          "severity": "warning",
+          "count": 131
+        },
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 17
+        },
+        {
+          "code": "auth_conjunction_unsatisfiable",
+          "severity": "warning",
+          "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
+    {
+      "id": "oai-petstore-expanded-v3-0",
+      "file": "oai-examples/petstore-expanded.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore-expanded.yaml",
+      "license": "CC-BY-4.0",
+      "sha256": "abc68d08c674c8f0415aaeeb87c4203d5dd7257cdb79ac7ccb0446d1c5b9a7c2",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 4,
+        "ir": 4,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 2,
+          "write": 1,
+          "destructive": 1
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 4,
+          "strictAjvCompiles": 4
+        },
+        "output": {
+          "total": 3,
+          "strictAjvCompiles": 3
+        }
+      },
+      "compactIrBytes": 6180,
+      "topDiagnostics": [],
+      "errorSamples": []
+    },
+    {
+      "id": "oai-petstore-minimal-swagger-2-0",
+      "file": "oai-examples/petstore-minimal.swagger.json",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v2.0/json/petstore-minimal.json",
+      "license": "CC-BY-4.0",
+      "sha256": "d62d85d467ca86dc9f5ebeb6c9eda996822c972ecf00d6862beb0f25f01bcddd",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "rejected",
+        "fatalCode": "unsupported_version"
+      },
+      "operations": {
+        "document": 1,
+        "ir": 0,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {
+          "unsupported_version": 1
+        },
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 0,
+          "write": 0,
+          "destructive": 0
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": null,
+      "schemas": {
+        "input": {
+          "total": 0,
+          "strictAjvCompiles": 0
+        },
+        "output": {
+          "total": 0,
+          "strictAjvCompiles": 0
+        }
+      },
+      "compactIrBytes": 0,
+      "topDiagnostics": [
+        {
+          "code": "unsupported_version",
+          "severity": "error",
+          "count": 1
+        }
+      ],
+      "errorSamples": [
+        {
+          "code": "unsupported_version",
+          "message": "Swagger 2.0 is not supported; convert to OpenAPI 3 first"
+        }
+      ]
+    },
+    {
+      "id": "oai-uspto-v3-0",
+      "file": "oai-examples/uspto.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/uspto.yaml",
+      "license": "CC-BY-4.0",
+      "sha256": "29d32d0a0710b0acac434807e018ebd9cc192ad604fefdcf51422833b5963642",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 3,
+        "ir": 3,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 2,
+          "write": 1,
+          "destructive": 0
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 3,
+          "strictAjvCompiles": 3
+        },
+        "output": {
+          "total": 3,
+          "strictAjvCompiles": 3
+        }
+      },
+      "compactIrBytes": 6287,
+      "topDiagnostics": [],
+      "errorSamples": []
+    },
+    {
+      "id": "oai-webhook-example-v3-1",
+      "file": "oai-examples/webhook-example.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.1/webhook-example.yaml",
+      "license": "CC-BY-4.0",
+      "sha256": "1bf9c928e1d42d5ffd3d793dbc6b569bd47a97a4679ee5c85cd78091136ab2a4",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 0,
+        "ir": 0,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 0,
+          "write": 0,
+          "destructive": 0
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": null,
+      "schemas": {
+        "input": {
+          "total": 0,
+          "strictAjvCompiles": 0
+        },
+        "output": {
+          "total": 0,
+          "strictAjvCompiles": 0
+        }
+      },
+      "compactIrBytes": 499,
+      "topDiagnostics": [],
+      "errorSamples": []
+    },
+    {
+      "id": "openai-openapi",
+      "file": "openai/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/main/openapi.yaml",
+      "license": "MIT",
+      "sha256": "aea81bdac8b83352defafcacf548fe859b5005716e64d3e25e6c79489fddd756",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 376,
+        "ir": 369,
+        "skipped": 7
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 9,
+          "response_media_type_unspecified": 9,
+          "wildcard_media_type": 1
+        },
+        "errorsByCode": {
+          "ir_validation_failed": 7
+        },
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 163,
+          "write": 153,
+          "destructive": 53
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.892,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 369,
+          "strictAjvCompiles": 369
+        },
+        "output": {
+          "total": 360,
+          "strictAjvCompiles": 359
+        }
+      },
+      "compactIrBytes": 5108873,
+      "topDiagnostics": [
+        {
+          "code": "binary_request_body",
+          "severity": "warning",
+          "count": 9
+        },
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 9
+        },
+        {
+          "code": "ir_validation_failed",
+          "severity": "error",
+          "count": 7
+        },
+        {
+          "code": "wildcard_media_type",
+          "severity": "warning",
+          "count": 1
+        }
+      ],
+      "errorSamples": [
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_cancel_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_compactconversation",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_create_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_delete_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_get_response",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_getinputtokencounts",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        },
+        {
+          "code": "ir_validation_failed",
+          "operationId": "beta_list_input_items",
+          "message": "mapped operation failed IR validation: must start with / and contain no query or fragment"
+        }
+      ]
+    },
+    {
+      "id": "swagger-petstore-v3",
+      "file": "swagger-petstore/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/swagger-api/swagger-petstore/master/src/main/resources/openapi.yaml",
+      "license": "Apache-2.0",
+      "sha256": "65cfe2e8826c81db0eea34c51d18da3a305ae4840f1a778cd63b89d396efb687",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 19,
+        "ir": 19,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 1,
+          "invalid_security_scheme": 1,
+          "response_media_type_unspecified": 5,
+          "security_requirement_dropped": 8,
+          "unsupported_oauth_flow": 1
+        },
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 8,
+          "write": 8,
+          "destructive": 3
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.863,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 19,
+          "strictAjvCompiles": 19
+        },
+        "output": {
+          "total": 14,
+          "strictAjvCompiles": 14
+        }
+      },
+      "compactIrBytes": 27736,
+      "topDiagnostics": [
+        {
+          "code": "security_requirement_dropped",
+          "severity": "warning",
+          "count": 8
+        },
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 5
+        },
+        {
+          "code": "binary_request_body",
+          "severity": "warning",
+          "count": 1
+        },
+        {
+          "code": "invalid_security_scheme",
+          "severity": "warning",
+          "count": 1
+        },
+        {
+          "code": "unsupported_oauth_flow",
+          "severity": "warning",
+          "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
+    {
+      "id": "twilio-api-v2010-json",
+      "file": "twilio/twilio_api_v2010.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+      "license": "MIT",
+      "sha256": "bfdf249a129819af274d6bdc7672156ea3416ad48670a6f0544def6ef386ba87",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 197,
+        "ir": 197,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "no_success_response": 1
+        },
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 101,
+          "write": 64,
+          "destructive": 32
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.899,
+        "min": 0.8
+      },
+      "schemas": {
+        "input": {
+          "total": 197,
+          "strictAjvCompiles": 197
+        },
+        "output": {
+          "total": 164,
+          "strictAjvCompiles": 164
+        }
+      },
+      "compactIrBytes": 1037120,
+      "topDiagnostics": [
+        {
+          "code": "no_success_response",
+          "severity": "warning",
+          "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
+    {
+      "id": "twilio-conversations-v2-yaml",
+      "file": "twilio/twilio_conversations_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_conversations_v2.yaml",
+      "license": "MIT",
+      "sha256": "5c3ce298f390c070f5ec02a0001609583318dc4481661ec4904c421290980ace",
+      "retrievedOn": "2026-10-30",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 22,
+        "ir": 22,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {},
+        "errorsByCode": {},
+        "infosByCode": {}
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 10,
+          "write": 10,
+          "destructive": 2
+        },
+        "nameHeuristicEscalations": 0
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.9
+      },
+      "schemas": {
+        "input": {
+          "total": 22,
+          "strictAjvCompiles": 22
+        },
+        "output": {
+          "total": 22,
+          "strictAjvCompiles": 22
+        }
+      },
+      "compactIrBytes": 159894,
+      "topDiagnostics": [],
+      "errorSamples": []
+    }
+  ]
+}
