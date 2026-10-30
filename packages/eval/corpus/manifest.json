@@ -17,21 +17,68 @@
       "retrievedOn": "2026-10-30"
     },
     {
+      "id": "box-v2",
+      "file": "box/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/box/box-openapi/main/openapi.json",
+      "license": "Apache-2.0",
+      "sha256": "47cdf4bcbc7cdebcb042f155f13a8413bf913678489bd15b263b65f49e841ba1",
+      "retrievedOn": "2026-10-30",
+      "notes": "Large hand-maintained OpenAPI 3.0 document."
+    },
+    {
+      "id": "discord-v10",
+      "file": "discord/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
+      "license": "MIT",
+      "sha256": "281a2bff563d77a19e51fc3bf8bbe3ebcef28e3dc86684ae395b06ac51ba7484",
+      "retrievedOn": "2026-10-30",
+      "notes": "Large OpenAPI 3.1 document from a different generator than Twilio."
+    },
+    {
       "id": "intervals-icu",
       "file": "../../ingest/fixtures/intervals-icu/openapi.json",
       "sourceUrl": "https://raw.githubusercontent.com/yerzhansa/intervals-icu-api/main/openapi.json",
       "license": "MIT",
       "sha256": "f067e5e8ce21aaeb6fa959a72f7a3404d13871ba16baa1488ccb54c5e7ad07b2",
       "retrievedOn": "2026-10-30",
-      "notes": "Reuses the ingest fixture by path; not duplicated in eval/corpus."
+      "notes": "Reuses the ingest fixture by path; not duplicated in eval/corpus.",
+      "refetch": false
     },
     {
-      "id": "kubernetes-openapi-v2",
-      "file": "kubernetes/swagger.json",
-      "sourceUrl": "https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/openapi-spec/swagger.json",
-      "license": "Apache-2.0",
-      "sha256": "93fe8c3c3b388e5e1a6e9396ed264d8c0c1b89b1659e30f46db20883e6cd96f4",
-      "retrievedOn": "2026-10-30"
+      "id": "oai-petstore-expanded-v3-0",
+      "file": "oai-examples/petstore-expanded.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/petstore-expanded.yaml",
+      "license": "CC-BY-4.0",
+      "sha256": "abc68d08c674c8f0415aaeeb87c4203d5dd7257cdb79ac7ccb0446d1c5b9a7c2",
+      "retrievedOn": "2026-10-30",
+      "notes": "OpenAPI Initiative example (learn.openapis.org), CC BY 4.0: attribution to the OpenAPI Initiative."
+    },
+    {
+      "id": "oai-petstore-minimal-swagger-2-0",
+      "file": "oai-examples/petstore-minimal.swagger.json",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v2.0/json/petstore-minimal.json",
+      "license": "CC-BY-4.0",
+      "sha256": "d62d85d467ca86dc9f5ebeb6c9eda996822c972ecf00d6862beb0f25f01bcddd",
+      "retrievedOn": "2026-10-30",
+      "notes": "OpenAPI Initiative example (learn.openapis.org), CC BY 4.0: attribution to the OpenAPI Initiative. Swagger 2.0: checks clean rejection."
+    },
+    {
+      "id": "oai-uspto-v3-0",
+      "file": "oai-examples/uspto.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.0/uspto.yaml",
+      "license": "CC-BY-4.0",
+      "sha256": "29d32d0a0710b0acac434807e018ebd9cc192ad604fefdcf51422833b5963642",
+      "retrievedOn": "2026-10-30",
+      "notes": "OpenAPI Initiative example (learn.openapis.org), CC BY 4.0: attribution to the OpenAPI Initiative."
+    },
+    {
+      "id": "oai-webhook-example-v3-1",
+      "file": "oai-examples/webhook-example.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/OAI/learn.openapis.org/main/examples/v3.1/webhook-example.yaml",
+      "license": "CC-BY-4.0",
+      "sha256": "1bf9c928e1d42d5ffd3d793dbc6b569bd47a97a4679ee5c85cd78091136ab2a4",
+      "retrievedOn": "2026-10-30",
+      "notes": "OpenAPI Initiative example (learn.openapis.org), CC BY 4.0: attribution to the OpenAPI Initiative. Has webhooks and no paths."
     },
     {
       "id": "openai-openapi",
@@ -42,11 +89,11 @@
       "retrievedOn": "2026-10-30"
     },
     {
-      "id": "twilio-accounts-v1-json",
-      "file": "twilio/twilio_accounts_v1.json",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_accounts_v1.json",
-      "license": "MIT",
-      "sha256": "a21ff11add2e8ce407423bd6841744de9ae0bc21ca28054150c61ae4e8f0f684",
+      "id": "swagger-petstore-v3",
+      "file": "swagger-petstore/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/swagger-api/swagger-petstore/master/src/main/resources/openapi.yaml",
+      "license": "Apache-2.0",
+      "sha256": "65cfe2e8826c81db0eea34c51d18da3a305ae4840f1a778cd63b89d396efb687",
       "retrievedOn": "2026-10-30"
     },
     {
@@ -63,38 +110,6 @@
       "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_conversations_v2.yaml",
       "license": "MIT",
       "sha256": "5c3ce298f390c070f5ec02a0001609583318dc4481661ec4904c421290980ace",
-      "retrievedOn": "2026-10-30"
-    },
-    {
-      "id": "twilio-sync-v1-yaml",
-      "file": "twilio/twilio_sync_v1.yaml",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_sync_v1.yaml",
-      "license": "MIT",
-      "sha256": "48d7c85e2c09231688d6b5d3ef3a2da4e7517a01e6675683940ed4e40153eb2d",
-      "retrievedOn": "2026-10-30"
-    },
-    {
-      "id": "twilio-taskrouter-v1-yaml",
-      "file": "twilio/twilio_taskrouter_v1.yaml",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_taskrouter_v1.yaml",
-      "license": "MIT",
-      "sha256": "1553e1e453f481135210531b01610d7ca0e6dae273c030d9566e0848cf9d7491",
-      "retrievedOn": "2026-10-30"
-    },
-    {
-      "id": "twilio-verify-v2-json",
-      "file": "twilio/twilio_verify_v2.json",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_verify_v2.json",
-      "license": "MIT",
-      "sha256": "bee888a5f4c53e422604cafbd610ffe23b46db5789dab9ef516980a188e480bb",
-      "retrievedOn": "2026-10-30"
-    },
-    {
-      "id": "twilio-video-v1-json",
-      "file": "twilio/twilio_video_v1.json",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_video_v1.json",
-      "license": "MIT",
-      "sha256": "162f62d432a227cb5aab8da45af7bbfceca5569feff4e26529504583946d1383",
       "retrievedOn": "2026-10-30"
     }
   ]

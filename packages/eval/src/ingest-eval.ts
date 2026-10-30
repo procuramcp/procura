@@ -47,6 +47,8 @@ export type IngestEvalReport = {
     operationsInDocuments: number;
     operationsInIr: number;
     operationsSkipped: number;
+    /** Operations in documents the mapper rejected outright (e.g. Swagger 2.0). */
+    operationsInRejectedDocuments: number;
   };
   documents: IngestEvalDocumentResult[];
 };
@@ -67,6 +69,9 @@ export function runIngestEval(options?: { manifestPath?: string; ids?: string[] 
     operationsInDocuments: documents.reduce((sum, d) => sum + d.operations.document, 0),
     operationsInIr: documents.reduce((sum, d) => sum + d.operations.ir, 0),
     operationsSkipped: documents.reduce((sum, d) => sum + d.operations.skipped, 0),
+    operationsInRejectedDocuments: documents
+      .filter((d) => d.outcome.kind === "rejected")
+      .reduce((sum, d) => sum + d.operations.document, 0),
   };
   return { summary, documents };
 }
@@ -104,7 +109,8 @@ function evaluateEntry(entry: CorpusEntry, manifestPath: string): IngestEvalDocu
       sha256: actualSha,
       retrievedOn: entry.retrievedOn,
       outcome: { kind: "rejected", fatalCode },
-      operations: { document: operationsInDocument, ir: 0, skipped: operationsInDocument },
+      // A rejected document has no operations to skip; it is counted under `rejected`.
+      operations: { document: operationsInDocument, ir: 0, skipped: 0 },
       diagnostics,
       sideEffects: { classCounts: { read: 0, write: 0, destructive: 0 }, nameHeuristicEscalations: 0 },
       confidence: null,
@@ -166,8 +172,24 @@ function countSkippedOperations(diagnostics: Diagnostic[], documentOperations: n
   return Math.max(operationIds.size, Math.max(documentOperations - irOperations, 0));
 }
 
+/**
+ * JSON Schema 2020-12 validator that rejects unknown keywords (an OpenAPI-only
+ * keyword leaking into the IR is a mapper bug). Ajv's other strict rules
+ * (strictTypes, strictRequired, strictTuples) are style lints that reject
+ * valid schemas, such as `required` naming an undeclared property, so they
+ * are off: they measured upstream sloppiness, not mapper correctness.
+ */
 function strictAjv() {
-  return new Ajv2020({ strict: true, validateFormats: false, allowUnionTypes: true, allErrors: true });
+  return new Ajv2020({
+    strictSchema: true,
+    strictNumbers: true,
+    strictTypes: false,
+    strictTuples: false,
+    strictRequired: false,
+    validateFormats: false,
+    allowUnionTypes: true,
+    allErrors: true,
+  });
 }
 
 function compileSchemaStats(operations: Operation[]) {

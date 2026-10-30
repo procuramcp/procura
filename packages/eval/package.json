@@ -6,7 +6,8 @@
   "description": "Offline evaluation scripts for cairnmcp ingestors.",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "eval:ingest": "node scripts/run-ingest-eval.ts"
+    "eval:ingest": "node scripts/run-ingest-eval.ts",
+    "corpus:fetch": "node scripts/fetch-corpus.ts"
   },
   "dependencies": {
     "@cairnmcp/core": "workspace:*",

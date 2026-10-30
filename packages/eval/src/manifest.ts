@@ -10,11 +10,16 @@ export const CorpusEntry = z.object({
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   retrievedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   notes: z.string().min(1).optional(),
+  /**
+   * False for files owned elsewhere (e.g. a test fixture in another package),
+   * so the fetch script never overwrites them.
+   */
+  refetch: z.boolean().optional(),
 });
 export type CorpusEntry = z.infer<typeof CorpusEntry>;
 
 export const CorpusManifest = z.object({
-  entries: z.array(CorpusEntry).min(12),
+  entries: z.array(CorpusEntry).min(1),
 });
 export type CorpusManifest = z.infer<typeof CorpusManifest>;
 

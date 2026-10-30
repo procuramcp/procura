@@ -1,36 +1,43 @@
+// Re-download the corpus from the manifest URLs and update hashes and dates.
+// The only part of the eval that uses the network; the eval itself runs offline.
+// Usage: node scripts/fetch-corpus.ts [id ...]   (no ids = every refetchable entry)
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { DEFAULT_MANIFEST_PATH, loadCorpusManifest, resolveCorpusFile } from "../src/manifest.ts";
+import { dirname } from "node:path";
+import { MAX_DOCUMENT_BYTES } from "@cairnmcp/ingest";
+import { DEFAULT_MANIFEST_PATH, loadCorpusManifest, resolveCorpusFile, type CorpusEntry } from "../src/manifest.ts";
 
+const TIMEOUT_MS = 60_000;
 const manifestPath = DEFAULT_MANIFEST_PATH;
 const manifest = loadCorpusManifest(manifestPath);
+const only = new Set(process.argv.slice(2));
+const today = new Date().toISOString().slice(0, 10);
 
-const updated = [] as typeof manifest.entries;
-for (const entry of manifest.entries) {
-  const response = await fetch(entry.sourceUrl);
-  if (!response.ok) throw new Error(`failed to download ${entry.id} from ${entry.sourceUrl}: ${response.status} ${response.statusText}`);
+async function download(entry: CorpusEntry): Promise<string> {
+  const response = await fetch(entry.sourceUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!response.ok) throw new Error(`${entry.id}: ${response.status} ${response.statusText} from ${entry.sourceUrl}`);
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (declared > MAX_DOCUMENT_BYTES) throw new Error(`${entry.id}: ${declared} bytes exceeds ${MAX_DOCUMENT_BYTES}`);
   const text = await response.text();
-  const absolutePath = resolveCorpusFile(manifestPath, entry.file);
-  mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, text, "utf8");
+  if (Buffer.byteLength(text, "utf8") > MAX_DOCUMENT_BYTES) throw new Error(`${entry.id}: body exceeds ${MAX_DOCUMENT_BYTES} bytes`);
+  return text;
+}
+
+const entries: CorpusEntry[] = [];
+for (const entry of manifest.entries) {
+  if (entry.refetch === false || (only.size > 0 && !only.has(entry.id))) {
+    entries.push(entry);
+    continue;
+  }
+  const text = await download(entry);
+  const file = resolveCorpusFile(manifestPath, entry.file);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text, "utf8");
   const sha256 = createHash("sha256").update(text, "utf8").digest("hex");
-  updated.push({ ...entry, sha256 });
+  entries.push({ ...entry, sha256, retrievedOn: today });
   console.log(`${entry.id}: ${sha256} (${Buffer.byteLength(text, "utf8")} bytes)`);
 }
 
-const out = {
-  entries: updated
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map((entry) => ({
-      id: entry.id,
-      file: entry.file,
-      sourceUrl: entry.sourceUrl,
-      license: entry.license,
-      sha256: entry.sha256,
-      retrievedOn: entry.retrievedOn,
-      ...(entry.notes ? { notes: entry.notes } : {}),
-    })),
-};
-writeFileSync(resolve(manifestPath), `${JSON.stringify(out, null, 2)}\n`);
+entries.sort((a, b) => a.id.localeCompare(b.id));
+writeFileSync(manifestPath, `${JSON.stringify({ entries }, null, 2)}\n`);
 console.log(`updated ${manifestPath}`);

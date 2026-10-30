@@ -146,8 +146,16 @@ planning handoff are not repeated here unless implementation added something.
 
 ## D-017 Ingest eval corpus is a fixed, redistributable snapshot
 
-- **Decision:** `packages/eval/corpus/manifest.json` pins a vendored corpus by URL, SHA-256, and
-  retrieval date. The corpus mixes OpenAPI 3.0/3.1 plus one Swagger 2.0 document and reuses the
-  existing Intervals.icu fixture by path.
-- **Why:** Eval output must be deterministic and fully offline. Pinning exact bytes makes report
-  diffs meaningful and keeps `pnpm eval:ingest` reproducible in CI and local runs.
+- **Decision:** `packages/eval/corpus/manifest.json` pins a vendored corpus by URL, license,
+  SHA-256, and retrieval date. `pnpm eval:ingest` runs offline and writes a deterministic report
+  to `docs/eval/`; `pnpm --filter @cairnmcp/eval corpus:fetch` refreshes it.
+- **Corpus choice:** 13 documents, chosen for variety over volume: OpenAPI 3.0 and 3.1, JSON and
+  YAML, hand-written and generated (no single generator for more than two entries), small
+  reference examples to large real APIs (OpenAI, Box, Discord, Twilio), a 3.1 document with only
+  webhooks, and one tiny Swagger 2.0 document to check rejection. Only redistributable licenses
+  (MIT, Apache-2.0, CC0, CC BY 4.0 with attribution in `notes`). The Intervals.icu fixture is
+  reused by path and marked `refetch: false` so refreshing never overwrites it.
+- **Validity check:** schemas must compile under Ajv 2020 with unknown keywords rejected. Ajv's
+  style lints (`strictTypes`, `strictRequired`) are off because they reject valid schemas.
+- **Rejected:** Pulling a large share of APIs.guru (skews toward one conversion pipeline, and
+  repository bloat); fetching at eval time (non-deterministic, needs network in CI).
