@@ -21,7 +21,7 @@ if (!apiKey) {
   console.error("INTERVALS_API_KEY is not set. Copy .env.example to .env at the repo root and add your key.");
   process.exit(1);
 }
-// "0" means "the athlete this API key belongs to". Set INTERVALS_ATHLETE_ID (e.g. i12345,
+// "0" means "the athlete this API key belongs to" (confirmed). Set INTERVALS_ATHLETE_ID (e.g. i12345,
 // shown on your Intervals.icu settings page) to use an explicit id instead.
 const athleteId = process.env["INTERVALS_ATHLETE_ID"]?.trim() || "0";
 if (!/^(0|i?\d+)$/.test(athleteId)) {

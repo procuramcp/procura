@@ -5,7 +5,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 
 | | Milestone | Status |
 | --- | --- | --- |
-| 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | IR ✅ · OpenAPI ingestor ✅ · runtime ✅ · vault ✅ · live Intervals.icu call ⏳ (`pnpm try:intervals`, needs a real key) |
+| 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
 | 2 | Tenancy (RLS plus isolation tests), MCP server with OAuth; the app container image and our hosted deployment of it | — |
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening | — |

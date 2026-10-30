@@ -4,8 +4,8 @@ A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs t
 ingests an API description, curates a safe set of operations, and serves them as a remote
 MCP server, on our hosting or yours.
 
-Status: milestone 1 in progress. The IR, OpenAPI ingestor, vault, and runtime are done; the first
-live Intervals.icu call (`pnpm try:intervals`) is next. Hosted first; self-hosting with one container image follows (see the roadmap).
+Status: milestone 1 done (IR, OpenAPI ingestor, vault, runtime, live Intervals.icu call).
+Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted first; self-hosting with one container image follows (see the roadmap).
 
 ## Layout
 
@@ -19,7 +19,7 @@ live Intervals.icu call (`pnpm try:intervals`) is next. Hosted first; self-hosti
 | `packages/db`, `api`, `mcp`, `web`, `backtest` | Added with their milestones | — |
 
 Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
-[`docs/DECISIONS.md`](docs/DECISIONS.md).
+[`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/sources/`](docs/sources/) (per-API findings).
 
 ## Develop
 
