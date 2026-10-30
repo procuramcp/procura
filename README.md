@@ -1,11 +1,11 @@
 # cairnmcp
 
 A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs to agents: it
-ingests an API description, curates a safe set of operations, and serves them as a hosted remote
-MCP server.
+ingests an API description, curates a safe set of operations, and serves them as a remote
+MCP server, on our hosting or yours.
 
-Status: milestone 1 in progress. The IR and the OpenAPI ingestor are done; runtime, vault, and
-MCP server are next.
+Status: milestone 1 in progress. The IR and the OpenAPI ingestor are done; the runtime and vault
+are next. Hosted first; self-hosting with one container image follows (see the roadmap).
 
 ## Layout
 
@@ -13,9 +13,11 @@ MCP server are next.
 | --- | --- | --- |
 | `packages/core` | The IR (Zod), side-effect rules, toolset resolution. Pure: no I/O, no clock. | ✅ |
 | `packages/ingest` | API description → IR. OpenAPI 3.0/3.1 now; GraphQL, Postman/HAR/curl, docs later. | OpenAPI ✅ |
+| `packages/eval` | Offline eval of the ingestor over a corpus of public API descriptions. | ✅ |
 | `packages/db`, `runtime`, `api`, `mcp`, `web`, `backtest` | Added with their milestones | — |
 
-Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
+[`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Develop
 
