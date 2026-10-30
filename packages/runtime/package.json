@@ -1,0 +1,23 @@
+{
+  "name": "@cairnmcp/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Executes IR operations against upstream APIs: validation, auth, egress controls, throttling, audit.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "try:intervals": "node scripts/try-intervals.ts"
+  },
+  "dependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "@cairnmcp/vault": "workspace:*",
+    "ajv": "8.20.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cairnmcp/ingest": "workspace:*"
+  }
+}
