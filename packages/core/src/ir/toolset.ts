@@ -4,23 +4,6 @@ import { OperationId, SourceId, ToolName, ToolsetId } from "./ids.ts";
 import { JsonValue, type JsonSchema } from "./json-schema.ts";
 import type { Operation } from "./operation.ts";
 
-/**
- * Safety switches. All default to off: a toolset is read-only unless a human
- * opts in to writes, and destructive or unverified operations each need their
- * own explicit opt-in.
- */
-export const ToolsetPolicy = z
-  .object({
-    allowWrites: z.boolean().default(false),
-    allowDestructive: z.boolean().default(false),
-    allowUnverified: z.boolean().default(false),
-  })
-  .refine((p) => !p.allowDestructive || p.allowWrites, {
-    message: "allowDestructive requires allowWrites",
-    path: ["allowDestructive"],
-  });
-export type ToolsetPolicy = z.infer<typeof ToolsetPolicy>;
-
 /** One operation exposed as one tool, renamed and re-described for agents. */
 export const ToolBinding = z.object({
   operationId: OperationId,
@@ -28,6 +11,7 @@ export const ToolBinding = z.object({
   title: z.string().max(200).optional(),
   /** Agent-facing description. Written for models: explicit, short, with an example if useful. */
   description: z.string().min(1).max(4000),
+  /** The only switch. `defaultToolset` enables read tools; users can enable anything else. */
   enabled: z.boolean().default(true),
   /**
    * Input values fixed by the toolset and hidden from the agent. Used to
@@ -45,7 +29,6 @@ export const Toolset = z
     sourceId: SourceId,
     name: z.string().min(1).max(200),
     description: z.string().max(4000).optional(),
-    policy: ToolsetPolicy.default({ allowWrites: false, allowDestructive: false, allowUnverified: false }),
     tools: z.array(ToolBinding),
   })
   .superRefine((ts, ctx) => {
@@ -66,7 +49,7 @@ export type ToolAnnotations = {
   openWorldHint: boolean;
 };
 
-/** A tool ready to be served: everything the MCP layer needs, already checked against policy. */
+/** A tool ready to be served: everything the MCP layer needs. */
 export type ResolvedTool = {
   name: ToolName;
   description: string;
@@ -79,22 +62,38 @@ export type ResolvedTool = {
 
 export type ToolsetIssue = {
   toolName: string;
-  code:
-    | "source_mismatch"
-    | "unknown_operation"
-    | "writes_not_allowed"
-    | "destructive_not_allowed"
-    | "unverified_not_allowed"
-    | "unknown_pinned_input";
+  code: "source_mismatch" | "unknown_operation" | "unknown_pinned_input";
   message: string;
 };
 
 export type ResolveResult = { ok: true; tools: ResolvedTool[] } | { ok: false; issues: ToolsetIssue[] };
 
 /**
+ * Starting toolset for a source: every operation becomes a tool, and only
+ * read operations are enabled. This is the one safety default (DECISIONS
+ * D-016); users can enable any other tool directly, with no further opt-in.
+ */
+export function defaultToolset(ir: IrDocument, options: { id: string; name: string }): Toolset {
+  return Toolset.parse({
+    id: options.id,
+    sourceId: ir.source.id,
+    name: options.name,
+    tools: ir.operations.map((op) => ({
+      operationId: op.id,
+      name: op.id,
+      title: op.title,
+      description: op.description.length <= 4000 ? op.description : `${op.description.slice(0, 3999)}…`,
+      enabled: op.sideEffect.class === "read",
+    })),
+  });
+}
+
+/**
  * Check a toolset against the IR it curates and produce the tools to serve.
- * Disabled tools are skipped. Any issue fails the whole toolset, so a bad
- * edit never silently serves a partial or over-permissive set.
+ * Disabled tools are skipped. Side effects never block a tool: enabling it is
+ * the user's decision, and the MCP annotations tell clients what it does.
+ * Structural issues (unknown operation, bad pin) fail the whole toolset, so a
+ * broken edit never silently serves a partial set.
  */
 export function resolveToolset(toolset: Toolset, ir: IrDocument): ResolveResult {
   const issues: ToolsetIssue[] = [];
@@ -118,16 +117,6 @@ export function resolveToolset(toolset: Toolset, ir: IrDocument): ResolveResult 
     if (!op) {
       issue("unknown_operation", `operation "${binding.operationId}" does not exist in source "${ir.source.id}"`);
       continue;
-    }
-    const effect = op.sideEffect.class;
-    if (effect === "write" && !toolset.policy.allowWrites) {
-      issue("writes_not_allowed", `"${op.id}" writes data; set policy.allowWrites to enable it`);
-    }
-    if (effect === "destructive" && !toolset.policy.allowDestructive) {
-      issue("destructive_not_allowed", `"${op.id}" is destructive (${op.sideEffect.reason}); set policy.allowDestructive to enable it`);
-    }
-    if (op.provenance.kind === "inferred" && !toolset.policy.allowUnverified) {
-      issue("unverified_not_allowed", `"${op.id}" was inferred from docs and not verified; set policy.allowUnverified to enable it`);
     }
     const props = inputProperties(op.input);
     for (const key of Object.keys(binding.pinnedInputs)) {
