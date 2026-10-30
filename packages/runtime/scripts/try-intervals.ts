@@ -21,6 +21,13 @@ if (!apiKey) {
   console.error("INTERVALS_API_KEY is not set. Copy .env.example to .env at the repo root and add your key.");
   process.exit(1);
 }
+// "0" means "the athlete this API key belongs to". Set INTERVALS_ATHLETE_ID (e.g. i12345,
+// shown on your Intervals.icu settings page) to use an explicit id instead.
+const athleteId = process.env["INTERVALS_ATHLETE_ID"]?.trim() || "0";
+if (!/^(0|i?\d+)$/.test(athleteId)) {
+  console.error(`INTERVALS_ATHLETE_ID should look like i12345 (or be empty to use 0); got "${athleteId}".`);
+  process.exit(1);
+}
 const masterKey = process.env["CAIRNMCP_MASTER_KEY"] ? parseMasterKey(process.env["CAIRNMCP_MASTER_KEY"]) : randomBytes(32);
 
 // 1. Ingest the Intervals.icu description and apply the one curation step it needs.
@@ -38,7 +45,7 @@ const resolved = resolveToolset(
     id: "try",
     sourceId: "intervals-icu",
     name: "Try",
-    tools: [{ operationId: "list_activities", name: "list_activities", description: "List my activities.", pinnedInputs: { id: "0" } }],
+    tools: [{ operationId: "list_activities", name: "list_activities", description: "List my activities.", pinnedInputs: { id: athleteId } }],
   }),
   mapped.ir,
 );
@@ -61,10 +68,13 @@ const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISO
 const oldest = day(-14);
 
 // 4. Call it.
-console.log(`Listing your activities since ${oldest} (read-only)…`);
+console.log(`Listing activities for athlete ${athleteId === "0" ? "0 (the key's own athlete)" : athleteId} since ${oldest} (read-only)…`);
 const all = await runtime.invoke({ tenantId, source, tool, args: { oldest, limit: 10 } });
 if (!all.ok) {
   console.error(`Failed: ${all.error.kind}: ${all.error.message}`);
+  if (athleteId === "0" && all.error.kind === "upstream_error" && (all.error.status === 403 || all.error.status === 404)) {
+    console.error('Tip: athlete id "0" may not be accepted. Set INTERVALS_ATHLETE_ID in .env to your id (e.g. i12345) and retry.');
+  }
   process.exit(1);
 }
 const activities = Array.isArray(all.data) ? (all.data as Array<Record<string, unknown>>) : [];

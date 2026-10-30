@@ -40,8 +40,9 @@ pnpm ir:dump
 `pnpm check` runs typecheck and tests. `pnpm ir:dump` writes the Intervals.icu IR and its
 diagnostics to `out/` (gitignored).
 
-To call Intervals.icu with your own key: copy `.env.example` to `.env`, set `INTERVALS_API_KEY`,
-then run `pnpm try:intervals`. It only reads, and prints a summary.
+To call Intervals.icu with your own key: copy `.env.example` to `.env`, set `INTERVALS_API_KEY`
+(and optionally `INTERVALS_ATHLETE_ID`; it defaults to `0`, the key's own athlete), then run
+`pnpm try:intervals`. It only reads, and prints a summary.
 
 ## Data and secrets
 
