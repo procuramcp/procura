@@ -181,3 +181,45 @@ planning handoff are not repeated here unless implementation added something.
   runner-to-control-plane channel; revisit if users ask for it.
 - **Open:** which container platform for our deployment (Fly.io, Cloud Run, Railway, or similar),
   and Neon/Upstash free-tier limits. Decide in milestone 2 against current pricing and limits.
+
+## D-019 Vault: envelope encryption with Node's built-in AES-256-GCM
+
+- **Decision:** `packages/vault`. Each tenant has a random 256-bit data key, stored only wrapped by
+  a key-encryption key (KEK). Credentials are encrypted with the tenant's data key using
+  AES-256-GCM. The authenticated context binds tenant, credential id, source, scheme, and kind, so
+  a ciphertext copied to another row or tenant, or with edited metadata, fails to decrypt. The
+  KEK sits behind a `KeyWrapper` interface: `LocalKeyWrapper` uses `CAIRNMCP_MASTER_KEY` (32
+  bytes, base64) for self-hosting and development; a KMS wrapper can replace it. Data keys
+  record which KEK wrapped them, and `rotateTenantKey` re-wraps them without touching credentials.
+- **Secrets in memory:** decrypted values are `Secret` objects that print as `[redacted]` in
+  strings, JSON, and `console.log`; code must call `reveal()`, which is easy to audit.
+- **Why these primitives:** AES-256-GCM via `node:crypto` (OpenSSL) is a reviewed implementation;
+  the vault only fixes parameters (fresh 96-bit IV per encryption, 128-bit tag) and encoding.
+  No custom cryptography.
+- **Rejected:** One global key for all credentials (no per-tenant isolation, rotation rewrites
+  everything); libsodium (another native dependency for no gain here); storing credentials in the
+  upstream's OAuth provider only (not every API offers OAuth).
+- **Later:** a Postgres `VaultStore` with RLS (milestone 2), a KMS `KeyWrapper` for the hosted
+  deployment, and a short-lived data-key cache once unwrapping is a network call.
+
+## D-020 Runtime: fail closed, errors as tool results, no automatic retries
+
+- **Decision:** `packages/runtime` executes one tool call in a fixed order: validate the agent's
+  input against the schema it was shown; add pinned inputs and validate again; take a throttle
+  slot; build the request; attach credentials; record intent in the audit log (writes only);
+  send under egress rules; record the outcome. Expected failures are returned as
+  `{ ok: false, error }` with a kind, an agent-readable message, and `retryable`/`retryAfterSeconds`,
+  not thrown.
+- **Egress rules (now):** https only; only the source's origin, checked before every request and
+  redirect; same-origin redirects only and never for writes; one timeout (15 s) for the whole call;
+  responses read as a stream and cut at 2 MB. An `EgressGuard` hook runs on every hop; milestone 3
+  plugs in DNS resolution and private-range blocking there.
+- **Throughput:** token buckets plus a concurrency cap, per tenant+source (60/min, 4 at once) and
+  per source across tenants (300/min, 16 at once), because every tenant shares our egress IP.
+  Upstream `429`/`503` with `Retry-After` cools down both keys. Defaults are guesses until
+  Intervals.icu's limits are confirmed; they are settings, not constants.
+- **No automatic retries:** the agent gets `retryable` and a wait time and decides. Retrying a
+  write inside the runtime could repeat it.
+- **Audit fails closed:** if the intent entry can't be written, the write is not sent.
+- **No leaks by construction:** error messages never include URLs (a query-string key would leak)
+  or request headers; credential values the upstream echoes back are scrubbed from bodies.

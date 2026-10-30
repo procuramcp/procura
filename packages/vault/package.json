@@ -1,0 +1,17 @@
+{
+  "name": "@cairnmcp/vault",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Envelope-encrypted storage for upstream API credentials.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

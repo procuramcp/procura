@@ -27,3 +27,11 @@ export type ToolName = z.infer<typeof ToolName>;
 /** Id of an auth scheme within a source, e.g. the OpenAPI securitySchemes key. */
 export const AuthSchemeId = z.string().regex(/^[A-Za-z0-9._-]{1,64}$/).brand<"AuthSchemeId">();
 export type AuthSchemeId = z.infer<typeof AuthSchemeId>;
+
+/**
+ * Tenant identifier. Opaque to cairnmcp: a UUID in the hosted deployment, any
+ * slug-like value in tests and self-hosted setups. Not part of the IR itself
+ * (D-004); used by the vault, runtime, and storage layers.
+ */
+export const TenantId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, "must be 1-64 letters, digits, - or _").brand<"TenantId">();
+export type TenantId = z.infer<typeof TenantId>;
