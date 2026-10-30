@@ -8,8 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "try:intervals": "node scripts/try-intervals.ts"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@cairnmcp/core": "workspace:*",

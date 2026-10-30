@@ -81,11 +81,12 @@ planning handoff are not repeated here unless implementation added something.
 
 ## D-010 Date/time convention
 
-- **Decision:** `Instant` = UTC ISO-8601 ending in `Z`. `LocalDate` = `YYYY-MM-DD` in the
-  athlete's own time zone. Both are branded Zod types (`packages/core/src/time.ts`). Training-day
-  keys, dated settings, and baselines use `LocalDate`; audit and ingest timestamps use `Instant`.
-- **Why:** A late-evening workout belongs to the athlete's local day; mixing the two is a classic
-  off-by-one-day bug, so the types keep them apart.
+*Narrowed by D-021: `LocalDate` was removed with the analyzer.*
+
+- **Decision:** `Instant` = UTC ISO-8601 ending in `Z`, a branded Zod type
+  (`packages/core/src/time.ts`), for audit, ingest, and credential-expiry timestamps.
+- **Why:** One unambiguous representation for points in time; the type stops a local or
+  offset timestamp from slipping in.
 
 ## D-011 `core` purity is enforced, not just intended
 
@@ -223,3 +224,23 @@ planning handoff are not repeated here unless implementation added something.
 - **Audit fails closed:** if the intent entry can't be written, the write is not sent.
 - **No leaks by construction:** error messages never include URLs (a query-string key would leak)
   or request headers; credential values the upstream echoes back are scrubbed from bodies.
+
+## D-021 Scope: cairnmcp returns API output as-is; analysis is a separate project
+
+- **Decision:** cairnmcp turns APIs into agent-ready tools and returns what the upstream API
+  returns. It does not analyze, interpret, summarize, or filter domain data. The planned analyzer
+  tool pack (milestone 6) and its `backtest` package are removed from this project; the athlete-
+  local `LocalDate` type built for them is removed from `core`.
+- **What the runtime may still do to output:** decode it (JSON, text, base64), scrub echoed
+  credentials, enforce the size cap, and wrap it generically where a protocol requires (MCP
+  structured content must be an object, so an array response gets wrapped). All of these are
+  API-agnostic.
+- **What curation may still do:** rename and re-describe tools, pin inputs, and point agents at the
+  API's own parameters (e.g. Intervals.icu's `fields`) to keep responses small. Those use the API
+  as designed; they don't change what it returns.
+- **Why:** Keeps cairnmcp general-purpose. An analysis product is built on top of it as a
+  consumer, like any other agent or app.
+- **No source-specific code or settings in the product:** facts about one API (Intervals.icu's
+  `API_KEY` username, athlete `0`) are curation data. Until the curation UI stores them per tenant,
+  they live in `examples/<api>/` and `docs/sources/<api>.md`, never in `packages/` or the root
+  `.env.example`.

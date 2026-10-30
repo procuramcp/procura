@@ -4,8 +4,9 @@ A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs t
 ingests an API description, curates a safe set of operations, and serves them as a remote
 MCP server, on our hosting or yours.
 
-Status: milestone 1 in progress. The IR, OpenAPI ingestor, vault, and runtime are done; the first
-live Intervals.icu call (`pnpm try:intervals`) is next. Hosted first; self-hosting with one container image follows (see the roadmap).
+Status: milestone 1 done (IR, OpenAPI ingestor, vault, runtime, a live call to Intervals.icu as the
+first example API).
+Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted first; self-hosting with one container image follows (see the roadmap).
 
 ## Layout
 
@@ -16,10 +17,10 @@ live Intervals.icu call (`pnpm try:intervals`) is next. Hosted first; self-hosti
 | `packages/eval` | Offline eval of the ingestor over a corpus of public API descriptions. | ✅ |
 | `packages/vault` | Envelope-encrypted credential storage (per-tenant data keys, master key or KMS). | ✅ |
 | `packages/runtime` | Runs a tool call: input validation, auth, egress rules, throttling, audit. | ✅ |
-| `packages/db`, `api`, `mcp`, `web`, `backtest` | Added with their milestones | — |
+| `packages/db`, `api`, `mcp`, `web` | Added with their milestones | — |
 
 Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
-[`docs/DECISIONS.md`](docs/DECISIONS.md).
+[`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/sources/`](docs/sources/) (per-API findings).
 
 ## Develop
 
@@ -40,10 +41,16 @@ pnpm ir:dump
 `pnpm check` runs typecheck and tests. `pnpm ir:dump` writes the Intervals.icu IR and its
 diagnostics to `out/` (gitignored).
 
-To call Intervals.icu with your own key: copy `.env.example` to `.env`, set `INTERVALS_API_KEY`,
-then run `pnpm try:intervals`. It only reads, and prints a summary.
+## Examples
+
+`examples/intervals-icu/` calls Intervals.icu with your own API key, through the whole pipeline.
+Copy its `.env.example` to `.env` in that folder, set `INTERVALS_API_KEY`, then run
+`pnpm example:intervals`. It only reads, and prints a summary.
 
 ## Data and secrets
 
-Never commit secrets, `.env` files, or real training/wellness data. Fixtures are synthetic or
-public API descriptions. Analyzer output is training-load guidance, not medical advice.
+Never commit secrets, `.env` files, or real personal data from any API. Fixtures are synthetic
+or public API descriptions.
+
+cairnmcp returns each API's output as-is. It doesn't analyze or interpret data; that belongs to
+whatever agent or app consumes the tools.

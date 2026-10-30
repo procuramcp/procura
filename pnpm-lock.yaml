@@ -18,6 +18,21 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))
 
+  examples/intervals-icu:
+    dependencies:
+      '@cairnmcp/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@cairnmcp/ingest':
+        specifier: workspace:*
+        version: link:../../packages/ingest
+      '@cairnmcp/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@cairnmcp/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault
+
   packages/core:
     dependencies:
       zod:
