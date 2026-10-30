@@ -1,7 +1,7 @@
 # cairnmcp
 
 A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs to agents: it
-ingests an API description, curates a safe set of operations, and serves them as a hosted remote
+ingests an API description, curates a safe set of operations, and serves them as a remote
 MCP server, on our hosting or yours.
 
 Status: milestone 1 in progress. The IR and the OpenAPI ingestor are done; the runtime and vault
