@@ -1,0 +1,26 @@
+{
+  "name": "@cairnmcp/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Postgres storage with row-level security: tenants, members, sources, toolsets, vault, audit.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "migrate": "node scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "@cairnmcp/runtime": "workspace:*",
+    "@cairnmcp/vault": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cairnmcp/ingest": "workspace:*",
+    "@types/pg": "8.23.1"
+  }
+}

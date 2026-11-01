@@ -1,4 +1,4 @@
-import type { Instant, JsonValue, SideEffect, TenantId } from "@cairnmcp/core";
+import type { Instant, JsonValue, SideEffect, TenantId, UserId } from "@cairnmcp/core";
 
 /**
  * One entry in the tenant-scoped audit log. Every non-read tool call writes an
@@ -8,6 +8,8 @@ import type { Instant, JsonValue, SideEffect, TenantId } from "@cairnmcp/core";
 export type AuditEvent = {
   invocationId: string;
   tenantId: TenantId;
+  /** The user the call was made for (D-023: every entry records who). */
+  actorUserId: UserId;
   at: Instant;
   phase: "intent" | "outcome";
   sourceId: string;

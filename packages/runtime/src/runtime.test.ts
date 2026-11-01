@@ -1,7 +1,7 @@
 // End to end: real Intervals.icu IR, real vault, fake upstream.
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { resolveToolset, TenantId, Toolset, type Instant, type IrDocument, type ResolvedTool, type Source } from "@cairnmcp/core";
+import { resolveToolset, TenantId, Toolset, UserId, type Caller, type Instant, type IrDocument, type ResolvedTool, type Source } from "@cairnmcp/core";
 import { ingestOpenApiText } from "@cairnmcp/ingest";
 import { InMemoryVaultStore, LocalKeyWrapper, Vault } from "@cairnmcp/vault";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -12,6 +12,7 @@ import { fakeFetch, json } from "./test-support.ts";
 
 const API_KEY = "test-api-key-not-real-0123456789";
 const TENANT = TenantId.parse("tenant-me");
+const CALLER: Caller = { userId: UserId.parse("user-me"), claims: { sub: "me" } };
 const NOW = "2026-10-30T12:00:00Z" as Instant;
 
 const fixture = new URL("../../ingest/fixtures/intervals-icu/openapi.json", import.meta.url);
@@ -67,7 +68,7 @@ function expectNoSecret(...things: unknown[]) {
 describe("Runtime with Intervals.icu", () => {
   it("lists activities: pinned athlete, basic auth, decoded JSON", async () => {
     const { fetch, calls } = fakeFetch(() => json([{ id: "i1", type: "Ride", moving_time: 3600 }]));
-    const result = await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("list_activities"), args: { oldest: "2026-10-23", limit: 5 } });
+    const result = await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("list_activities"), args: { oldest: "2026-10-23", limit: 5 } });
 
     expect(result).toEqual({ ok: true, status: 200, contentType: "application/json", data: [{ id: "i1", type: "Ride", moving_time: 3600 }] });
     expect(calls[0]?.method).toBe("GET");
@@ -87,7 +88,7 @@ describe("Runtime with Intervals.icu", () => {
       ["not an object", "list everything", "must be object"],
     ])("rejects %s before any request", async (_name, args, message) => {
       const { fetch, calls } = fakeFetch(() => json([]));
-      const result = await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("list_activities"), args });
+      const result = await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("list_activities"), args });
       expect(result).toMatchObject({ ok: false, error: { kind: "invalid_input", retryable: false } });
       expect(!result.ok && result.error.message).toContain(message);
       expect(calls).toHaveLength(0);
@@ -96,15 +97,23 @@ describe("Runtime with Intervals.icu", () => {
 
   it("reports missing credentials for a tenant with none stored", async () => {
     const { fetch, calls } = fakeFetch(() => json([]));
-    const result = await runtime(fetch).invoke({ tenantId: TenantId.parse("tenant-new"), source, tool: tool("list_activities"), args: { oldest: "2026-10-23" } });
+    const result = await runtime(fetch).invoke({ tenantId: TenantId.parse("tenant-new"), caller: CALLER, source, tool: tool("list_activities"), args: { oldest: "2026-10-23" } });
     expect(result).toMatchObject({ ok: false, error: { kind: "missing_credentials" } });
     expect(calls).toHaveLength(0);
+  });
+
+  it("passes the caller to the credential lookup", async () => {
+    const seen: unknown[] = [];
+    const credentials = { credentialsForSource: async (...args: unknown[]) => (seen.push(args), new Map()) };
+    const { fetch } = fakeFetch(() => json([]));
+    await runtime(fetch, { credentials }).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("list_activities"), args: { oldest: "2026-10-23" } });
+    expect(seen).toEqual([[TENANT, "intervals-icu", CALLER]]);
   });
 
   it("does not use another tenant's credentials", async () => {
     // tenant-me has a key; tenant-other does not and must not borrow it.
     const { fetch, calls } = fakeFetch(() => json([]));
-    const result = await runtime(fetch).invoke({ tenantId: TenantId.parse("tenant-other"), source, tool: tool("list_activities"), args: { oldest: "2026-10-23" } });
+    const result = await runtime(fetch).invoke({ tenantId: TenantId.parse("tenant-other"), caller: CALLER, source, tool: tool("list_activities"), args: { oldest: "2026-10-23" } });
     expect(!result.ok && result.error.kind).toBe("missing_credentials");
     expect(calls).toHaveLength(0);
   });
@@ -112,7 +121,7 @@ describe("Runtime with Intervals.icu", () => {
   describe("upstream errors", () => {
     it("passes the status and an excerpt, scrubbing any echoed key", async () => {
       const { fetch } = fakeFetch(() => new Response(`Invalid API key ${API_KEY}`, { status: 401 }));
-      const result = await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("get_activity"), args: { id: "i1" } });
+      const result = await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("get_activity"), args: { id: "i1" } });
       expect(result).toMatchObject({ ok: false, error: { kind: "upstream_error", status: 401, retryable: false } });
       expect(!result.ok && result.error.message).toContain("Invalid API key [redacted]");
       expectNoSecret(result);
@@ -120,7 +129,7 @@ describe("Runtime with Intervals.icu", () => {
 
     it("marks 5xx as retryable", async () => {
       const { fetch } = fakeFetch(() => new Response("oops", { status: 502 }));
-      const result = await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("get_activity"), args: { id: "i1" } });
+      const result = await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("get_activity"), args: { id: "i1" } });
       expect(result).toMatchObject({ ok: false, error: { kind: "upstream_error", status: 502, retryable: true } });
     });
   });
@@ -129,16 +138,16 @@ describe("Runtime with Intervals.icu", () => {
     it("turns an upstream 429 into a retry hint and cools down the source for every tenant", async () => {
       const { fetch, calls } = fakeFetch(() => new Response("slow down", { status: 429, headers: { "retry-after": "20" } }));
       const rt = runtime(fetch);
-      const first = await rt.invoke({ tenantId: TENANT, source, tool: tool("get_activity"), args: { id: "i1" } });
+      const first = await rt.invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("get_activity"), args: { id: "i1" } });
       expect(first).toMatchObject({ ok: false, error: { kind: "rate_limited", retryAfterSeconds: 20, retryable: true } });
 
       await vault.putCredential({ tenantId: TenantId.parse("tenant-friend"), sourceId: "intervals-icu", schemeId: "APIKey", credential: { kind: "basic", password: "friend-key" } });
-      const friend = await rt.invoke({ tenantId: TenantId.parse("tenant-friend"), source, tool: tool("get_activity"), args: { id: "i2" } });
+      const friend = await rt.invoke({ tenantId: TenantId.parse("tenant-friend"), caller: CALLER, source, tool: tool("get_activity"), args: { id: "i2" } });
       expect(friend).toMatchObject({ ok: false, error: { kind: "rate_limited" } });
       expect(calls).toHaveLength(1); // the friend's call never left the process
 
       clockMs += 20_000;
-      await rt.invoke({ tenantId: TENANT, source, tool: tool("get_activity"), args: { id: "i1" } });
+      await rt.invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("get_activity"), args: { id: "i1" } });
       expect(calls).toHaveLength(2);
     });
 
@@ -148,7 +157,7 @@ describe("Runtime with Intervals.icu", () => {
         throughput: { perTenant: { requestsPerMinute: 2, maxConcurrent: 4 }, perSource: { requestsPerMinute: 100, maxConcurrent: 16 } },
       });
       const results: ToolResult[] = [];
-      for (let i = 0; i < 3; i++) results.push(await rt.invoke({ tenantId: TENANT, source, tool: tool("get_activity"), args: { id: "i1" } }));
+      for (let i = 0; i < 3; i++) results.push(await rt.invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("get_activity"), args: { id: "i1" } }));
       expect(results.map((r) => r.ok)).toEqual([true, true, false]);
       expect(calls).toHaveLength(2);
     });
@@ -159,7 +168,7 @@ describe("Runtime with Intervals.icu", () => {
 
     it("records intent before and outcome after", async () => {
       const { fetch, calls } = fakeFetch(() => json({ id: "i1", name: "Morning ride" }));
-      const result = await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("update_activity"), args: update });
+      const result = await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("update_activity"), args: update });
       expect(result.ok).toBe(true);
       expect(calls[0]).toMatchObject({ method: "PUT", url: "https://intervals.icu/api/v1/activity/i1", body: '{"name":"Morning ride"}' });
       expect(audit.events.map((e) => [e.phase, e.invocationId, e.operationId, e.outcome])).toEqual([
@@ -167,19 +176,20 @@ describe("Runtime with Intervals.icu", () => {
         ["outcome", "inv-1", "update_activity", { ok: true, status: 200 }],
       ]);
       expect(audit.events[0]?.input).toEqual(update);
+      expect(audit.events.map((e) => e.actorUserId)).toEqual([CALLER.userId, CALLER.userId]);
       expectNoSecret(audit.events);
     });
 
     it("records failed writes too", async () => {
       const { fetch } = fakeFetch(() => new Response("nope", { status: 403 }));
-      await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("update_activity"), args: update });
+      await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("update_activity"), args: update });
       expect(audit.events.at(-1)?.outcome).toEqual({ ok: false, errorKind: "upstream_error", status: 403 });
     });
 
     it("does not write if the audit log is unavailable", async () => {
       const broken: AuditSink = { record: async () => Promise.reject(new Error("db down")) };
       const { fetch, calls } = fakeFetch(() => json({}));
-      const result = await runtime(fetch, { audit: broken }).invoke({ tenantId: TENANT, source, tool: tool("update_activity"), args: update });
+      const result = await runtime(fetch, { audit: broken }).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("update_activity"), args: update });
       expect(result).toMatchObject({ ok: false, error: { kind: "audit_failed" } });
       expect(calls).toHaveLength(0);
     });
@@ -188,7 +198,7 @@ describe("Runtime with Intervals.icu", () => {
   it("keeps path input from changing the host", async () => {
     // Host blocking itself is covered in egress.test.ts; here, input can't smuggle a host into the URL.
     const { fetch, calls } = fakeFetch(() => json({}));
-    await runtime(fetch).invoke({ tenantId: TENANT, source, tool: tool("get_activity"), args: { id: "@evil.example.com" } });
+    await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: tool("get_activity"), args: { id: "@evil.example.com" } });
     expect(calls[0]?.url).toBe("https://intervals.icu/api/v1/activity/%40evil.example.com");
   });
 });

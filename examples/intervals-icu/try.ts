@@ -7,7 +7,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { resolveToolset, TenantId, Toolset, type Source } from "@cairnmcp/core";
+import { resolveToolset, TenantId, Toolset, UserId, type Source } from "@cairnmcp/core";
 import { ingestOpenApiText } from "@cairnmcp/ingest";
 import { InMemoryAuditSink, InMemoryRateLimiter, Runtime } from "@cairnmcp/runtime";
 import { InMemoryVaultStore, LocalKeyWrapper, parseMasterKey, Vault } from "@cairnmcp/vault";
@@ -48,6 +48,8 @@ const tool = resolved.tools[0]!;
 
 // 3. Store the key in an (in-memory) vault, as the server will.
 const tenantId = TenantId.parse("local-me");
+// The server gets this from a validated token; locally there is one user.
+const caller = { userId: UserId.parse("local-me"), claims: {} };
 const vault = new Vault({ store: new InMemoryVaultStore(), keyWrapper: new LocalKeyWrapper(masterKey) });
 await vault.putCredential({ tenantId, sourceId: source.id, schemeId: "APIKey", credential: { kind: "basic", password: apiKey } });
 
@@ -55,7 +57,7 @@ await vault.putCredential({ tenantId, sourceId: source.id, schemeId: "APIKey", c
 const runtime = new Runtime({ fetch: (url, init) => fetch(url, init), credentials: vault, limiter: new InMemoryRateLimiter(), audit: new InMemoryAuditSink() });
 const oldest = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
 console.log(`Calling list_activities since ${oldest} (read-only)…`);
-const result = await runtime.invoke({ tenantId, source, tool, args: { oldest, limit: 10, fields: ["id", "start_date_local", "type", "moving_time"] } });
+const result = await runtime.invoke({ tenantId, caller, source, tool, args: { oldest, limit: 10, fields: ["id", "start_date_local", "type", "moving_time"] } });
 if (!result.ok) {
   console.error(`Failed: ${result.error.kind}: ${result.error.message}`);
   process.exit(1);
