@@ -18,7 +18,9 @@ Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted fi
 | `packages/vault` | Envelope-encrypted credential storage (per-tenant data keys, master key or KMS). | ✅ |
 | `packages/runtime` | Runs a tool call: input validation, auth, egress rules, throttling, audit. | ✅ |
 | `packages/db` | Postgres with row-level security: tenants, members and toolset access, sources, toolsets, vault and audit storage. | ✅ |
-| `packages/mcp` | The MCP endpoint: an OAuth resource server serving each toolset with per-member access. | Resource server ✅ |
+| `packages/mcp` | The MCP endpoint: an OAuth resource server serving each toolset with per-member access. | ✅ |
+| `packages/auth` | The embedded OAuth authorization server: client registration, sign-in through OIDC providers, consent, tokens. | ✅ |
+| `packages/server` | The app: authorization server and MCP endpoint in one process, configured from the environment. | ✅ |
 | `packages/api`, `web` | Added with their milestones | — |
 
 Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),

@@ -14,23 +14,45 @@ const PublicUrl = z
   }, "must be just the origin, with no path, query, or fragment")
   .transform((u) => u.replace(/\/+$/, ""));
 
-const TrustedIssuers = z
-  .string()
-  .transform((text, ctx) => {
-    try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      ctx.addIssue({ code: "custom", message: "must be JSON" });
-      return z.NEVER;
-    }
-  })
-  .pipe(z.array(z.object({ issuer: z.url(), jwksUri: z.url().refine((u) => u.startsWith("https://") || LOCAL_HOSTS.has(new URL(u).hostname), "must be https") })).min(1));
+const httpsUrl = z.url().refine((u) => u.startsWith("https://") || LOCAL_HOSTS.has(new URL(u).hostname), "must be https");
+
+/** A JSON environment value checked against `shape`. */
+const jsonEnv = <T extends z.ZodType>(shape: T) =>
+  z
+    .string()
+    .transform((text, ctx) => {
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        ctx.addIssue({ code: "custom", message: "must be JSON" });
+        return z.NEVER;
+      }
+    })
+    .pipe(shape);
+
+const OidcProviders = jsonEnv(
+  z
+    .array(
+      z.object({
+        id: z.string().regex(/^[a-z0-9-]{1,32}$/, "id must be a short lowercase slug"),
+        name: z.string().min(1).max(60),
+        issuer: httpsUrl,
+        clientId: z.string().min(1),
+        clientSecret: z.string().min(1),
+      }),
+    )
+    .min(1, "configure at least one sign-in provider")
+    .refine((ps) => new Set(ps.map((p) => p.id)).size === ps.length, "provider ids must be unique"),
+);
+
+const TrustedIssuers = jsonEnv(z.array(z.object({ issuer: z.url(), jwksUri: httpsUrl })));
 
 const Env = z.object({
   CAIRNMCP_PUBLIC_URL: PublicUrl,
   CAIRNMCP_DATABASE_URL: z.string().startsWith("postgres", "must be a postgres:// URL"),
   CAIRNMCP_MASTER_KEY: z.string().min(1),
-  CAIRNMCP_TRUSTED_ISSUERS: TrustedIssuers,
+  CAIRNMCP_OIDC_PROVIDERS: OidcProviders,
+  CAIRNMCP_TRUSTED_ISSUERS: TrustedIssuers.optional(),
   CAIRNMCP_ALLOWED_ORIGINS: z
     .string()
     .optional()
@@ -42,6 +64,9 @@ export type ServerConfig = {
   publicUrl: string;
   databaseUrl: string;
   masterKey: string;
+  /** Where people sign in to the embedded authorization server. */
+  oidcProviders: Array<{ id: string; name: string; issuer: string; clientId: string; clientSecret: string }>;
+  /** Other issuers whose tokens the MCP endpoint accepts, besides the embedded one. */
   trustedIssuers: Array<{ issuer: string; jwksUri: string }>;
   allowedOrigins: string[];
   port: number;
@@ -62,7 +87,8 @@ export function loadConfig(env: Record<string, string | undefined>): ServerConfi
     publicUrl: e.CAIRNMCP_PUBLIC_URL,
     databaseUrl: e.CAIRNMCP_DATABASE_URL,
     masterKey: e.CAIRNMCP_MASTER_KEY,
-    trustedIssuers: e.CAIRNMCP_TRUSTED_ISSUERS,
+    oidcProviders: e.CAIRNMCP_OIDC_PROVIDERS,
+    trustedIssuers: e.CAIRNMCP_TRUSTED_ISSUERS ?? [],
     allowedOrigins: e.CAIRNMCP_ALLOWED_ORIGINS,
     port: e.PORT,
   };

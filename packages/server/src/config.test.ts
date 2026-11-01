@@ -1,17 +1,17 @@
 import type { AddressInfo } from "node:net";
 import type { Database } from "@cairnmcp/db";
+import { createMcpHandler, TokenVerifier } from "@cairnmcp/mcp";
 import type { Runtime } from "@cairnmcp/runtime";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "./config.ts";
-import { createMcpHandler } from "./handler.ts";
 import { serve } from "./node-http.ts";
-import { toCallToolResult } from "./results.ts";
-import { TokenVerifier } from "./token.ts";
 
+const provider = { id: "google", name: "Google", issuer: "https://accounts.google.com", clientId: "id", clientSecret: "shh-not-real" };
 const env = {
   CAIRNMCP_PUBLIC_URL: "https://cairn.example.com/",
   CAIRNMCP_DATABASE_URL: "postgres://app@db/cairnmcp",
   CAIRNMCP_MASTER_KEY: "c2VjcmV0",
+  CAIRNMCP_OIDC_PROVIDERS: JSON.stringify([provider]),
   CAIRNMCP_TRUSTED_ISSUERS: JSON.stringify([{ issuer: "https://auth.example.com", jwksUri: "https://auth.example.com/jwks" }]),
 };
 
@@ -21,6 +21,7 @@ describe("loadConfig", () => {
       publicUrl: "https://cairn.example.com",
       databaseUrl: env.CAIRNMCP_DATABASE_URL,
       masterKey: env.CAIRNMCP_MASTER_KEY,
+      oidcProviders: [provider],
       trustedIssuers: [{ issuer: "https://auth.example.com", jwksUri: "https://auth.example.com/jwks" }],
       allowedOrigins: ["https://a.test", "https://b.test"],
       port: 3000,
@@ -28,31 +29,22 @@ describe("loadConfig", () => {
   });
 
   it("lists every problem without echoing values", () => {
-    const run = () => loadConfig({ CAIRNMCP_PUBLIC_URL: "http://cairn.example.com", CAIRNMCP_MASTER_KEY: "c2VjcmV0", CAIRNMCP_TRUSTED_ISSUERS: "[" });
-    expect(run).toThrow(/CAIRNMCP_PUBLIC_URL: must be https[\s\S]*CAIRNMCP_DATABASE_URL[\s\S]*CAIRNMCP_TRUSTED_ISSUERS: must be JSON/);
+    const run = () => loadConfig({ CAIRNMCP_PUBLIC_URL: "http://cairn.example.com", CAIRNMCP_MASTER_KEY: "c2VjcmV0", CAIRNMCP_OIDC_PROVIDERS: "[" });
+    expect(run).toThrow(/CAIRNMCP_PUBLIC_URL: must be https[\s\S]*CAIRNMCP_DATABASE_URL[\s\S]*CAIRNMCP_OIDC_PROVIDERS: must be JSON/);
     expect(run).not.toThrow(/c2VjcmV0/);
+  });
+
+  it("requires a sign-in provider; other trusted issuers are optional", () => {
+    const { CAIRNMCP_TRUSTED_ISSUERS: _, ...withoutIssuers } = env;
+    expect(loadConfig(withoutIssuers).trustedIssuers).toEqual([]);
+    expect(() => loadConfig({ ...env, CAIRNMCP_OIDC_PROVIDERS: "[]" })).toThrow(/at least one sign-in provider/);
+    expect(() => loadConfig({ ...env, CAIRNMCP_OIDC_PROVIDERS: JSON.stringify([provider, provider]) })).toThrow(/unique/);
+    expect(() => loadConfig({ ...env, CAIRNMCP_OIDC_PROVIDERS: JSON.stringify([{ ...provider, issuer: "http://idp.example.com" }]) })).toThrow(/https/);
   });
 
   it("allows http only for localhost, and only a bare origin", () => {
     expect(loadConfig({ ...env, CAIRNMCP_PUBLIC_URL: "http://localhost:8080" }).publicUrl).toBe("http://localhost:8080");
     expect(() => loadConfig({ ...env, CAIRNMCP_PUBLIC_URL: "https://cairn.example.com/api" })).toThrow(/just the origin/);
-  });
-});
-
-describe("toCallToolResult", () => {
-  it("wraps non-object JSON so structured content is an object", () => {
-    expect(toCallToolResult({ ok: true, status: 200, data: [1, 2] })).toEqual({ content: [{ type: "text", text: "[1,2]" }], structuredContent: { result: [1, 2] } });
-    expect(toCallToolResult({ ok: true, status: 200, data: { a: 1 } }).structuredContent).toEqual({ a: 1 });
-    expect(toCallToolResult({ ok: true, status: 200, data: "plain" })).toEqual({ content: [{ type: "text", text: "plain" }] });
-  });
-
-  it("returns failures as tool errors the agent can act on", () => {
-    const result = toCallToolResult({ ok: false, error: { kind: "rate_limited", message: "retry in 5s", retryable: true, retryAfterSeconds: 5 } });
-    expect(result).toEqual({
-      isError: true,
-      content: [{ type: "text", text: "retry in 5s" }],
-      structuredContent: { error: { kind: "rate_limited", message: "retry in 5s", retryable: true, retryAfterSeconds: 5 } },
-    });
   });
 });
 

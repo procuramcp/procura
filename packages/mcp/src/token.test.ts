@@ -27,7 +27,7 @@ const valid = { iss: ISSUER, sub: "user-1", aud: AUDIENCE };
 describe("TokenVerifier", () => {
   it("accepts a token from a trusted issuer for this resource", async () => {
     const result = await verifier.verify(await sign({ ...valid, scope: "mcp" }), AUDIENCE);
-    expect(result).toMatchObject({ ok: true, token: { issuer: ISSUER, subject: "user-1", claims: { scope: "mcp" } } });
+    expect(result).toMatchObject({ ok: true, token: { issuer: ISSUER, subject: "user-1", subjectIsUserId: false, claims: { scope: "mcp" } } });
   });
 
   it.each([

@@ -1,0 +1,29 @@
+{
+  "name": "@cairnmcp/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The cairnmcp app: the authorization server and the MCP endpoint in one process, configured from the environment.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node scripts/serve.ts"
+  },
+  "dependencies": {
+    "@cairnmcp/auth": "workspace:*",
+    "@cairnmcp/db": "workspace:*",
+    "@cairnmcp/mcp": "workspace:*",
+    "@cairnmcp/runtime": "workspace:*",
+    "@cairnmcp/vault": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "@cairnmcp/ingest": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "drizzle-orm": "^0.45.4",
+    "jose": "^6.2.12"
+  }
+}

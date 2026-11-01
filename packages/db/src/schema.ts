@@ -2,6 +2,7 @@
 // The SQL files are the source of truth (constraints, RLS, grants live there);
 // schema.test.ts checks that every column here exists in the migrated database.
 import { bigint, foreignKey, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import type { WrappedKey } from "@cairnmcp/vault";
 
 export const cairnmcp = pgSchema("cairnmcp");
 
@@ -127,4 +128,71 @@ export const auditEvents = cairnmcp.table(
   (t) => [primaryKey({ columns: [t.tenantId, t.seq] })],
 );
 
-export const allTables = { tenants, users, memberships, sources, toolsets, toolsetAccess, dataKeys, credentials, auditEvents };
+// OAuth authorization server (0002_oauth.sql). Global tables, no tenant_id.
+
+export const oauthClients = cairnmcp.table("oauth_clients", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  redirectUris: text("redirect_uris").array().notNull(),
+  createdAt: createdAt(),
+});
+
+export const oauthRequests = cairnmcp.table("oauth_requests", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  state: text("state"),
+  resource: text("resource").notNull(),
+  scope: text("scope").notNull(),
+  browserHash: text("browser_hash"),
+  provider: text("provider"),
+  upstreamStateHash: text("upstream_state_hash"),
+  upstreamNonce: text("upstream_nonce"),
+  upstreamVerifier: text("upstream_verifier"),
+  userId: text("user_id"),
+  userLabel: text("user_label"),
+  codeHash: text("code_hash"),
+  codeExpiresAt: timestamp("code_expires_at", { withTimezone: true }),
+  codeUsedAt: timestamp("code_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
+export const oauthRefreshTokens = cairnmcp.table("oauth_refresh_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  familyId: text("family_id").notNull(),
+  clientId: text("client_id").notNull(),
+  userId: text("user_id").notNull(),
+  resource: text("resource").notNull(),
+  scope: text("scope").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+export const oauthSigningKeys = cairnmcp.table("oauth_signing_keys", {
+  kid: text("kid").primaryKey(),
+  alg: text("alg", { enum: ["ES256"] }).notNull(),
+  publicJwk: jsonb("public_jwk").$type<Record<string, unknown>>().notNull(),
+  wrappedPrivate: jsonb("wrapped_private").$type<WrappedKey>().notNull(),
+  createdAt: createdAt(),
+  retiredAt: timestamp("retired_at", { withTimezone: true }),
+});
+
+export const allTables = {
+  tenants,
+  users,
+  memberships,
+  sources,
+  toolsets,
+  toolsetAccess,
+  dataKeys,
+  credentials,
+  auditEvents,
+  oauthClients,
+  oauthRequests,
+  oauthRefreshTokens,
+  oauthSigningKeys,
+};
