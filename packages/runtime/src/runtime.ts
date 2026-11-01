@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Instant, JsonSchema, JsonValue, ResolvedTool, Source, TenantId } from "@cairnmcp/core";
+import type { Caller, Instant, JsonSchema, JsonValue, ResolvedTool, Source, TenantId } from "@cairnmcp/core";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import type { Credential } from "@cairnmcp/vault";
 import { applyAuth } from "./auth.ts";
@@ -9,9 +9,13 @@ import { fail, RuntimeFailure, type RuntimeError } from "./errors.ts";
 import { parseRetryAfter, type LimitSettings, type RateLimiter } from "./limiter.ts";
 import { buildRequest } from "./request.ts";
 
-/** What the runtime needs from the vault: decrypted credentials for one source, by scheme id. */
+/**
+ * What the runtime needs from the vault: decrypted credentials for one source,
+ * by scheme id. `caller` is passed so on-behalf-of providers (milestone 3b) can
+ * derive credentials from the caller's identity; the vault ignores it.
+ */
 export interface CredentialSource {
-  credentialsForSource(tenantId: TenantId, sourceId: string): Promise<Map<string, Credential>>;
+  credentialsForSource(tenantId: TenantId, sourceId: string, caller: Caller): Promise<Map<string, Credential>>;
 }
 
 export type ThroughputSettings = {
@@ -49,6 +53,8 @@ export type ToolResult =
 
 export type Invocation = {
   tenantId: TenantId;
+  /** Who is calling. Authorization (canCall) happens before invoke; this is for credentials and audit. */
+  caller: Caller;
   source: Source;
   tool: ResolvedTool;
   /** The agent's arguments, untrusted. */
@@ -77,7 +83,7 @@ export class Runtime {
    * `{ ok: false, error }` with a message the agent can act on.
    */
   async invoke(call: Invocation): Promise<ToolResult> {
-    const { tenantId, source, tool } = call;
+    const { tenantId, caller, source, tool } = call;
     const op = tool.operation;
     const isWrite = op.sideEffect.class !== "read";
     const invocationId = this.#o.newId();
@@ -107,7 +113,7 @@ export class Runtime {
 
       // 4. Build the request and attach credentials.
       const plan = buildRequest(op, input);
-      const credentials = await this.#o.credentials.credentialsForSource(tenantId, source.id);
+      const credentials = await this.#o.credentials.credentialsForSource(tenantId, source.id, caller);
       const auth = applyAuth(op.auth ?? source.defaultAuth, source.authSchemes, credentials, this.#o.now());
 
       const url = new URL(source.baseUrl + plan.pathAndQuery);
@@ -122,6 +128,7 @@ export class Runtime {
         auditBase = {
           invocationId,
           tenantId,
+          actorUserId: caller.userId,
           sourceId: source.id,
           toolName: tool.name,
           operationId: op.id,

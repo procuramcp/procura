@@ -17,7 +17,8 @@ Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted fi
 | `packages/eval` | Offline eval of the ingestor over a corpus of public API descriptions. | ✅ |
 | `packages/vault` | Envelope-encrypted credential storage (per-tenant data keys, master key or KMS). | ✅ |
 | `packages/runtime` | Runs a tool call: input validation, auth, egress rules, throttling, audit. | ✅ |
-| `packages/db`, `api`, `mcp`, `web` | Added with their milestones | — |
+| `packages/db` | Postgres with row-level security: tenants, members and toolset access, sources, toolsets, vault and audit storage. | ✅ |
+| `packages/api`, `mcp`, `web` | Added with their milestones | — |
 
 Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
 [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/sources/`](docs/sources/) (per-API findings).

@@ -35,3 +35,11 @@ export type AuthSchemeId = z.infer<typeof AuthSchemeId>;
  */
 export const TenantId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, "must be 1-64 letters, digits, - or _").brand<"TenantId">();
 export type TenantId = z.infer<typeof TenantId>;
+
+/**
+ * A cairnmcp user: one identity from one issuer (token `iss` + `sub`). Global,
+ * not per tenant; a user joins tenants through memberships. Opaque like
+ * `TenantId` (a UUID in practice).
+ */
+export const UserId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, "must be 1-64 letters, digits, - or _").brand<"UserId">();
+export type UserId = z.infer<typeof UserId>;

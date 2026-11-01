@@ -200,7 +200,7 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** One global key for all credentials (no per-tenant isolation, rotation rewrites
   everything); libsodium (another native dependency for no gain here); storing credentials in the
   upstream's OAuth provider only (not every API offers OAuth).
-- **Later:** a Postgres `VaultStore` with RLS (milestone 2), a KMS `KeyWrapper` for the hosted
+- **Later:** a Postgres `VaultStore` with RLS (milestone 2, done: D-024), a KMS `KeyWrapper` for the hosted
   deployment, and a short-lived data-key cache once unwrapping is a network call.
 
 ## D-020 Runtime: fail closed, errors as tool results, no automatic retries
@@ -290,3 +290,43 @@ planning handoff are not repeated here unless implementation added something.
   clients to only call listed tools (clients are untrusted); writing a policy language (use Cedar
   or OPA if declarative rules stop being enough).
 
+
+## D-024 Database: Postgres, Drizzle for queries, hand-written SQL migrations, RLS per transaction
+
+- **Decision:** `packages/db`. Postgres through Drizzle (`drizzle-orm` 0.45, `pg` 8) for typed
+  queries. The schema is defined by hand-written SQL migrations, applied by a small migrator
+  (ordered files, one transaction each, an advisory lock, and checksums so an applied file can't
+  be edited). `src/schema.ts` mirrors the tables for Drizzle; a test checks it against the
+  migrated database.
+- **Two roles:** an owner that owns every object and runs migrations, and an app role (a member
+  of the `cairnmcp_app` group, `NOBYPASSRLS`, not the owner) that the server connects as. The app
+  refuses to start as a superuser, a `BYPASSRLS` role, or the owner. No `TRUNCATE` is granted
+  (it ignores RLS).
+- **Isolation:** every tenant table has `tenant_id`, with RLS enabled and forced (so the owner is
+  filtered too). The server sets the tenant per transaction with
+  `set_config('app.tenant_id', …, true)`; it reverts at commit, so a pooled connection never
+  carries a tenant forward. Unset means every table reads empty and rejects writes. Foreign keys
+  between tenant tables include `tenant_id`, so a row can't reference another tenant's row even
+  with a guessed id.
+- **Users and members:** users are global, one per token issuer and subject; the app sees only
+  members of the current tenant. Memberships are per tenant with a role (`owner`, `admin`,
+  `member`). Toolset access is a separate per-member grant (`use`, `use_writes`, D-023) that
+  references the membership, so leaving a tenant removes it. Roles don't imply toolset access
+  yet; what each role may manage comes with the curation UI.
+- **Cross-tenant operations** are three narrow `SECURITY DEFINER` functions, callable only by
+  the app role: `create_tenant`, `find_user`, `ensure_user`. Each has a fixed `search_path`.
+- **Audit:** the app role can insert and select audit entries, never update or delete them.
+  Entries reference the acting user but not sources or memberships, so they outlive both.
+- **What RLS protects against:** a missing `WHERE tenant_id = …` or a confused query, not a
+  compromised server, which can set any tenant. The vault's per-tenant encryption context
+  (D-019) is a second layer for credentials.
+- **Ids:** text with the same pattern as `TenantId`/`UserId` in core (UUIDs in practice), so core
+  stays storage-agnostic and tests can use readable ids.
+- **Tests:** each test file creates its own database from a superuser URL
+  (`CAIRNMCP_TEST_DATABASE_URL`), with the same owner/app split as production. Skipped with a
+  warning locally if unset; required in CI, which runs a Postgres service.
+- **Rejected:** Drizzle Kit generated migrations (RLS policies, grants, and definer functions are
+  the point of the schema and read best as SQL; generated diffs would hide them); a schema or
+  database per tenant (migrations and pooling multiply with tenants); filtering by tenant in
+  application code only (one forgotten filter leaks data); `SET ROLE` per tenant (a role per
+  tenant doesn't scale and still needs RLS).
