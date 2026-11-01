@@ -16,12 +16,12 @@
     "@cairnmcp/core": "workspace:*",
     "@cairnmcp/runtime": "workspace:*",
     "@cairnmcp/vault": "workspace:*",
-    "drizzle-orm": "0.45.4",
-    "pg": "8.23.1",
-    "zod": "4.6.7"
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cairnmcp/ingest": "workspace:*",
-    "@types/pg": "8.23.1"
+    "@types/pg": "^8.23.1"
   }
 }

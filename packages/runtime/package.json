@@ -13,8 +13,8 @@
   "dependencies": {
     "@cairnmcp/core": "workspace:*",
     "@cairnmcp/vault": "workspace:*",
-    "ajv": "8.20.0",
-    "zod": "4.6.7"
+    "ajv": "^8.20.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cairnmcp/ingest": "workspace:*"

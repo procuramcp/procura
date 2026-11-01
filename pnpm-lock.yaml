@@ -9,13 +9,13 @@ importers:
   .:
     devDependencies:
       '@types/node':
-        specifier: 26.6.6
+        specifier: ^26.6.6
         version: 26.6.6
       typescript:
-        specifier: 7.0.2
+        specifier: ^7.0.2
         version: 7.0.2
       vitest:
-        specifier: 5.0.5
+        specifier: ^5.0.5
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))
 
   examples/intervals-icu:
@@ -36,7 +36,7 @@ importers:
   packages/core:
     dependencies:
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
 
   packages/db:
@@ -51,20 +51,20 @@ importers:
         specifier: workspace:*
         version: link:../vault
       drizzle-orm:
-        specifier: 0.45.4
+        specifier: ^0.45.4
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
       pg:
-        specifier: 8.23.1
+        specifier: ^8.23.1
         version: 8.23.1
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
       '@cairnmcp/ingest':
         specifier: workspace:*
         version: link:../ingest
       '@types/pg':
-        specifier: 8.23.1
+        specifier: ^8.23.1
         version: 8.23.1
 
   packages/eval:
@@ -76,13 +76,13 @@ importers:
         specifier: workspace:*
         version: link:../ingest
       ajv:
-        specifier: 8.20.0
+        specifier: ^8.20.0
         version: 8.20.0
       yaml:
-        specifier: 2.9.1
+        specifier: ^2.9.1
         version: 2.9.1
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
 
   packages/ingest:
@@ -91,14 +91,14 @@ importers:
         specifier: workspace:*
         version: link:../core
       yaml:
-        specifier: 2.9.1
+        specifier: ^2.9.1
         version: 2.9.1
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
       ajv:
-        specifier: 8.20.0
+        specifier: ^8.20.0
         version: 8.20.0
 
   packages/mcp:
@@ -116,13 +116,13 @@ importers:
         specifier: workspace:*
         version: link:../vault
       '@modelcontextprotocol/sdk':
-        specifier: 1.32.1
+        specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
       jose:
-        specifier: 6.2.12
+        specifier: ^6.2.12
         version: 6.2.12
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
       '@cairnmcp/ingest':
@@ -138,10 +138,10 @@ importers:
         specifier: workspace:*
         version: link:../vault
       ajv:
-        specifier: 8.20.0
+        specifier: ^8.20.0
         version: 8.20.0
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
       '@cairnmcp/ingest':
@@ -154,7 +154,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: 4.6.7
+        specifier: ^4.6.7
         version: 4.6.7
 
 packages:
