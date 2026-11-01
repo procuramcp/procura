@@ -19,3 +19,7 @@ exports/
 .claude/skills/
 skills-lock.json
 .neon
+
+# Oracle VM settings and secrets (written by deploy/oracle/setup-vm.sh).
+deploy/oracle/.env
+deploy/oracle/*.env

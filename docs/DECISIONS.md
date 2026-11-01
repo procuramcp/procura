@@ -434,6 +434,9 @@ planning handoff are not repeated here unless implementation added something.
 
 ## D-028 Hosted deployment: Cloud Run and Neon, free tier for now
 
+- **Superseded by D-029** (Oracle Cloud VM). The Cloud Run scripts were removed; they're in git
+  history if we move back.
+
 - **Decision:** our deployment runs the D-027 image on Google Cloud Run (`us-west1`) with Neon
   Postgres (AWS `us-west-2`, next to it), sized to stay free: scale to zero, at most one instance,
   CPU only during requests (request-based billing). Google is also the first sign-in provider
@@ -463,3 +466,31 @@ planning handoff are not repeated here unless implementation added something.
 - **Deploys** are a script for now (`deploy/cloud-run/deploy.sh`): build for amd64, push to
   Artifact Registry, run the migration job, deploy the revision, check health and metadata.
   Deploying from CI (with workload identity federation, no stored keys) comes later.
+
+## D-029 Hosted deployment: an Oracle Cloud Always Free VM, behind Caddy
+
+- **Decision:** our deployment runs the D-027 image on one Oracle Cloud Always Free Arm VM
+  (Ubuntu 24.04, Ampere A1), with Docker Compose: the app plus Caddy for HTTPS (Let's Encrypt,
+  automatic renewal). The database stays on Neon's free plan (D-028's Neon setup, in `us-west-2`);
+  the VM's home region should be US West (San Jose or Phoenix). Replaces Cloud Run (D-028).
+- **Why:** free, and the only free option with a **stable outbound IP**: the VM's public IP is
+  ours alone, so per-IP upstream rate limits (Intervals.icu) see only our traffic, which D-028
+  had to give up. One long-running process also suits the in-memory rate limiter (D-020), with no
+  cold starts.
+- **Costs of the choice:** a server to look after (security updates are automatic; reboots aren't),
+  and Oracle reclaims idle Always Free VMs (under 20% use for a week). We upgrade the account to Pay
+  As You Go, which community reports say exempts it (Always Free resources stay free), with a $1
+  budget alert, rather than faking load. Oracle has
+  cut the A1 allowance before (reportedly to 2 OCPU / 12 GB in 2026); we need far less (1 OCPU,
+  6 GB).
+- **Layout:** `deploy/oracle/compose.yaml` builds the image on the VM (natively arm64; no registry
+  needed yet). The app runs read-only, with no capabilities and no privilege escalation, and is
+  only reachable through Caddy. Migrations run in a one-off `migrate` container that alone gets the
+  owner URL (`migrate.env`); the app's settings are in `app.env`. Both are mode 600 and gitignored.
+- **Domain:** the operator's own, or `<ip>.sslip.io` (free wildcard DNS) to start. The public URL is
+  the OAuth issuer (D-026), so changing it later invalidates sessions and tokens.
+- **Master key:** generated on the VM into `app.env`. With no managed secret store, the disk is the
+  only copy, so the guide makes backing it up to a password manager a setup step.
+- **Rejected:** Cloud Run (free, but no stable outbound IP without paid Cloud NAT, and a Google
+  billing account); Neon Functions (free in beta, regions don't include our `us-west-2`, unknown
+  pricing later); Render's free tier (sleeps, slow wake); Fly.io and Railway (no free plans).
