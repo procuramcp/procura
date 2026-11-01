@@ -33,6 +33,40 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vault
 
+  packages/auth:
+    dependencies:
+      '@cairnmcp/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cairnmcp/db':
+        specifier: workspace:*
+        version: link:../db
+      '@cairnmcp/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@cairnmcp/vault':
+        specifier: workspace:*
+        version: link:../vault
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
+      openid-client:
+        specifier: ^6.8.8
+        version: 6.8.8
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@cairnmcp/ingest':
+        specifier: workspace:*
+        version: link:../ingest
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.32.1
+        version: 1.32.1(zod@4.6.7)
+
   packages/core:
     dependencies:
       zod:
@@ -147,6 +181,43 @@ importers:
       '@cairnmcp/ingest':
         specifier: workspace:*
         version: link:../ingest
+
+  packages/server:
+    dependencies:
+      '@cairnmcp/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@cairnmcp/db':
+        specifier: workspace:*
+        version: link:../db
+      '@cairnmcp/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@cairnmcp/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@cairnmcp/vault':
+        specifier: workspace:*
+        version: link:../vault
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@cairnmcp/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cairnmcp/ingest':
+        specifier: workspace:*
+        version: link:../ingest
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.32.1
+        version: 1.32.1(zod@4.6.7)
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
 
   packages/vault:
     dependencies:
@@ -865,6 +936,9 @@ packages:
     resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
     engines: {node: '>=18'}
 
+  oauth4webapi@3.8.8:
+    resolution: {integrity: sha512-8N28E+a/oxfXWBgOMt+ZP/JUf/XR+IFbvkAEPP3gznXOMv9BpAAwiIj0TFNz3tGTPc0ZQ8zmWBNgN1nAys0gng==}
+
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
@@ -883,6 +957,9 @@ packages:
 
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
+
+  openid-client@6.8.8:
+    resolution: {integrity: sha512-ZsucJA5Ad04Uv7YN4ql+s4GXNmb9uAYQwyJTsJx7CH/MX3JZioLE2pVKi1SC+YrbSLA4Px3Gi30dMjgOZtb6pA==}
 
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
@@ -1682,6 +1759,8 @@ snapshots:
     dependencies:
       content-type: 2.1.0
 
+  oauth4webapi@3.8.8: {}
+
   object-assign@4.1.1: {}
 
   object-inspect@1.13.4: {}
@@ -1695,6 +1774,11 @@ snapshots:
   once@1.4.0:
     dependencies:
       wrappy: 1.0.2
+
+  openid-client@6.8.8:
+    dependencies:
+      jose: 6.2.12
+      oauth4webapi: 3.8.8
 
   parseurl@1.3.3: {}
 

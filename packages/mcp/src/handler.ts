@@ -1,4 +1,4 @@
-import { canCall, resolveToolset, TenantId, ToolsetId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccessLevel } from "@cairnmcp/core";
+import { canCall, resolveToolset, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccessLevel } from "@cairnmcp/core";
 import { getSource, getToolset, memberRole, toolsetAccessLevel, type Database } from "@cairnmcp/db";
 import type { Runtime } from "@cairnmcp/runtime";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -50,6 +50,7 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
         resource: `${base}${route.path}`,
         authorization_servers: issuers,
         bearer_methods_supported: ["header"],
+        scopes_supported: ["mcp"],
         resource_name: "cairnmcp",
       });
     }
@@ -72,7 +73,10 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
 
     // Same answer for "no such user", "no such tenant", and "not a member": nothing to probe.
     const forbidden = () => json(403, { error: "forbidden", error_description: "you are not a member of this tenant" });
-    const userId = await options.db.findUser(checked.token.issuer, checked.token.subject);
+    const { token: verified } = checked;
+    const userId = verified.subjectIsUserId
+      ? UserId.safeParse(verified.subject).data
+      : await options.db.findUser(verified.issuer, verified.subject);
     if (!userId) return forbidden();
     const loaded = await options.db.withTenant(route.tenantId, async (tx) => {
       if (!(await memberRole(tx, userId))) return "forbidden" as const;
@@ -88,7 +92,7 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
     const resolved = resolveToolset(loaded.toolset, loaded.ir);
     if (!resolved.ok) return json(500, { error: "toolset_invalid", error_description: "this toolset has problems and can't be served; fix it in the toolset settings" });
 
-    const caller: Caller = { userId, claims: checked.token.claims };
+    const caller: Caller = { userId, claims: verified.claims };
     return serveMcp(request, { ...options, tenantId: route.tenantId, caller, toolset: loaded.toolset, ir: loaded.ir, level: loaded.level, tools: resolved.tools });
   };
 }
@@ -128,6 +132,24 @@ async function serveMcp(request: Request, s: Session): Promise<Response> {
 }
 
 type Route = { tenantId: TenantId; toolsetId: ToolsetId; path: string };
+
+/**
+ * The MCP endpoint a resource URL names (RFC 8707), or undefined if it isn't
+ * exactly one of ours: same origin as `publicUrl`, no query or fragment.
+ * The authorization server uses this so it only issues tokens for real endpoints.
+ */
+export function parseMcpResource(publicUrl: string, resource: string): { tenantId: TenantId; toolsetId: ToolsetId; resource: string } | undefined {
+  let url: URL;
+  try {
+    url = new URL(resource);
+  } catch {
+    return undefined;
+  }
+  const base = new URL(publicUrl);
+  if (url.origin !== base.origin || url.search || url.hash || url.username || url.password) return undefined;
+  const route = parseRoute(url.pathname);
+  return route && { tenantId: route.tenantId, toolsetId: route.toolsetId, resource: `${base.origin}${route.path}` };
+}
 
 function parseRoute(pathname: string): Route | undefined {
   const match = /^\/mcp\/([^/]+)\/([^/]+)\/?$/.exec(pathname);

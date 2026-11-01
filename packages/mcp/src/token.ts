@@ -11,11 +11,17 @@ export type TrustedIssuer = {
   issuer: string;
   /** Where the issuer publishes its signing keys. */
   jwksUri: string;
+  /**
+   * True for the embedded authorization server, whose `sub` is already a
+   * cairnmcp user id. Other issuers' subjects are looked up by issuer + subject.
+   */
+  subjectIsUserId?: boolean;
 };
 
 export type VerifiedToken = {
   issuer: string;
   subject: string;
+  subjectIsUserId: boolean;
   claims: Record<string, JsonValue>;
 };
 
@@ -32,10 +38,12 @@ const CLOCK_TOLERANCE_SECONDS = 30;
  */
 export class TokenVerifier {
   readonly #keys: Map<string, JWTVerifyGetKey>;
+  readonly #subjectIsUserId: Set<string>;
 
   /** `keys` overrides key fetching per issuer (tests use local key sets). */
   constructor(issuers: TrustedIssuer[], keys: Map<string, JWTVerifyGetKey> = new Map()) {
     this.#keys = new Map(issuers.map((i) => [i.issuer, keys.get(i.issuer) ?? createRemoteJWKSet(new URL(i.jwksUri))]));
+    this.#subjectIsUserId = new Set(issuers.filter((i) => i.subjectIsUserId).map((i) => i.issuer));
   }
 
   get issuers(): string[] {
@@ -60,7 +68,8 @@ export class TokenVerifier {
         requiredClaims: ["exp", "sub"],
         clockTolerance: CLOCK_TOLERANCE_SECONDS,
       });
-      return { ok: true, token: { issuer: payload.iss!, subject: payload.sub!, claims: payload as Record<string, JsonValue> } };
+      const issuer = payload.iss!;
+      return { ok: true, token: { issuer, subject: payload.sub!, subjectIsUserId: this.#subjectIsUserId.has(issuer), claims: payload as Record<string, JsonValue> } };
     } catch (e) {
       return { ok: false, reason: reasonFor(e) };
     }

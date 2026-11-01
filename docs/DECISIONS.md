@@ -363,3 +363,47 @@ planning handoff are not repeated here unless implementation added something.
 - **Not yet:** scopes (no scope is required yet), token revocation before expiry (keep access
   tokens short-lived), and per-instance rate limits becoming shared ones once there is more than
   one instance.
+
+## D-026 Embedded authorization server: OIDC sign-in, consent, short-lived endpoint-bound tokens
+
+- **Decision:** `packages/auth`, an OAuth 2.1 authorization server in the same process and image
+  as the MCP endpoint (`packages/server`), following the MCP authorization spec (2025-11-25):
+  RFC 8414 metadata, dynamic client registration (RFC 7591), authorization code with PKCE (S256
+  only), resource indicators (RFC 8707), and `iss` in the authorization response (RFC 9207). The
+  MCP endpoint trusts it like any other issuer (D-022); its tokens carry the cairnmcp user id as
+  `sub`, so no lookup is needed.
+- **Sign-in is delegated** to OpenID Connect providers set in `CAIRNMCP_OIDC_PROVIDERS` (Google,
+  Okta, Entra, Keycloak, ...), through `openid-client` (code flow, PKCE, state, nonce, ID token
+  validation). cairnmcp never handles passwords or sends email. A user is the provider's issuer +
+  subject (`ensure_user`). GitHub isn't an OIDC provider and needs its own adapter later.
+- **Pages live in the container:** a provider chooser and a consent page, server-rendered with
+  every value escaped, a strict CSP, and no framing. One container stays enough to self-host;
+  the web app can restyle them later.
+- **Consent** names the app, the account, the toolset and tenant, the access level, and where the
+  app returns. Only members with access to the toolset reach it (others see "no access"). The
+  flow is bound to the browser that started it by an HttpOnly, SameSite=Lax cookie whose hash is
+  stored with the request; the consent form also refuses a foreign `Origin`.
+- **Clients:** public only, so no client secrets to store or leak; a requested secret-based auth
+  method is replaced with `none` (RFC 7591 allows that). Redirect URIs: https, loopback http on
+  any port (RFC 8252), or a native app's private scheme; never `javascript:`, `data:`, `file:`,
+  fragments, or credentials. Until the client and redirect URI are verified, errors are shown
+  as a page, never redirected (no open redirect).
+- **Tokens:** access tokens are ES256 JWTs (`typ: at+jwt`) with `aud` set to exactly one MCP
+  endpoint, valid 15 minutes. Membership and access are still checked on every MCP call (D-025),
+  so revoking access doesn't wait for expiry. Refresh tokens are opaque, rotate on every use,
+  and last 30 days. Codes are single-use for 60 seconds. A reused code or refresh token revokes
+  every token from that sign-in (RFC 9700). Codes, refresh tokens, and browser bindings are
+  stored only as SHA-256 hashes.
+- **Signing keys:** one active ES256 key, created on first start and stored wrapped by the KEK
+  (D-019); the MCP endpoint verifies with the same keys in memory. Retired keys stay in the JWKS
+  for a day. Rotation itself is not built yet.
+- **Scope:** one scope, `mcp`. What a user may do is decided per call by toolset access (D-023),
+  not by scopes.
+- **Deferred:** Client ID Metadata Documents (the 2025-11-25 alternative to registration). The
+  server would fetch a URL each client names, which needs the private-address blocking planned
+  for egress hardening (milestone 3). Also deferred: rate limits on registration and sign-in,
+  pruning clients that never sign in, and a page to see and revoke connected apps.
+- **Rejected:** a hosted identity service (Auth0, Clerk, ...) as the authorization server (a
+  required third party for self-hosters, against D-018); passwords or magic links (credential
+  storage or an email dependency for every deployment); MCP-session-length tokens (the endpoint
+  is stateless, D-025).

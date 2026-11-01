@@ -133,6 +133,7 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
         resource: resource(a.tenantId),
         authorization_servers: [ISSUER],
         bearer_methods_supported: ["header"],
+        scopes_supported: ["mcp"],
         resource_name: "cairnmcp",
       });
     });

@@ -1,0 +1,27 @@
+{
+  "name": "@cairnmcp/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The embedded OAuth authorization server: client registration, sign-in through OIDC providers, consent, and tokens for the MCP endpoint.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "@cairnmcp/db": "workspace:*",
+    "@cairnmcp/mcp": "workspace:*",
+    "@cairnmcp/vault": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "jose": "^6.2.12",
+    "openid-client": "^6.8.8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cairnmcp/ingest": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  }
+}

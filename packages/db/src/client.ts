@@ -5,7 +5,7 @@ import pg from "pg";
 import * as schema from "./schema.ts";
 
 type Db = NodePgDatabase<typeof schema>;
-/** A transaction scoped to one tenant: row-level security hides every other tenant's rows. */
+/** A transaction (usually scoped to one tenant: row-level security hides every other tenant's rows). */
 export type TenantTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export type DatabaseOptions = {
@@ -52,6 +52,14 @@ export class Database {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${id}, true)`);
       return fn(tx);
     });
+  }
+
+  /**
+   * A transaction with no tenant set, for global tables (the OAuth server's).
+   * Tenant tables read as empty and reject writes in here.
+   */
+  async withoutTenant<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+    return this.#db.transaction(fn);
   }
 
   /** Create a tenant owned by `ownerUserId`. */

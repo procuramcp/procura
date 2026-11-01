@@ -80,6 +80,25 @@ describe.skipIf(!adminUrl)("migrations (Postgres)", () => {
     expect(rows).toEqual([]);
   });
 
+  it("lets the app add signing keys but never change or delete them", async () => {
+    const { rows } = await withAdmin(scratch.adminUrl, (c) =>
+      c.query("SELECT privilege_type FROM information_schema.role_table_grants WHERE grantee = 'cairnmcp_app' AND table_name = 'oauth_signing_keys' ORDER BY 1"),
+    );
+    expect(rows.map((r) => r.privilege_type)).toEqual(["INSERT", "SELECT"]);
+  });
+
+  it("hides tenant tables in a transaction without a tenant", async () => {
+    const db = await Database.connect({ url: scratch.appUrl, max: 1 });
+    try {
+      const owner = await db.ensureUser("https://issuer.test", "no-tenant-owner");
+      await db.createTenant("no-tenant", owner);
+      const rows = await db.withoutTenant((tx) => tx.select().from(allTables.tenants));
+      expect(rows).toEqual([]);
+    } finally {
+      await db.close();
+    }
+  });
+
   it("refuses to connect as the owner or a superuser", async () => {
     await expect(Database.connect({ url: scratch.ownerUrl })).rejects.toThrow(/refusing to connect/);
     await expect(Database.connect({ url: scratch.adminUrl })).rejects.toThrow(/refusing to connect/);
