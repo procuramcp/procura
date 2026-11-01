@@ -1,0 +1,143 @@
+import { canCall, resolveToolset, TenantId, ToolsetId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccessLevel } from "@cairnmcp/core";
+import { getSource, getToolset, memberRole, toolsetAccessLevel, type Database } from "@cairnmcp/db";
+import type { Runtime } from "@cairnmcp/runtime";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js";
+import { toCallToolResult, toMcpTool } from "./results.ts";
+import { bearerToken, type TokenVerifier } from "./token.ts";
+
+export type McpHandlerOptions = {
+  db: Database;
+  verifier: TokenVerifier;
+  runtime: Runtime;
+  /** Public base URL, e.g. `https://cairnmcp.example.com`. Resource URLs and token audiences derive from it. */
+  publicUrl: string;
+  /** Browser origins allowed to call the endpoint. Requests with any other `Origin` are refused (DNS rebinding). */
+  allowedOrigins?: string[];
+  version?: string;
+};
+
+const METADATA_PREFIX = "/.well-known/oauth-protected-resource";
+
+/**
+ * The MCP endpoint, one per toolset: `/mcp/{tenantId}/{toolsetId}`.
+ *
+ * It is an OAuth resource server (D-022): every request carries a bearer
+ * token from a trusted issuer whose audience is that endpoint's URL. The
+ * token resolves to a user, the user must be a member of the tenant with
+ * access to the toolset, and the tools they see and may call follow their
+ * access level (D-023). Stateless: each HTTP request loads everything fresh,
+ * so a revoked grant applies to the very next call.
+ */
+export function createMcpHandler(options: McpHandlerOptions): (request: Request) => Promise<Response> {
+  const base = options.publicUrl.replace(/\/+$/, "");
+  const allowedOrigins = new Set(options.allowedOrigins ?? []);
+  const issuers = options.verifier.issuers;
+
+  return async (request) => {
+    const url = new URL(request.url);
+    if (url.pathname === "/healthz") return new Response("ok", { status: 200 });
+
+    const origin = request.headers.get("origin");
+    if (origin !== null && !allowedOrigins.has(origin)) return json(403, { error: "forbidden", error_description: "origin not allowed" });
+
+    // Protected-resource metadata (RFC 9728), path-inserted: tells clients which issuers to get tokens from.
+    if (url.pathname.startsWith(`${METADATA_PREFIX}/`)) {
+      const route = parseRoute(url.pathname.slice(METADATA_PREFIX.length));
+      if (!route || request.method !== "GET") return json(404, { error: "not_found" });
+      return json(200, {
+        resource: `${base}${route.path}`,
+        authorization_servers: issuers,
+        bearer_methods_supported: ["header"],
+        resource_name: "cairnmcp",
+      });
+    }
+
+    const route = parseRoute(url.pathname);
+    if (!route) return json(404, { error: "not_found" });
+    if (request.method !== "POST") {
+      // Stateless JSON responses: no server-initiated stream (GET) and no sessions to end (DELETE).
+      return new Response(null, { status: 405, headers: { allow: "POST" } });
+    }
+
+    const resource = `${base}${route.path}`;
+    const challenge = (params: string) => `Bearer ${params}${params ? ", " : ""}resource_metadata="${base}${METADATA_PREFIX}${route.path}"`;
+    const token = bearerToken(request.headers.get("authorization"));
+    if (!token) return json(401, { error: "unauthorized", error_description: "a bearer token is required" }, { "www-authenticate": challenge("") });
+    const checked = await options.verifier.verify(token, resource);
+    if (!checked.ok) {
+      return json(401, { error: "invalid_token", error_description: checked.reason }, { "www-authenticate": challenge(`error="invalid_token", error_description="${checked.reason}"`) });
+    }
+
+    // Same answer for "no such user", "no such tenant", and "not a member": nothing to probe.
+    const forbidden = () => json(403, { error: "forbidden", error_description: "you are not a member of this tenant" });
+    const userId = await options.db.findUser(checked.token.issuer, checked.token.subject);
+    if (!userId) return forbidden();
+    const loaded = await options.db.withTenant(route.tenantId, async (tx) => {
+      if (!(await memberRole(tx, userId))) return "forbidden" as const;
+      const toolset = await getToolset(tx, route.toolsetId);
+      const source = toolset && (await getSource(tx, toolset.sourceId));
+      if (!toolset || !source) return "not_found" as const;
+      return { toolset, ir: source.ir, level: await toolsetAccessLevel(tx, route.toolsetId, userId) };
+    });
+    if (loaded === "forbidden") return forbidden();
+    if (loaded === "not_found") return json(404, { error: "not_found", error_description: "no such toolset" });
+    if (loaded.level === undefined) return json(403, { error: "forbidden", error_description: "you don't have access to this toolset" });
+
+    const resolved = resolveToolset(loaded.toolset, loaded.ir);
+    if (!resolved.ok) return json(500, { error: "toolset_invalid", error_description: "this toolset has problems and can't be served; fix it in the toolset settings" });
+
+    const caller: Caller = { userId, claims: checked.token.claims };
+    return serveMcp(request, { ...options, tenantId: route.tenantId, caller, toolset: loaded.toolset, ir: loaded.ir, level: loaded.level, tools: resolved.tools });
+  };
+}
+
+type Session = McpHandlerOptions & {
+  tenantId: TenantId;
+  caller: Caller;
+  toolset: Toolset;
+  ir: IrDocument;
+  level: ToolsetAccessLevel;
+  tools: ResolvedTool[];
+};
+
+async function serveMcp(request: Request, s: Session): Promise<Response> {
+  // Tools the caller may not call are hidden, and calling one by name gets the same answer as a tool that doesn't exist.
+  const visible = new Map(s.tools.filter((t) => canCall(s.level, t.operation.sideEffect.class)).map((t) => [t.name as string, t]));
+
+  const server = new Server(
+    { name: "cairnmcp", title: s.toolset.name, version: s.version ?? "0.0.0" },
+    { capabilities: { tools: {} }, ...(s.toolset.description ? { instructions: s.toolset.description } : {}) },
+  );
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...visible.values()].map(toMcpTool) }));
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const tool = visible.get(req.params.name);
+    if (!tool) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${req.params.name}`);
+    const result = await s.runtime.invoke({ tenantId: s.tenantId, caller: s.caller, source: s.ir.source, tool, args: req.params.arguments ?? {} });
+    return toCallToolResult(result);
+  });
+
+  const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true }) // no sessionIdGenerator: stateless;
+  await server.connect(transport);
+  try {
+    return await transport.handleRequest(request);
+  } finally {
+    await server.close();
+  }
+}
+
+type Route = { tenantId: TenantId; toolsetId: ToolsetId; path: string };
+
+function parseRoute(pathname: string): Route | undefined {
+  const match = /^\/mcp\/([^/]+)\/([^/]+)\/?$/.exec(pathname);
+  if (!match) return undefined;
+  const tenantId = TenantId.safeParse(match[1]);
+  const toolsetId = ToolsetId.safeParse(match[2]);
+  if (!tenantId.success || !toolsetId.success) return undefined;
+  return { tenantId: tenantId.data, toolsetId: toolsetId.data, path: `/mcp/${tenantId.data}/${toolsetId.data}` };
+}
+
+function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
+}

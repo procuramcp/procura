@@ -6,7 +6,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 | | Milestone | Status |
 | --- | --- | --- |
 | 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
-| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024) |
+| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025). Next: the embedded authorization server |
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | — |
 | 3b | Custom and on-behalf-of upstream auth; external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
