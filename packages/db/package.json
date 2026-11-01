@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Postgres storage with row-level security: tenants, members, sources, toolsets, vault, audit.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./test-support": "./src/test-support.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

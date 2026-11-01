@@ -1,4 +1,5 @@
-// Shared helpers for database tests. Not exported from the package index.
+// Shared helpers for database tests. Not in the package index; other packages
+// import them from `@cairnmcp/db/test-support` (tests only).
 //
 // Tests need a Postgres superuser URL in CAIRNMCP_TEST_DATABASE_URL. Each test
 // file gets its own scratch database, migrated by a non-superuser owner role,

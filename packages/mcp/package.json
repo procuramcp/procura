@@ -1,0 +1,26 @@
+{
+  "name": "@cairnmcp/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The MCP endpoint: an OAuth resource server that serves each tenant's toolsets with per-member authorization.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node scripts/serve.ts"
+  },
+  "dependencies": {
+    "@cairnmcp/core": "workspace:*",
+    "@cairnmcp/db": "workspace:*",
+    "@cairnmcp/runtime": "workspace:*",
+    "@cairnmcp/vault": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "jose": "6.2.12",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cairnmcp/ingest": "workspace:*"
+  }
+}

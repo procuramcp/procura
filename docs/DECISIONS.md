@@ -330,3 +330,36 @@ planning handoff are not repeated here unless implementation added something.
   database per tenant (migrations and pooling multiply with tenants); filtering by tenant in
   application code only (one forgotten filter leaks data); `SET ROLE` per tenant (a role per
   tenant doesn't scale and still needs RLS).
+
+## D-025 MCP endpoint: one per toolset, stateless, a resource server that authorizes every request
+
+- **Decision:** `packages/mcp`. Streamable HTTP via the official SDK's low-level `Server` (tool
+  lists differ per caller, and input schemas are already JSON Schema, so the high-level
+  `McpServer` with Zod tools doesn't fit). One endpoint per toolset: `/mcp/{tenantId}/{toolsetId}`.
+- **Why per toolset:** tool names are unique only within a toolset, an MCP client connects to one
+  URL with one token, and access is granted per toolset (D-023).
+- **Stateless:** no MCP sessions; every POST is authenticated and loads membership, toolset, and
+  access fresh, with JSON responses (no SSE). Revoking access applies to the next call, and any
+  instance can serve any request. GET and DELETE answer 405.
+- **Tokens (resource server only):** JWTs signed with an asymmetric key (RS256, PS256, ES256,
+  EdDSA) by a configured trusted issuer (keys from its JWKS), with `aud` equal to the endpoint's
+  exact URL (RFC 8707), `exp`, and `sub`. The issuer and subject resolve to a user through
+  `find_user`; the endpoint never creates users. 401s carry `WWW-Authenticate` with
+  `resource_metadata` (RFC 9728), and the metadata names the trusted issuers. The embedded
+  authorization server, which issues these tokens, comes next and is configured as one trusted
+  issuer.
+- **Authorization:** not a member, unknown user, and unknown tenant get the same 403; a member
+  without access gets 403; a member with access sees only the tools `canCall` allows, and
+  calling any other tool by name gets "unknown tool", the same as a tool that doesn't exist.
+  RLS can't catch a member of tenant B calling tenant A's endpoint (the server sets tenant A on
+  purpose), so this membership check is the boundary there, and the tests cover it.
+- **Hardening:** resource URLs come from `CAIRNMCP_PUBLIC_URL`, never the `Host` header;
+  requests with an `Origin` not in `CAIRNMCP_ALLOWED_ORIGINS` get 403 (DNS rebinding); error
+  responses never echo tokens or internals.
+- **Rejected:** one endpoint per tenant serving all toolsets (name clashes, coarser access);
+  MCP sessions (in-memory state per instance, and stale permissions until the session ends);
+  opaque tokens with introspection (a network call per request; JWTs from the embedded server
+  verify locally).
+- **Not yet:** scopes (no scope is required yet), token revocation before expiry (keep access
+  tokens short-lived), and per-instance rate limits becoming shared ones once there is more than
+  one instance.
