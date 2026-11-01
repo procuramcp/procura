@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "start": "node scripts/serve.ts"
+    "start": "node --env-file-if-exists=../../.env.local scripts/serve.ts"
   },
   "dependencies": {
     "@cairnmcp/auth": "workspace:*",

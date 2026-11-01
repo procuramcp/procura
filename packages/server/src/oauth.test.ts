@@ -271,7 +271,10 @@ describe.skipIf(!adminUrl)("embedded authorization server (Postgres)", () => {
       for (const user of [{ sub: "carol", email: "carol@example.com" }, { sub: "bob", email: "bob@example.com" }, { sub: "stranger", email: "s@example.com" }]) {
         const page = await untilConsent(new TestBrowser(app), authorizeUrl(await newClient(), pkce().challenge), user);
         expect(page.status).toBe(403);
-        expect(await page.text()).toContain("doesn&#39;t have access to this toolset");
+        const html = await page.text();
+        expect(html).toContain("have access to this toolset");
+        // The account id an owner needs to grant access.
+        expect(html).toContain(`<code>${await db.ensureUser(op.issuer, user.sub)}</code>`);
       }
     });
 

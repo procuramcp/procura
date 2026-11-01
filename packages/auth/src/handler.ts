@@ -5,7 +5,7 @@ import { and, eq, gt, isNull, lt, or, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import type { IdentityProvider } from "./identity.ts";
 import type { SigningKeys } from "./keys.ts";
-import { chooserPage, consentPage, errorPage, htmlResponse } from "./pages.ts";
+import { chooserPage, consentPage, errorPage, htmlResponse, noAccessPage } from "./pages.ts";
 import { matchesRegistered, redirectUriProblem } from "./redirect.ts";
 
 export type AuthServerOptions = {
@@ -208,7 +208,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
       return level && toolset && tenant ? { level, toolsetName: toolset.name, tenantName: tenant.name } : undefined;
     });
     if (!access) {
-      return htmlResponse(403, errorPage("No access", `${identity.label} doesn't have access to this toolset. Ask its owner to add you, then connect again.`));
+      return htmlResponse(403, noAccessPage({ userLabel: identity.label, userId }));
     }
     await db.withoutTenant((tx) => tx.update(requests).set({ userId, userLabel: identity.label }).where(eq(requests.id, row.id)));
     const [client] = await db.withoutTenant((tx) => tx.select({ name: clients.name }).from(clients).where(eq(clients.id, row.clientId)));

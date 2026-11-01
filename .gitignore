@@ -14,3 +14,8 @@ data/
 exports/
 *.fit
 *.fit.gz
+
+# Agent skills installed locally (npx neon skills); not part of the project.
+.claude/skills/
+skills-lock.json
+.neon
