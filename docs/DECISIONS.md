@@ -407,3 +407,59 @@ planning handoff are not repeated here unless implementation added something.
   required third party for self-hosters, against D-018); passwords or magic links (credential
   storage or an email dependency for every deployment); MCP-session-length tokens (the endpoint
   is stateless, D-025).
+
+## D-027 Container image: one Node image, no build step, migrations as a separate command
+
+- **Decision:** a root `Dockerfile` for the image of D-018. Base `node:24-trixie-slim` pinned by
+  digest (Dependabot keeps it current). Node runs the TypeScript sources directly, as everywhere
+  else (D-009), so there is no compile stage. A first stage installs only `@cairnmcp/server` and
+  its runtime dependencies with the lockfile (`pnpm fetch` then an offline install, cached by
+  lockfile); the final stage copies the result without pnpm or Corepack.
+- **Layout:** workspace packages stay where they are and are linked from `node_modules`, because
+  Node won't strip types from files under `node_modules` (so `pnpm deploy`, which copies them
+  there, doesn't work for us).
+- **Runtime:** runs as the unprivileged `node` user; the code is owned by root and read-only.
+  `PORT` defaults to 8080; `SIGTERM` closes the server and the pool. A `HEALTHCHECK` calls
+  `/healthz` with Node's `fetch`, so the image needs no curl.
+- **Migrations aren't run at startup.** They need the owner role, which the running app must not
+  have (D-024), so they are a separate command in the same image
+  (`node packages/db/scripts/migrate.ts`), run before a deploy as a release step or one-off job.
+- **CI** builds the image and runs `scripts/image-smoke.sh` against Postgres: migrate inside the
+  image, start it as the app role, check health, metadata, registration, the MCP 401, and the
+  non-root user. Publishing the image waits for self-hosting (milestone 2b).
+- **Rejected:** a compile step to JavaScript (another build to keep in sync, for no runtime
+  gain); distroless or Alpine bases (slim keeps glibc and a shell for debugging, at a modest size
+  cost); running migrations on start (needs owner credentials in the app, and several instances
+  starting at once would race to migrate).
+
+## D-028 Hosted deployment: Cloud Run and Neon, free tier for now
+
+- **Decision:** our deployment runs the D-027 image on Google Cloud Run (`us-west1`) with Neon
+  Postgres (AWS `us-west-2`, next to it), sized to stay free: scale to zero, at most one instance,
+  CPU only during requests (request-based billing). Google is also the first sign-in provider
+  (D-026), with the OAuth client in the same project. Closes the platform question left open in
+  D-018.
+- **Why free now:** one user (D-016). Fly.io, the cheapest always-on option with a dedicated
+  outbound IP (about $7-10/month), no longer has a free plan; Railway's static IPs need its paid
+  plan and may be shared; Render's dedicated IPs cost $100/month.
+- **Trade-off accepted for now: no stable outbound IP.** Upstream calls leave from Google's
+  shared addresses, so a per-IP rate limit (Intervals.icu) is shared with whoever else uses them.
+  Fix when it matters: Cloud NAT with a reserved IP on Cloud Run, or move the same image to
+  Fly.io with a static egress IP.
+- **One instance on purpose:** the rate limiter and throttles are in memory (D-020), so a second
+  instance would double the limits. A shared limiter comes before raising `max-instances`.
+- **Cold starts:** a second or two after idle; the endpoint is stateless (D-025) and signing keys
+  load from the database on start, so nothing is lost. The hourly cleanup of expired sign-in state
+  only runs while an instance is up, which is fine at this size.
+- **Secrets** live in Secret Manager. Two service accounts: the service reads the app database URL,
+  master key, and sign-in config; the migration job reads only the owner URL. The master key is
+  generated into Secret Manager and never displayed.
+- **Neon roles:** the project is managed with the Neon CLI (`neon.ts`, `neon deploy`), whose env pull
+  gives only the branch owner's URLs. The app role is created with SQL by
+  `pnpm --filter @cairnmcp/db roles`, not in Neon's Console, whose roles join `neon_superuser` and
+  can bypass RLS (the app refuses to run as such a role anyway, D-024). The app uses Neon's pooled
+  endpoint with `pg` (a long-running process, so the pool is reused); migrations use the direct
+  one (session advisory lock), falling back to Neon's `DATABASE_URL_UNPOOLED`.
+- **Deploys** are a script for now (`deploy/cloud-run/deploy.sh`): build for amd64, push to
+  Artifact Registry, run the migration job, deploy the revision, check health and metadata.
+  Deploying from CI (with workload identity federation, no stored keys) comes later.

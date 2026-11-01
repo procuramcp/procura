@@ -10,7 +10,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "migrate": "node scripts/migrate.ts"
+    "migrate": "node --env-file-if-exists=../../.env.local scripts/migrate.ts",
+    "roles": "node --env-file-if-exists=../../.env.local scripts/create-app-role.ts"
   },
   "dependencies": {
     "@cairnmcp/core": "workspace:*",

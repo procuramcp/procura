@@ -1,0 +1,21 @@
+# Keep the build context to what the server needs. Every workspace package.json
+# stays (pnpm checks them against the lockfile); heavy content and tests don't.
+**/node_modules
+.git
+.github
+.env
+.env.*
+!.env.example
+**/*.test.ts
+**/test-support.ts
+**/__snapshots__
+**/coverage
+docs
+examples/*/*
+!examples/*/package.json
+packages/eval/corpus
+packages/eval/scripts
+packages/ingest/fixtures
+packages/ingest/scripts
+Dockerfile
+.dockerignore

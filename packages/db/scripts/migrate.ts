@@ -1,10 +1,12 @@
-// Apply pending migrations. Needs the owner role's URL, not the app's.
-// Run: CAIRNMCP_DATABASE_OWNER_URL=postgres://… pnpm --filter @cairnmcp/db migrate
+// Apply pending migrations. Needs the owner role's URL on a direct (not pooled)
+// host: the migrator holds a session advisory lock.
+// Run: pnpm --filter @cairnmcp/db migrate (reads the repo's .env.local if present)
 import { migrate } from "../src/migrate.ts";
 
-const url = process.env["CAIRNMCP_DATABASE_OWNER_URL"];
+// Neon's env pull names the owner's direct URL DATABASE_URL_UNPOOLED.
+const url = process.env["CAIRNMCP_DATABASE_OWNER_URL"] ?? process.env["DATABASE_URL_UNPOOLED"];
 if (!url) {
-  console.error("CAIRNMCP_DATABASE_OWNER_URL is not set (the owner role's connection URL).");
+  console.error("Set CAIRNMCP_DATABASE_OWNER_URL (or Neon's DATABASE_URL_UNPOOLED) to the owner role's direct connection URL.");
   process.exit(1);
 }
 const { applied, alreadyApplied } = await migrate(url);

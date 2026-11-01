@@ -17,3 +17,9 @@ updates:
     groups:
       dev-tooling:
         dependency-type: development
+
+  # Keeps the digest-pinned base image in the Dockerfile current.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

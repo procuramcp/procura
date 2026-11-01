@@ -42,6 +42,15 @@ export function errorPage(title: string, message: string): string {
   return page(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`);
 }
 
+/** Signed in, but no access: show the account id, which is what an owner needs to grant access. */
+export function noAccessPage(input: { userLabel: string; userId: string }): string {
+  return page(
+    "No access",
+    `<h1>No access</h1><p>${escapeHtml(input.userLabel)} doesn't have access to this toolset. Ask its owner to add you, then connect again.</p>
+<dl><dt>Your account id</dt><dd><code>${escapeHtml(input.userId)}</code></dd></dl>`,
+  );
+}
+
 export function chooserPage(input: { clientName: string; providers: Array<{ name: string; href: string }> }): string {
   const buttons = input.providers.map((p) => `<a class="button" href="${escapeHtml(p.href)}">Continue with ${escapeHtml(p.name)}</a>`).join("");
   return page(
