@@ -9,6 +9,12 @@ project already set up (see below), and an SSH key.
 
 ## 1. Oracle account and VM
 
+**With Terraform (recommended):** [infra/README.md](infra/README.md) creates the network, firewall
+rules, a reserved public IP, the Ubuntu VM with first-boot setup, a free-shapes-only quota, and the
+budget alerts. Do steps 1–2 below (account, region, upgrade), then use it instead of steps 3–4.
+
+**By hand:**
+
 1. Sign up at [oracle.com/cloud/free](https://www.oracle.com/cloud/free/). Pick a **home region**
    near the database: **US West (San Jose)** or **US West (Phoenix)** for Neon's `us-west-2`. Always
    Free resources exist only in the home region, and it can't be changed later.
@@ -19,9 +25,14 @@ project already set up (see below), and an SSH key.
    an alert at $1 (Billing → Budgets) so a mistake can't cost money quietly.
 3. Create the VM (Compute → Instances → Create):
    - Image: **Canonical Ubuntu 24.04**.
-   - Shape: **Ampere `VM.Standard.A1.Flex`**, 1 OCPU and 6 GB is plenty (stay within the Always
-     Free allowance shown in the console). "Out of capacity" is common; retry later or in another
-     availability domain.
+   - Shape, either:
+     - **Ampere `VM.Standard.A1.Flex`** (Arm), 1 OCPU and 6 GB. Roomier, but often "out of
+       capacity"; Pay As You Go accounts reportedly get it more easily.
+     - **`VM.Standard.E2.1.Micro`** (x86), almost always available: 1 GB of memory and a small
+       share of a CPU. Enough to run cairnmcp (setup adds swap), not to build it, so build on
+       your own machine with `ship.sh` (below).
+     
+     Check for the **Always Free-eligible** label before creating it.
    - Networking: choose **Create new virtual cloud network** with a **public subnet**, turn on
      **Assign a public IPv4 address**, and add your SSH public key. Creating the network here (or
      with the "VCN with Internet Connectivity" wizard) also creates the **Internet Gateway** and the
@@ -46,15 +57,21 @@ the setup asks for is:
 [{"id":"google","name":"Google","issuer":"https://accounts.google.com","clientId":"…apps.googleusercontent.com","clientSecret":"…"}]
 ```
 
-## 3. Set up and deploy (on the VM)
+## 3. Set up and deploy
+
+The image is built on your machine (needs Docker and an SSH host entry, e.g. `cairnmcp` in
+`~/.ssh/config`) and shipped to the VM, so the VM needs no copy of the repo and no GitHub access.
 
 ```bash
-ssh ubuntu@<public ip>
-git clone https://github.com/cairnmcp/cairnmcp.git && cd cairnmcp
-deploy/oracle/setup-vm.sh     # once: Docker, firewall, automatic updates, settings
-newgrp docker                 # or log out and back in, after the first run
-deploy/oracle/deploy.sh       # every release: pull, build, migrate, restart, check
+deploy/oracle/ship.sh cairnmcp           # first run: copies deploy/oracle/ to the VM and stops
+ssh cairnmcp
+cd cairnmcp && deploy/oracle/setup-vm.sh # once, on the VM: Docker, swap, firewall, updates, settings
+exit                                     # log out so the docker group applies
+deploy/oracle/ship.sh cairnmcp           # every release: build, copy the image, migrate, start, check
 ```
+
+On an A1 VM you can instead clone the repo there (it needs a read-only deploy key, since the repo
+is private) and run `deploy/oracle/deploy.sh`, which builds on the VM.
 
 `setup-vm.sh` asks for:
 - **Domain:** your own (an A record pointing at the VM), or Enter for `<ip>.sslip.io`, a free
@@ -82,14 +99,16 @@ grep CAIRNMCP_MASTER_KEY deploy/oracle/app.env
 - Logs: `docker compose -f deploy/oracle/compose.yaml logs -f app` (or `caddy`).
 - The containers restart on failure and after a reboot. Ubuntu installs security updates
   automatically; reboot now and then for kernel updates (`sudo reboot`).
-- `deploy.sh` builds the image on the VM (it's an Arm machine, so natively), runs migrations in a
-  one-off container, restarts, checks `https://<domain>/healthz` and the OAuth metadata, and prunes
-  old images.
+- `ship.sh` builds the image for the VM's architecture on your machine, streams it over SSH
+  (about 95 MB compressed), syncs `deploy/oracle/` (never the settings files), then runs
+  `deploy.sh --no-pull --no-build` on the VM: migrations in a one-off container, restart, a check of
+  `https://<domain>/healthz` and the OAuth metadata, and pruning of old images. The image is tagged
+  with the commit (`-dirty` if you ship uncommitted changes).
 - Hardening in the stack: the app has a read-only filesystem, no Linux capabilities, and no
   privilege escalation, and isn't published on the host; only Caddy listens on 80/443.
 
 ## What it costs
 
-Nothing within the Always Free allowance (an A1 VM, up to 200 GB of block volumes, 10 TB of outbound
+Nothing within the Always Free allowance (an A1 or E2.1.Micro VM, up to 200 GB of block volumes, 10 TB of outbound
 data a month) and Neon's free plan. Oracle has changed the A1 allowance before; check the current
 limits in the console before sizing the VM.

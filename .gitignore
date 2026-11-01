@@ -23,3 +23,11 @@ skills-lock.json
 # Oracle VM settings and secrets (written by deploy/oracle/setup-vm.sh).
 deploy/oracle/.env
 deploy/oracle/*.env
+
+# Terraform (deploy/oracle/infra): local state and settings stay out of git; the lock file is committed.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

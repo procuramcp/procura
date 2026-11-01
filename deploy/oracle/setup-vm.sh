@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # One-time setup of an Oracle Cloud Always Free VM (Ubuntu 24.04, Ampere A1)
-# for cairnmcp. Run on the VM, from a clone of the repo:
+# for cairnmcp: Ampere A1 (Arm) or the x86 E2.1.Micro. Run on the VM, from
+# the folder that ship.sh (or a repo clone) put there:
 #
-#   git clone https://github.com/cairnmcp/cairnmcp.git && cd cairnmcp
-#   deploy/oracle/setup-vm.sh
+#   cd cairnmcp && deploy/oracle/setup-vm.sh
 #
 # Safe to re-run: installed pieces and existing settings are kept. Secret
 # values are read from the terminal (hidden), never from arguments.
@@ -12,7 +12,24 @@ export DEBIAN_FRONTEND=noninteractive
 here="$(cd "$(dirname "$0")" && pwd)"
 step() { printf '\n• %s\n' "$*"; }
 
-case "$(uname -m)" in aarch64 | arm64) ;; *) echo "note: expected an Arm (A1) VM, found $(uname -m); continuing" ;; esac
+# Check before changing anything: this script uses apt and Ubuntu's iptables rules.
+. /etc/os-release
+if [ "${ID:-}" != "ubuntu" ]; then
+  echo "This VM runs ${PRETTY_NAME:-an unknown system}, but this script needs Ubuntu (24.04)." >&2
+  echo "Recreate the VM with image Canonical Ubuntu 24.04 and shape VM.Standard.A1.Flex (see README)." >&2
+  exit 1
+fi
+case "$(uname -m)" in
+  aarch64 | arm64) ;;
+  *) echo "note: found $(uname -m), not the Always Free Arm shape (VM.Standard.A1.Flex); check the shape is free. Continuing." ;;
+esac
+
+# A VM made by deploy/oracle/infra runs cloud-init on first boot (Docker, swap,
+# firewall); wait for it so the two don't fight over apt.
+if command -v cloud-init >/dev/null; then
+  echo "waiting for first-boot setup (cloud-init) to finish..."
+  sudo cloud-init status --wait >/dev/null || true
+fi
 
 step "Docker (from Docker's apt repository)"
 if ! command -v docker >/dev/null; then
@@ -28,6 +45,22 @@ if ! command -v docker >/dev/null; then
   echo "  installed; log out and back in (or run 'newgrp docker') before deploy.sh"
 else
   echo "  already installed"
+fi
+
+step "swap (small VMs)"
+# The free x86 VM (E2.1.Micro) has 1 GB of memory; swap absorbs spikes such as Docker pulls.
+mem_kb="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)"
+if [ "$mem_kb" -lt 3000000 ] && [ -z "$(swapon --noheadings --show)" ]; then
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile >/dev/null
+  sudo swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+  echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-cairnmcp-swap.conf >/dev/null
+  sudo sysctl -q -p /etc/sysctl.d/99-cairnmcp-swap.conf
+  echo "  added a 2 GB swap file"
+else
+  echo "  not needed or already present"
 fi
 
 step "automatic security updates"

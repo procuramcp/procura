@@ -483,10 +483,20 @@ planning handoff are not repeated here unless implementation added something.
   budget alert, rather than faking load. Oracle has
   cut the A1 allowance before (reportedly to 2 OCPU / 12 GB in 2026); we need far less (1 OCPU,
   6 GB).
-- **Layout:** `deploy/oracle/compose.yaml` builds the image on the VM (natively arm64; no registry
-  needed yet). The app runs read-only, with no capabilities and no privilege escalation, and is
+- **Shapes:** Ampere A1 (Arm) when Oracle has capacity, which it often doesn't; otherwise the free
+  x86 `E2.1.Micro` (1 GB). The Micro can run the stack (app capped at 512 MB, Caddy at 128 MB, plus
+  2 GB of swap) but not build it, so `ship.sh` builds the image on the operator's machine for the
+  VM's architecture and streams it over SSH (`docker save | docker load`). No registry and no
+  GitHub access on the VM; the repo stays private.
+- **Layout:** `deploy/oracle/compose.yaml`; on an A1 VM with a clone of the repo, `deploy.sh` can
+  also build there. The app runs read-only, with no capabilities and no privilege escalation, and is
   only reachable through Caddy. Migrations run in a one-off `migrate` container that alone gets the
   owner URL (`migrate.env`); the app's settings are in `app.env`. Both are mode 600 and gitignored.
+- **Infrastructure as code:** Terraform (`deploy/oracle/infra`, provider `oracle/oci`): the VCN,
+  public subnet, security list, a **reserved** public IP (survives replacing the VM), the Ubuntu VM
+  with cloud-init (Docker, swap, firewall, updates), a quota allowing only the Always Free shapes,
+  and a budget alerting on any spend. App settings and secrets stay out of Terraform state;
+  `setup-vm.sh` writes them on the VM. Local state, gitignored; Resource Manager also works.
 - **Domain:** the operator's own, or `<ip>.sslip.io` (free wildcard DNS) to start. The public URL is
   the OAuth issuer (D-026), so changing it later invalidates sessions and tokens.
 - **Master key:** generated on the VM into `app.env`. With no managed secret store, the disk is the
