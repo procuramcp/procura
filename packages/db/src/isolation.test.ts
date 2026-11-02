@@ -114,9 +114,12 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
         // A plain transaction with no set_config: reach Drizzle through a throwaway tenant scope and clear it.
         const counts = await db2.withTenant(a.tenantId, async (tx) => {
           await tx.execute(sql`SELECT set_config('app.tenant_id', '', true)`);
-          return Promise.all(
-            [tenants, memberships, users, sources, toolsets, toolsetAccess, dataKeys, credentials, auditEvents].map(async (t) => (await tx.select().from(t)).length),
-          );
+          // One at a time: a transaction is one connection, and pg@9 refuses overlapping queries on it.
+          const lengths: number[] = [];
+          for (const t of [tenants, memberships, users, sources, toolsets, toolsetAccess, dataKeys, credentials, auditEvents]) {
+            lengths.push((await tx.select().from(t)).length);
+          }
+          return lengths;
         });
         expect(counts).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
       } finally {
