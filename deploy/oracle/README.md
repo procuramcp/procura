@@ -45,17 +45,18 @@ budget alerts. Do steps 1–2 below (account, region, upgrade), then use it inst
 The public IP stays with the VM for its whole life. To keep the same address even if you ever
 recreate the VM, promote it to a reserved public IP in the console.
 
-## 2. Google sign-in
+## 2. Sign-in
 
-People sign in with Google (D-026). In a Google Cloud project (no billing needed for this):
-OAuth consent screen → External, keep it in **Testing**, add yourself as a test user, scopes
-`openid`, `email`, `profile`. Then Credentials → OAuth client ID → Web application, with the
-redirect URI that `setup-vm.sh` prints: `https://<your domain>/oauth/callback/google`. The value
-the setup asks for is:
+People sign in through an OIDC provider (D-026). The recommended setup is **Auth0, as code**:
+follow [../auth0/README.md](../auth0/README.md) after the VM is set up; its `push-provider.sh`
+installs the settings on the VM. When `setup-vm.sh` asks for `CAIRNMCP_OIDC_PROVIDERS` before that
+exists, enter a placeholder such as
+`[{"id":"auth0","name":"Auth0","issuer":"https://example.us.auth0.com/","clientId":"x","clientSecret":"x"}]`;
+the push replaces it.
 
-```json
-[{"id":"google","name":"Google","issuer":"https://accounts.google.com","clientId":"…apps.googleusercontent.com","clientSecret":"…"}]
-```
+Any other OIDC provider works too (Google, Microsoft, Okta, …): its redirect URI is
+`https://<your domain>/oauth/callback/<id>`, and the value is a JSON list of
+`{"id","name","issuer","clientId","clientSecret"}`.
 
 ## 3. Set up and deploy
 
@@ -93,6 +94,38 @@ credentials stored in the vault can't be decrypted. Copy it into your password m
 ```bash
 grep CAIRNMCP_MASTER_KEY deploy/oracle/app.env
 ```
+
+## Set up your first tenant
+
+Until the curation UI exists, tenants are set up with `deploy/oracle/admin.sh`, run from the repo
+on your machine. It runs the admin CLI inside the app container on the VM (where the master key
+is), forwards files on stdin, and asks for secrets hidden. Example with Intervals.icu:
+
+1. **Pick the ids, which make up your MCP URL:** tenant `colter`, toolset `intervals` →
+   `https://<domain>/mcp/colter/intervals`.
+2. **Sign in once to get your account id:** add that URL to your MCP client (in Claude: Settings →
+   Connectors → Add custom connector) and connect. You'll sign in (through Auth0) and land on
+   **No access**, which shows **Your account id**. Copy it.
+3. **Create everything** (replace `<account id>`):
+
+   ```bash
+   deploy/oracle/admin.sh cairnmcp tenant create --name "Colter" --owner <account id> --id colter
+   deploy/oracle/admin.sh cairnmcp source add --tenant colter --id intervals-icu --fixed-username APIKey=API_KEY < packages/ingest/fixtures/intervals-icu/openapi.json
+   deploy/oracle/admin.sh cairnmcp toolset put --tenant colter --source intervals-icu --id intervals --definition < examples/intervals-icu/toolset.json
+   deploy/oracle/admin.sh cairnmcp access grant --tenant colter --toolset intervals --user <account id> --level use
+   deploy/oracle/admin.sh cairnmcp credential set --tenant colter --source intervals-icu --scheme APIKey --kind basic
+   ```
+
+   The last one asks for your Intervals.icu API key (Settings → Developer Settings), hidden; it's
+   encrypted into the vault and never printed. Check with
+   `deploy/oracle/admin.sh cairnmcp tenant show --tenant colter`.
+4. **Connect again** in your MCP client. You'll see the toolset's tools and can ask about your
+   training.
+
+The starter toolset (`examples/intervals-icu/toolset.json`) is read-only: eight tools with the
+athlete pinned to your own (`id = 0`). `toolset put` without `--definition` makes the default
+instead: every operation as a tool, reads enabled (D-016). `--level use_writes` also allows write
+tools a toolset enables.
 
 ## Operating it
 

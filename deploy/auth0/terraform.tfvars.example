@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+auth0_domain = "your-tenant.us.auth0.com"
+public_url   = "https://163-192-43-4.sslip.io"
+
+# Optional
+# enable_google = false   # only email/password
+# allow_signup  = false   # no new email/password accounts (existing ones keep working)

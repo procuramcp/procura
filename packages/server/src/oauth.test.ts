@@ -113,6 +113,8 @@ describe.skipIf(!adminUrl)("embedded authorization server (Postgres)", () => {
   }
 
   async function allow(browser: TestBrowser, consentPage: Response): Promise<URL> {
+    // Under no-referrer, real browsers post the form with `Origin: null`, which the check refuses.
+    expect(consentPage.headers.get("referrer-policy")).toBe("same-origin");
     const html = await consentPage.text();
     const requestId = /name="request" value="([^"]+)"/.exec(html)![1]!;
     const response = await browser.postForm(`${BASE}/oauth/consent`, { request: requestId, decision: "allow" }, { origin: BASE });

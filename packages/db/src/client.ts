@@ -62,9 +62,13 @@ export class Database {
     return this.#db.transaction(fn);
   }
 
-  /** Create a tenant owned by `ownerUserId`. */
-  async createTenant(name: string, ownerUserId: UserId): Promise<TenantId> {
-    const { rows } = await this.#pool.query<{ id: string }>("SELECT cairnmcp.create_tenant($1, $2) AS id", [name, UserId.parse(ownerUserId)]);
+  /** Create a tenant owned by `ownerUserId`, with a random id unless `id` is given (it must be free). */
+  async createTenant(name: string, ownerUserId: UserId, options: { id?: TenantId } = {}): Promise<TenantId> {
+    const owner = UserId.parse(ownerUserId);
+    const { rows } =
+      options.id === undefined
+        ? await this.#pool.query<{ id: string }>("SELECT cairnmcp.create_tenant($1, $2) AS id", [name, owner])
+        : await this.#pool.query<{ id: string }>("SELECT cairnmcp.create_tenant($1, $2, $3) AS id", [name, owner, TenantId.parse(options.id)]);
     return TenantId.parse(rows[0]!.id);
   }
 
