@@ -59,13 +59,14 @@ export function mapSource(input: { sourceId: string; openapi: string; documentUr
     const scheme = mapped.ir.source.authSchemes.find((s) => s.id === schemeId);
     if (!scheme || scheme.type !== "http_basic") throw new AdminError(`--fixed-username: ${schemeId} isn't a basic-auth scheme of this API`);
   }
-  const ir = IrDocument.parse({
+  // Already validated by the ingestor, and again by putSource before storing; no third parse here.
+  const ir: IrDocument = {
     ...mapped.ir,
     source: {
       ...mapped.ir.source,
       authSchemes: mapped.ir.source.authSchemes.map((s) => (s.type === "http_basic" && fixed[s.id] ? { ...s, fixedUsername: fixed[s.id] } : s)),
     },
-  });
+  };
   const warnings = mapped.diagnostics
     .filter((d) => d.severity === "warning")
     .map((d) => ({ code: d.code, message: d.message, ...("pointer" in d && typeof d.pointer === "string" ? { pointer: d.pointer } : {}) }));

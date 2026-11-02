@@ -1,3 +1,4 @@
+import { randomToken } from "@cairnmcp/http";
 import * as oidc from "openid-client";
 
 /** Who an upstream identity provider says signed in. */
@@ -18,6 +19,32 @@ export interface IdentityProvider {
   readonly name: string;
   authorizationUrl(input: { redirectUri: string; state: string; nonce: string; codeVerifier: string }): Promise<URL>;
   finish(input: { callbackUrl: URL; redirectUri: string; expectedState: string; expectedNonce: string; codeVerifier: string }): Promise<UpstreamIdentity>;
+}
+
+/** The single-use secrets of one sign-in at a provider. Store them (state and browser hashed) until the callback. */
+export type SignInSecrets = { state: string; nonce: string; verifier: string; browser: string };
+
+/**
+ * Start a sign-in at `provider`: fresh state, nonce, PKCE verifier, and a
+ * browser secret (for a cookie that proves the callback lands in the same
+ * browser), plus where to send the browser.
+ */
+export async function startSignIn(provider: IdentityProvider, redirectUri: string): Promise<{ location: URL; secrets: SignInSecrets }> {
+  const secrets = { state: randomToken(32), nonce: randomToken(32), verifier: randomToken(32), browser: randomToken(32) };
+  const location = await provider.authorizationUrl({ redirectUri, state: secrets.state, nonce: secrets.nonce, codeVerifier: secrets.verifier });
+  return { location, secrets };
+}
+
+/** Finish a sign-in from the provider's callback, or undefined if the provider didn't confirm it. */
+export async function finishSignIn(
+  provider: IdentityProvider,
+  input: { callbackUrl: URL; redirectUri: string; state: string; nonce: string; verifier: string },
+): Promise<UpstreamIdentity | undefined> {
+  try {
+    return await provider.finish({ callbackUrl: input.callbackUrl, redirectUri: input.redirectUri, expectedState: input.state, expectedNonce: input.nonce, codeVerifier: input.verifier });
+  } catch {
+    return undefined;
+  }
 }
 
 export type OidcProviderConfig = {

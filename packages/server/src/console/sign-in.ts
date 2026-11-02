@@ -1,7 +1,7 @@
 // Console sign-in through an OIDC provider, and the session cookie it sets.
 // Login state and sessions are stored only as hashes (base64url SHA-256).
 import type { LoggedOut } from "@cairnmcp/console-api";
-import type { IdentityProvider } from "@cairnmcp/auth";
+import { finishSignIn, startSignIn, type IdentityProvider } from "@cairnmcp/auth";
 import { UserId } from "@cairnmcp/core";
 import { schema, type Database } from "@cairnmcp/db";
 import { json, randomToken, readCookie, redirect, safeEqual, setCookie, sha256Base64url as sha256 } from "@cairnmcp/http";
@@ -41,14 +41,11 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
     async login(providerId: string): Promise<Response> {
       const provider = providers.get(providerId);
       if (!provider) return page(404, "Unknown sign-in provider");
-      const state = randomToken(32);
-      const nonce = randomToken(32);
-      const verifier = randomToken(32);
-      const browser = randomToken(32);
+      const { location, secrets } = await startSignIn(provider, callbackUri(provider.id));
+      const { state, nonce, verifier, browser } = secrets;
       await db.withoutTenant((tx) =>
         tx.insert(logins).values({ stateHash: sha256(state), provider: provider.id, nonce, verifier, browserHash: sha256(browser), expiresAt: at(LOGIN_SECONDS) }),
       );
-      const location = await provider.authorizationUrl({ redirectUri: callbackUri(provider.id), state, nonce, codeVerifier: verifier });
       return redirect(location.toString(), { "set-cookie": cookie(LOGIN_COOKIE, browser, LOGIN_SECONDS) });
     },
 
@@ -63,12 +60,8 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
       if (!browser || !safeEqual(sha256(browser), row.browserHash)) return page(400, "Sign-in has to finish in the same browser it started in");
       if (url.searchParams.has("error")) return redirect(`${base}/app/`, { "set-cookie": cookie(LOGIN_COOKIE, "", 0) });
 
-      let identity;
-      try {
-        identity = await provider.finish({ callbackUrl: url, redirectUri: callbackUri(provider.id), expectedState: state, expectedNonce: row.nonce, codeVerifier: row.verifier });
-      } catch {
-        return page(502, `${provider.name} didn't confirm the sign-in`);
-      }
+      const identity = await finishSignIn(provider, { callbackUrl: url, redirectUri: callbackUri(provider.id), state, nonce: row.nonce, verifier: row.verifier });
+      if (!identity) return page(502, `${provider.name} didn't confirm the sign-in`);
       const userId = await db.ensureUser(identity.issuer, identity.subject);
       const token = randomToken(32);
       await db.withoutTenant((tx) => tx.insert(sessions).values({ tokenHash: sha256(token), userId, userLabel: identity.label, expiresAt: at(SESSION_SECONDS) }));
