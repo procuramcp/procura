@@ -1,4 +1,4 @@
-import { DatabaseIcon, PlusIcon, WrenchIcon } from "lucide-react";
+import { DatabaseIcon, PlusIcon, UsersIcon, WrenchIcon } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -35,7 +35,14 @@ export function TenantPage() {
             {members.length === 1 ? "" : "s"}
           </p>
         </div>
-        <NewToolset view={view.data} />
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to={`/t/${tenant.id}/access`}>
+              <UsersIcon /> People and profiles
+            </Link>
+          </Button>
+          <NewToolset view={view.data} />
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

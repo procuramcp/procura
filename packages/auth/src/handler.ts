@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
-import { memberRole, schema, toolsetAccessLevel, getToolset, type Database } from "@cairnmcp/db";
+import { highestLevel } from "@cairnmcp/core";
+import { memberRole, schema, toolsetAccessFor, getToolset, type Database } from "@cairnmcp/db";
 import { parseMcpResource } from "@cairnmcp/mcp";
 import { and, eq, gt, isNull, lt, or, isNotNull } from "drizzle-orm";
 import { z } from "zod";
@@ -202,7 +203,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     const target = parseMcpResource(base, row.resource)!;
     const access = await db.withTenant(target.tenantId, async (tx) => {
       if (!(await memberRole(tx, userId))) return undefined;
-      const level = await toolsetAccessLevel(tx, target.toolsetId, userId);
+      const level = highestLevel(await toolsetAccessFor(tx, target.toolsetId, userId));
       const toolset = level && (await getToolset(tx, target.toolsetId));
       const [tenant] = await tx.select({ name: tenants.name }).from(tenants);
       return level && toolset && tenant ? { level, toolsetName: toolset.name, tenantName: tenant.name } : undefined;

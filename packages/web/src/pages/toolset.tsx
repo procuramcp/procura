@@ -403,6 +403,11 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
   const [level, setLevel] = useState<Level>("use");
   const [busy, setBusy] = useState(false);
   const withoutAccess = view.members.filter((m) => !view.access.some((a) => a.userId === m.userId));
+  const viaProfiles = (userId: string) =>
+    view.profiles
+      .filter((p) => p.members.includes(userId))
+      .map((p) => p.name)
+      .join(", ");
 
   async function set(target: string, next: Level | "none") {
     setBusy(true);
@@ -441,7 +446,10 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
             {withoutAccess.map((m) => (
               <TableRow key={m.userId} className="text-muted-foreground">
                 <TableCell className="font-mono text-xs">
-                  {m.userId} <Badge variant="outline">{m.role}, no access</Badge>
+                  {m.userId}{" "}
+                  <Badge variant="outline">
+                    {m.role}, {viaProfiles(m.userId) ? `via ${viaProfiles(m.userId)}` : "no access"}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Button size="sm" variant="outline" disabled={busy} onClick={() => set(m.userId, "use")}>
@@ -468,6 +476,32 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
             Grant
           </Button>
         </div>
+      </Card>
+      <Card className="gap-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-medium">Through profiles</h3>
+            <p className="text-muted-foreground text-sm">People also get access from the profiles they hold.</p>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/t/${tenantId}/access`}>Edit profiles</Link>
+          </Button>
+        </div>
+        {view.profiles.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No profile gives access to this toolset.</p>
+        ) : (
+          <div className="flex flex-col divide-y">
+            {view.profiles.map((p) => (
+              <div key={p.profileId} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <span className="font-medium">{p.name}</span>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Badge variant="outline">{p.level}</Badge>
+                  {p.operations ? `${p.operations.length} tools` : "every tool"} · {p.members.length} {p.members.length === 1 ? "person" : "people"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
       <p className="text-muted-foreground text-xs">use calls read tools; use_writes also calls the write and destructive tools this toolset enables.</p>
     </div>
