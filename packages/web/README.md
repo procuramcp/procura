@@ -2,7 +2,8 @@
 
 A React app (Vite, Tailwind, shadcn/ui, AI Elements) that the server serves at `/app` (D-033).
 Owners and admins sign in and edit toolsets: tools on or off, names, descriptions, pins, access,
-and a test panel that runs a tool for real through the same runtime as the MCP endpoint.
+and a test panel that runs a tool for real through the same runtime as the MCP endpoint. Under
+*People and profiles* they define access profiles (D-034) and assign them to members.
 
 ## Run it locally
 

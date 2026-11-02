@@ -198,6 +198,57 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
     });
   });
 
+  describe("access profiles (D-034)", () => {
+    it("creates a profile, assigns it, and shows it on the toolset", async () => {
+      const browser = await signIn();
+      const created = await browser.json("PUT", `${API}/tenants/alpha/profiles/coach`, {
+        name: "Coach",
+        description: "",
+        rules: [{ toolsetId: "mine", level: "use", operations: ["list_activities"] }],
+      });
+      expect(created.status).toBe(200);
+      const assigned = await browser.json("PUT", `${API}/tenants/alpha/members/${carol}/profiles`, { profiles: ["coach"] });
+      const view = (await assigned.json()) as { profiles: Array<{ id: string; members: string[] }>; members: Array<{ userId: string; profiles: string[] }> };
+      expect(view.profiles).toEqual([expect.objectContaining({ id: "coach", members: [carol] })]);
+      expect(view.members.find((m) => m.userId === carol)?.profiles).toEqual(["coach"]);
+      const toolset = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/mine`)).json()) as { profiles: unknown[] };
+      expect(toolset.profiles).toEqual([{ profileId: "coach", name: "Coach", level: "use", operations: ["list_activities"], members: [carol] }]);
+    });
+
+    it("refuses rules for toolsets or tools that don't exist, and assignments to strangers", async () => {
+      const browser = await signIn();
+      const noToolset = await browser.json("PUT", `${API}/tenants/alpha/profiles/bad`, { name: "Bad", rules: [{ toolsetId: "nope", level: "use" }] });
+      expect(noToolset.status).toBe(422);
+      const noTool = await browser.json("PUT", `${API}/tenants/alpha/profiles/bad`, { name: "Bad", rules: [{ toolsetId: "mine", level: "use", operations: ["delete_activity"] }] });
+      expect(noTool.status).toBe(422);
+      const twice = await browser.json("PUT", `${API}/tenants/alpha/profiles/bad`, { name: "Bad", rules: [{ toolsetId: "mine", level: "use" }, { toolsetId: "mine", level: "use_writes" }] });
+      expect(twice.status).toBe(422);
+      const stranger = await db.ensureUser(op.issuer, "stranger");
+      expect((await browser.json("PUT", `${API}/tenants/alpha/members/${stranger}/profiles`, { profiles: [] })).status).toBe(404);
+      expect((await browser.json("PUT", `${API}/tenants/alpha/members/no-such-account/profiles`, { profiles: ["coach"] })).status).toBe(404);
+      expect((await browser.json("PUT", `${API}/tenants/alpha/members/${carol}/profiles`, { profiles: ["missing"] })).status).toBe(404);
+    });
+
+    it("adds someone who has signed in as a member when they get a profile", async () => {
+      const browser = await signIn();
+      const erin = await db.ensureUser(op.issuer, "erin");
+      const added = await browser.json("PUT", `${API}/tenants/alpha/members/${erin}/profiles`, { profiles: ["coach"] });
+      expect(added.status).toBe(200);
+      expect(((await added.json()) as { members: Array<{ userId: string; role: string; profiles: string[] }> }).members.find((m) => m.userId === erin)).toMatchObject({ role: "member", profiles: ["coach"] });
+    });
+
+    it("deletes a profile, and keeps members from editing profiles", async () => {
+      const browser = await signIn();
+      await browser.json("PUT", `${API}/tenants/alpha/profiles/temp`, { name: "Temp", rules: [] });
+      const deleted = await browser.json("DELETE", `${API}/tenants/alpha/profiles/temp`);
+      expect(((await deleted.json()) as { profiles: Array<{ id: string }> }).profiles.map((p) => p.id)).not.toContain("temp");
+      expect((await browser.json("DELETE", `${API}/tenants/alpha/profiles/temp`)).status).toBe(404);
+      const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
+      expect((await carol_.json("PUT", `${API}/tenants/alpha/profiles/mine`, { name: "Mine", rules: [{ toolsetId: "mine", level: "use_writes" }] })).status).toBe(403);
+      expect((await carol_.json("GET", `${API}/tenants/alpha/access`)).status).toBe(403);
+    });
+  });
+
   describe("tool test panel", () => {
     it("runs an unsaved tool with its pins and the stored key, through the runtime", async () => {
       const browser = await signIn();

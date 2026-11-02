@@ -181,6 +181,50 @@ export const oauthSigningKeys = cairnmcp.table("oauth_signing_keys", {
   retiredAt: timestamp("retired_at", { withTimezone: true }),
 });
 
+export const accessProfiles = cairnmcp.table(
+  "access_profiles",
+  {
+    tenantId: text("tenant_id").notNull(),
+    id: text("id").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.id] })],
+);
+
+export const profileRules = cairnmcp.table(
+  "profile_rules",
+  {
+    tenantId: text("tenant_id").notNull(),
+    profileId: text("profile_id").notNull(),
+    toolsetId: text("toolset_id").notNull(),
+    level: text("level", { enum: ["use", "use_writes"] }).notNull(),
+    operations: text("operations").array(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.profileId, t.toolsetId] }),
+    foreignKey({ columns: [t.tenantId, t.profileId], foreignColumns: [accessProfiles.tenantId, accessProfiles.id] }),
+    foreignKey({ columns: [t.tenantId, t.toolsetId], foreignColumns: [toolsets.tenantId, toolsets.id] }),
+  ],
+);
+
+export const memberProfiles = cairnmcp.table(
+  "member_profiles",
+  {
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    profileId: text("profile_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.userId, t.profileId] }),
+    foreignKey({ columns: [t.tenantId, t.profileId], foreignColumns: [accessProfiles.tenantId, accessProfiles.id] }),
+    foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId] }),
+  ],
+);
+
 export const consoleLogins = cairnmcp.table("console_logins", {
   stateHash: text("state_hash").primaryKey(),
   provider: text("provider").notNull(),
@@ -215,4 +259,7 @@ export const allTables = {
   oauthSigningKeys,
   consoleLogins,
   consoleSessions,
+  accessProfiles,
+  profileRules,
+  memberProfiles,
 };

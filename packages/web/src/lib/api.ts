@@ -42,8 +42,19 @@ export type OperationView = {
 
 export type Issue = { toolName: string; message: string };
 
+export type ProfileRule = { toolsetId: string; level: Level; operations: string[] | null };
+export type AccessProfile = { id: string; name: string; description?: string; rules: ProfileRule[]; members: string[] };
+
+export type AccessView = {
+  profiles: AccessProfile[];
+  members: Array<{ userId: string; role: Role; you: boolean; profiles: string[] }>;
+  toolsets: Array<{ id: string; name: string; tools: Array<{ operationId: string; name: string; enabled: boolean; sideEffect: SideEffect }> }>;
+};
+
 export type ToolsetView = {
   toolset: Toolset;
+  /** Profiles with a rule for this toolset (D-034). */
+  profiles: Array<{ profileId: string; name: string; level: Level; operations: string[] | null; members: string[] }>;
   endpoint: string;
   source: { id: string; name: string; baseUrl: string };
   operations: OperationView[];
@@ -93,6 +104,12 @@ export const api = {
     call<ToolsetView>("PUT", `/tenants/${t(tenantId)}/toolsets/${t(toolsetId)}`, edit),
   setAccess: (tenantId: string, toolsetId: string, userId: string, level: Level | "none") =>
     call<ToolsetView>("PUT", `/tenants/${t(tenantId)}/toolsets/${t(toolsetId)}/access`, { userId, level }),
+  access: (tenantId: string) => call<AccessView>("GET", `/tenants/${t(tenantId)}/access`),
+  saveProfile: (tenantId: string, profileId: string, edit: { name: string; description?: string; rules: ProfileRule[] }) =>
+    call<AccessView>("PUT", `/tenants/${t(tenantId)}/profiles/${t(profileId)}`, edit),
+  deleteProfile: (tenantId: string, profileId: string) => call<AccessView>("DELETE", `/tenants/${t(tenantId)}/profiles/${t(profileId)}`),
+  setMemberProfiles: (tenantId: string, userId: string, profiles: string[]) =>
+    call<AccessView>("PUT", `/tenants/${t(tenantId)}/members/${t(userId)}/profiles`, { profiles }),
   testTool: (tenantId: string, toolsetId: string, tool: ToolBinding, args: Record<string, JsonValue>, confirm = false) =>
     call<TestResult>("POST", `/tenants/${t(tenantId)}/toolsets/${t(toolsetId)}/test`, { tool, args, confirm }),
 };

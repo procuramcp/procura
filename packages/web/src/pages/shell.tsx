@@ -1,5 +1,5 @@
 import { Building2Icon, LogOutIcon, MountainIcon } from "lucide-react";
-import { NavLink, Outlet, useParams } from "react-router";
+import { NavLink, Outlet, useLocation, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +15,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -25,6 +28,7 @@ import { MeContext, useLoad } from "@/lib/hooks";
 export function Shell() {
   const me = useLoad(() => api.me(), []);
   const { tenantId } = useParams();
+  const { pathname } = useLocation();
 
   if (me.loading && !me.data) {
     return (
@@ -67,6 +71,22 @@ export function Shell() {
                           <span>{t.name}</span>
                         </NavLink>
                       </SidebarMenuButton>
+                      {t.id === tenantId && t.role !== "member" && (
+                        <SidebarMenuSub>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild isActive={!pathname.endsWith("/access")}>
+                              <NavLink to={`/t/${t.id}`} end>
+                                Toolsets
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild isActive={pathname.endsWith("/access")}>
+                              <NavLink to={`/t/${t.id}/access`}>People and profiles</NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      )}
                     </SidebarMenuItem>
                   ))}
                   {data.tenants.length === 0 && <p className="px-2 text-muted-foreground text-sm">None yet</p>}
