@@ -18,7 +18,7 @@ import {
 import { parseMcpResource } from "@cairnmcp/mcp";
 import { and, eq, gt, isNull, lt, or, isNotNull } from "drizzle-orm";
 import { z } from "zod";
-import type { IdentityProvider } from "./identity.ts";
+import { finishSignIn, startSignIn, type IdentityProvider } from "./identity.ts";
 import type { SigningKeys } from "./keys.ts";
 import { chooserPage, consentPage, errorPage, htmlResponse, noAccessPage } from "./pages.ts";
 import { matchesRegistered, redirectUriProblem } from "./redirect.ts";
@@ -174,18 +174,14 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     const provider = providers.get(providerId);
     const row = await loadRequest(eq(requests.id, url.searchParams.get("request") ?? ""));
     if (!provider || !row || row.userId !== null || row.codeHash !== null) return expired();
-    const browserSecret = random(32);
-    const upstreamState = random(32);
-    const nonce = random(32);
-    const verifier = random(32);
+    const { location, secrets } = await startSignIn(provider, callbackUri(provider.id));
     await db.withoutTenant((tx) =>
       tx
         .update(requests)
-        .set({ browserHash: sha256(browserSecret), provider: provider.id, upstreamStateHash: sha256(upstreamState), upstreamNonce: nonce, upstreamVerifier: verifier })
+        .set({ browserHash: sha256(secrets.browser), provider: provider.id, upstreamStateHash: sha256(secrets.state), upstreamNonce: secrets.nonce, upstreamVerifier: secrets.verifier })
         .where(eq(requests.id, row.id)),
     );
-    const location = await provider.authorizationUrl({ redirectUri: callbackUri(provider.id), state: upstreamState, nonce, codeVerifier: verifier });
-    return redirect(location.toString(), { "set-cookie": cookie(browserSecret, REQUEST_SECONDS) });
+    return redirect(location.toString(), { "set-cookie": cookie(secrets.browser, REQUEST_SECONDS) });
   }
 
   async function callback(request: Request, url: URL, providerId: string): Promise<Response> {
@@ -200,18 +196,8 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     await db.withoutTenant((tx) => tx.update(requests).set({ upstreamStateHash: null }).where(eq(requests.id, row.id)));
     if (url.searchParams.has("error")) return redirectWith(row.redirectUri, { error: "access_denied", error_description: "sign-in was cancelled", state: row.state });
 
-    let identity;
-    try {
-      identity = await provider.finish({
-        callbackUrl: url,
-        redirectUri: callbackUri(provider.id),
-        expectedState: state,
-        expectedNonce: row.upstreamNonce ?? "",
-        codeVerifier: row.upstreamVerifier ?? "",
-      });
-    } catch {
-      return htmlResponse(502, errorPage("Sign-in failed", `${provider.name} didn't confirm the sign-in. Start again from your app.`));
-    }
+    const identity = await finishSignIn(provider, { callbackUrl: url, redirectUri: callbackUri(provider.id), state, nonce: row.upstreamNonce ?? "", verifier: row.upstreamVerifier ?? "" });
+    if (!identity) return htmlResponse(502, errorPage("Sign-in failed", `${provider.name} didn't confirm the sign-in. Start again from your app.`));
     const userId = await db.ensureUser(identity.issuer, identity.subject);
     const target = parseMcpResource(base, row.resource)!;
     const access = await db.withTenant(target.tenantId, async (tx) => {
