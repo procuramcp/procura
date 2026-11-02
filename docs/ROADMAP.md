@@ -6,10 +6,10 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 | | Milestone | Status |
 | --- | --- | --- |
 | 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
-| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025); embedded authorization server with OIDC sign-in (D-026); container image built and smoke-tested in CI (D-027); Neon set up; deployed on an Oracle Cloud Always Free VM behind Caddy, infrastructure in Terraform (D-029). Next: tooling to create tenants, sources, and toolsets |
+| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025); embedded authorization server with OIDC sign-in (D-026); container image built and smoke-tested in CI (D-027); Neon set up; deployed on an Oracle Cloud Always Free VM behind Caddy, infrastructure in Terraform (D-029). admin CLI for tenants, sources, toolsets, access, and credentials (D-030). Next: the curation UI |
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | — |
-| 3b | Custom and on-behalf-of upstream auth; external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
+| 3b | Custom and on-behalf-of upstream auth; provider-hosted servers with per-user credentials (D-032); external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
 | 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
@@ -48,7 +48,13 @@ Done when someone can run their own cairnmcp with only Docker, a Postgres URL, a
 
 ## Milestone 3b: custom and on-behalf-of auth
 
-For teams exposing internal APIs, often from an OpenAPI document they already generate a client from.
+For teams exposing internal APIs, often from an OpenAPI document they already generate a client from,
+and for API providers hosting one MCP server for all their customers (D-032).
+
+- **Provider-hosted, first step** (D-032): a tenant's own sign-in provider; a `per_user`
+  credential mode per source, filled by the sign-in itself when the provider is also the
+  upstream's OAuth server (tokens stored and refreshed per user); claim-based access (e.g.
+  `plan = premium` gets `use`) re-checked on refresh; rate limits per user.
 
 - **Inbound:** the MCP endpoint accepts tokens from an external identity provider (Okta, Entra,
   Google Workspace, and the like) by configuration, alongside the embedded one.

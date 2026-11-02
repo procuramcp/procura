@@ -1,0 +1,53 @@
+{
+  "name": "My training (Intervals.icu)",
+  "description": "Read-only access to your own Intervals.icu data: activities, wellness, calendar, and fitness. Dates are YYYY-MM-DD in your local time.",
+  "tools": [
+    {
+      "operationId": "list_activities",
+      "name": "list_activities",
+      "description": "List my activities between two dates (oldest required, newest optional). Use limit and fields (e.g. id,start_date_local,type,name,moving_time,icu_training_load) to keep the response small.",
+      "pinnedInputs": { "id": "0" }
+    },
+    {
+      "operationId": "search_for_activities",
+      "name": "search_activities",
+      "description": "Find my activities by name or tag (q).",
+      "pinnedInputs": { "id": "0" }
+    },
+    {
+      "operationId": "get_activity",
+      "name": "get_activity",
+      "description": "Get one activity by its id (from list_activities). Set intervals=true to include the interval breakdown."
+    },
+    {
+      "operationId": "get_activity_streams",
+      "name": "get_activity_streams",
+      "description": "Get an activity's time-series data. Pass types (e.g. watts,heartrate,cadence) to fetch only what you need; streams are large.",
+      "pinnedInputs": { "ext": "" }
+    },
+    {
+      "operationId": "list_wellness_records",
+      "name": "list_wellness",
+      "description": "List my daily wellness records (HRV, resting HR, sleep, weight, fitness/fatigue/form) between oldest and newest.",
+      "pinnedInputs": { "id": "0", "ext": "" }
+    },
+    {
+      "operationId": "list_events",
+      "name": "list_calendar",
+      "description": "List my calendar between oldest and newest: planned workouts, races, notes. Filter with category (e.g. WORKOUT,RACE_A).",
+      "pinnedInputs": { "id": "0", "format": "" }
+    },
+    {
+      "operationId": "get_athlete_profile",
+      "name": "get_profile",
+      "description": "Get my athlete profile and sport settings (FTP, threshold pace and HR, zones).",
+      "pinnedInputs": { "id": "0" }
+    },
+    {
+      "operationId": "get_athlete_summary",
+      "name": "get_training_summary",
+      "description": "Get my training summary by week between start and end: totals, load, and time in zones.",
+      "pinnedInputs": { "id": "0", "ext": "" }
+    }
+  ]
+}

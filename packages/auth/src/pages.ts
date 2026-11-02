@@ -20,7 +20,10 @@ export const PAGE_HEADERS: Record<string, string> = {
   "cache-control": "no-store",
   "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
   "x-frame-options": "DENY",
-  "referrer-policy": "no-referrer",
+  // Not no-referrer: with it, browsers send `Origin: null` on the consent form's
+  // post, which the cross-site check refuses. same-origin keeps the URLs (with
+  // codes and state) from leaking to other sites all the same.
+  "referrer-policy": "same-origin",
   "x-content-type-options": "nosniff",
 };
 

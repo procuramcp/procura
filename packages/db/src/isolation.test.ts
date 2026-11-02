@@ -262,6 +262,15 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
       expect(await db.findUser("https://other-issuer.test", "alpha-reader")).toBeUndefined();
     });
 
+    it("creates a tenant with a chosen id, once", async () => {
+      const owner = await db.ensureUser("https://issuer.test", "chosen-id-owner");
+      expect(await db.createTenant("Chosen", owner, { id: "chosen-slug" as TenantId })).toBe("chosen-slug");
+      expect(await db.withTenant("chosen-slug" as TenantId, (tx) => memberRole(tx, owner))).toBe("owner");
+      // Taken ids and ids that aren't valid TenantIds are refused.
+      expect(await pgError(db.createTenant("Again", owner, { id: "chosen-slug" as TenantId }))).toBe("23505");
+      await expect(db.createTenant("Bad", owner, { id: "Not a slug!" as TenantId })).rejects.toThrow();
+    });
+
     it("tenants and users can only be created through the functions", async () => {
       expect(await pgError(db.withTenant(a.tenantId, (tx) => tx.insert(tenants).values({ id: "direct", name: "x" })))).toBe("42501");
       expect(await pgError(db.withTenant(a.tenantId, (tx) => tx.insert(users).values({ issuer: "i", subject: "s" } as never)))).toBe("42501");

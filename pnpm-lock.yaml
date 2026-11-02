@@ -193,9 +193,15 @@ importers:
       '@cairnmcp/auth':
         specifier: workspace:*
         version: link:../auth
+      '@cairnmcp/core':
+        specifier: workspace:*
+        version: link:../core
       '@cairnmcp/db':
         specifier: workspace:*
         version: link:../db
+      '@cairnmcp/ingest':
+        specifier: workspace:*
+        version: link:../ingest
       '@cairnmcp/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -205,22 +211,16 @@ importers:
       '@cairnmcp/vault':
         specifier: workspace:*
         version: link:../vault
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
       zod:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
-      '@cairnmcp/core':
-        specifier: workspace:*
-        version: link:../core
-      '@cairnmcp/ingest':
-        specifier: workspace:*
-        version: link:../ingest
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
-      drizzle-orm:
-        specifier: ^0.45.4
-        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
       jose:
         specifier: ^6.2.12
         version: 6.2.12
