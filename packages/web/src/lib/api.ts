@@ -42,6 +42,40 @@ export type OperationView = {
 
 export type Issue = { toolName: string; message: string };
 
+export type AuthSchemeView = { id: string; type: string; description?: string; fixedUsername?: string; in?: string; name?: string };
+export type OperationCounts = { total: number; read: number; write: number; destructive: number };
+export type SourcePreview = {
+  documentUrl: string | null;
+  via: string;
+  takenIds: string[];
+  preview: {
+    suggestedId: string;
+    name: string;
+    description?: string;
+    baseUrl: string;
+    operations: OperationCounts;
+    authSchemes: AuthSchemeView[];
+    warnings: Array<{ code: string; message: string; pointer?: string }>;
+    warningCount: number;
+  };
+};
+export type CredentialKind = "basic" | "bearer" | "api_key" | "oauth2";
+export type CredentialInput =
+  | { kind: "basic"; username?: string; password: string }
+  | { kind: "bearer"; token: string }
+  | { kind: "api_key"; value: string }
+  | { kind: "oauth2"; accessToken: string; refreshToken?: string };
+export type SourceView = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  documentUrl: string | null;
+  operations: OperationCounts;
+  authSchemes: Array<AuthSchemeView & { accepts: CredentialKind[]; stored: Array<{ kind: CredentialKind }> }>;
+  toolsets: Array<{ id: string; name: string }>;
+};
+export type DocumentInput = { url: string } | { document: string };
+
 export type ProfileRule = { toolsetId: string; level: Level; operations: string[] | null };
 export type AccessProfile = { id: string; name: string; description?: string; rules: ProfileRule[]; members: string[] };
 
@@ -110,6 +144,16 @@ export const api = {
   deleteProfile: (tenantId: string, profileId: string) => call<AccessView>("DELETE", `/tenants/${t(tenantId)}/profiles/${t(profileId)}`),
   setMemberProfiles: (tenantId: string, userId: string, profiles: string[]) =>
     call<AccessView>("PUT", `/tenants/${t(tenantId)}/members/${t(userId)}/profiles`, { profiles }),
+  previewSource: (tenantId: string, input: DocumentInput & { baseUrl?: string }) => call<SourcePreview>("POST", `/tenants/${t(tenantId)}/sources/preview`, input),
+  createSource: (
+    tenantId: string,
+    input: DocumentInput & { id: string; baseUrl?: string; fixedUsernames?: Record<string, string>; toolset?: { id: string; name: string } },
+  ) => call<{ source: { id: string }; toolset?: { id: string; endpoint: string } }>("POST", `/tenants/${t(tenantId)}/sources`, input),
+  source: (tenantId: string, sourceId: string) => call<SourceView>("GET", `/tenants/${t(tenantId)}/sources/${t(sourceId)}`),
+  setCredential: (tenantId: string, sourceId: string, schemeId: string, credential: CredentialInput) =>
+    call<SourceView>("PUT", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/credentials/${t(schemeId)}`, { credential }),
+  removeCredential: (tenantId: string, sourceId: string, schemeId: string) =>
+    call<SourceView>("DELETE", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/credentials/${t(schemeId)}`),
   testTool: (tenantId: string, toolsetId: string, tool: ToolBinding, args: Record<string, JsonValue>, confirm = false) =>
     call<TestResult>("POST", `/tenants/${t(tenantId)}/toolsets/${t(toolsetId)}/test`, { tool, args, confirm }),
 };

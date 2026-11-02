@@ -1,7 +1,7 @@
 // The curation console's server side (D-033) against real Postgres: sign-in
 // and sessions, who may edit what, CSRF, editing a toolset and its access,
 // the tool test panel, and the static files.
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -13,11 +13,26 @@ import type { FetchLike } from "@cairnmcp/runtime";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.ts";
+import { FetchRefused, type DocumentGetter } from "./fetch-document.ts";
 import { FakeOidcProvider, TestBrowser } from "./test-support.ts";
 
 const adminUrl = testDatabaseUrl();
 const BASE = "https://cairn.test";
 const API = `${BASE}/app/api`;
+const OPENAPI = readFileSync(new URL("../../ingest/fixtures/intervals-icu/openapi.json", import.meta.url), "utf8");
+const SECRET = "fake-console-key-0123456789";
+
+/** A fake web for URL ingestion: the Intervals.icu shape (Swagger UI page, config, document). */
+const getDocument: DocumentGetter = async (url) => {
+  if (url.includes("internal")) throw new FetchRefused("internal.test points to a private or internal address");
+  const pages: Record<string, string> = {
+    "https://api.test/api/v1/docs/swagger-ui/index.html": "<html>Swagger UI</html>",
+    "https://api.test/api/v1/docs/swagger-config": JSON.stringify({ url: "/api/v1/docs" }),
+    "https://api.test/api/v1/docs": OPENAPI,
+  };
+  const text = pages[url];
+  return text === undefined ? { url, status: 404, contentType: "text/plain", text: "" } : { url, status: 200, contentType: "application/json", text };
+};
 
 describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
   let scratch: ScratchDatabase;
@@ -72,6 +87,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       providers: [new OidcIdentityProvider({ id: "idp", name: "Test IdP", issuer: op.issuer, clientId: op.clientId, clientSecret: op.clientSecret }, { fetch: op.fetch })],
       fetch,
       consoleDir: staticDir,
+      getDocument,
     });
   });
 
@@ -246,6 +262,86 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
       expect((await carol_.json("PUT", `${API}/tenants/alpha/profiles/mine`, { name: "Mine", rules: [{ toolsetId: "mine", level: "use_writes" }] })).status).toBe(403);
       expect((await carol_.json("GET", `${API}/tenants/alpha/access`)).status).toBe(403);
+    });
+  });
+
+  describe("sources (D-035)", () => {
+    it("previews a pasted document without storing anything", async () => {
+      const browser = await signIn();
+      const res = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { document: OPENAPI });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { preview: { name: string; operations: { total: number; read: number }; authSchemes: Array<{ id: string; type: string }> }; takenIds: string[] };
+      expect(body.preview).toMatchObject({ name: "Intervals.icu API", operations: { total: 148, read: 79 } });
+      expect(body.preview.authSchemes.map((a) => [a.id, a.type])).toEqual([["APIKey", "http_basic"], ["AccessToken", "http_bearer"]]);
+      expect(body.takenIds).toEqual(["intervals-icu"]);
+      const tenant = (await (await browser.json("GET", `${API}/tenants/alpha`)).json()) as { sources: unknown[] };
+      expect(tenant.sources).toHaveLength(1);
+    });
+
+    it("finds the document behind a Swagger UI page, and refuses internal URLs", async () => {
+      const browser = await signIn();
+      const res = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { url: "https://api.test/api/v1/docs/swagger-ui/index.html" });
+      expect(await res.json()).toMatchObject({ documentUrl: "https://api.test/api/v1/docs", via: "Swagger UI's config", preview: { operations: { total: 148 } } });
+      const refused = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { url: "https://internal.test/openapi.json" });
+      expect([refused.status, ((await refused.json()) as { error: string }).error]).toEqual([422, "fetch_refused"]);
+      const junk = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { document: "not: [an, api" });
+      expect([junk.status, ((await junk.json()) as { error: string }).error]).toEqual([422, "invalid_document"]);
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { url: "https://api.test/x", document: OPENAPI })).status).toBe(400);
+    });
+
+    it("creates a source with its first toolset, and refuses an id that's taken", async () => {
+      const browser = await signIn();
+      const taken = await browser.json("POST", `${API}/tenants/alpha/sources`, { id: "intervals-icu", document: OPENAPI });
+      expect(taken.status).toBe(409);
+      const toolsetTaken = await browser.json("POST", `${API}/tenants/alpha/sources`, { id: "half", document: OPENAPI, toolset: { id: "mine", name: "Mine" } });
+      expect(toolsetTaken.status).toBe(409);
+      expect((await browser.json("GET", `${API}/tenants/alpha/sources/half`)).status).toBe(404);
+      const created = await browser.json("POST", `${API}/tenants/alpha/sources`, {
+        id: "intervals-live",
+        url: "https://api.test/api/v1/docs/swagger-ui/index.html",
+        fixedUsernames: { APIKey: "API_KEY" },
+        toolset: { id: "live", name: "Live" },
+      });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toMatchObject({ source: { id: "intervals-live", operations: 148 }, toolset: { id: "live", endpoint: `${BASE}/mcp/alpha/live` } });
+      const view = (await (await browser.json("GET", `${API}/tenants/alpha/sources/intervals-live`)).json()) as {
+        documentUrl: string;
+        authSchemes: Array<{ id: string; fixedUsername?: string; accepts: string[]; stored: unknown[] }>;
+        toolsets: Array<{ id: string }>;
+      };
+      expect(view.documentUrl).toBe("https://api.test/api/v1/docs");
+      expect(view.authSchemes[0]).toMatchObject({ id: "APIKey", fixedUsername: "API_KEY", accepts: ["basic"], stored: [] });
+      expect(view.toolsets).toEqual([{ id: "live", name: "Live" }]);
+      const toolset = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/live`)).json()) as { access: unknown[] };
+      expect(toolset.access).toEqual([{ userId: alice, level: "use" }]);
+    });
+
+    it("stores, replaces, and removes an API key without ever returning it", async () => {
+      const browser = await signIn();
+      const url = `${API}/tenants/alpha/sources/intervals-live/credentials/APIKey`;
+      const wrong = await browser.json("PUT", url, { credential: { kind: "bearer", token: SECRET } });
+      expect(wrong.status).toBe(422);
+      const set = await browser.json("PUT", url, { credential: { kind: "basic", password: SECRET } });
+      const text = await set.text();
+      expect(set.status).toBe(200);
+      expect(text).not.toContain(SECRET);
+      expect((JSON.parse(text) as { authSchemes: Array<{ stored: unknown[] }> }).authSchemes[0]?.stored).toEqual([{ kind: "basic" }]);
+      await browser.json("PUT", url, { credential: { kind: "basic", password: `${SECRET}-2` } });
+      const after = (await (await browser.json("GET", `${API}/tenants/alpha/sources/intervals-live`)).json()) as { authSchemes: Array<{ stored: unknown[] }> };
+      expect(after.authSchemes[0]?.stored).toHaveLength(1);
+      const removed = (await (await browser.json("DELETE", url)).json()) as { authSchemes: Array<{ stored: unknown[] }> };
+      expect(removed.authSchemes[0]?.stored).toEqual([]);
+      expect((await browser.json("PUT", `${API}/tenants/alpha/sources/intervals-live/credentials/Nope`, { credential: { kind: "basic", password: "x" } })).status).toBe(404);
+    });
+
+    it("is for editors only, and caps the body size", async () => {
+      const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
+      expect((await carol_.json("POST", `${API}/tenants/alpha/sources/preview`, { document: OPENAPI })).status).toBe(403);
+      expect((await carol_.json("POST", `${API}/tenants/alpha/sources`, { id: "x", document: OPENAPI })).status).toBe(403);
+      expect((await carol_.json("GET", `${API}/tenants/alpha/sources/intervals-icu`)).status).toBe(403);
+      const browser = await signIn();
+      const huge = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { document: "x".repeat(11 * 1024 * 1024) });
+      expect(huge.status).toBe(400);
     });
   });
 

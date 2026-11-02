@@ -4,6 +4,7 @@ import { createMcpHandler, TokenVerifier, type TrustedIssuer } from "@cairnmcp/m
 import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
 import { Vault, type KeyWrapper } from "@cairnmcp/vault";
 import { createConsoleHandler } from "./console.ts";
+import type { DocumentGetter } from "./fetch-document.ts";
 
 export type AppOptions = {
   db: Database;
@@ -16,6 +17,8 @@ export type AppOptions = {
   /** Upstream API access. Injected for tests. */
   fetch: FetchLike;
   now?: () => number;
+  /** How the console fetches API descriptions from URLs (D-035). Injected for tests. */
+  getDocument?: DocumentGetter;
   /** The built console (packages/web/dist), served at /app (D-033). */
   consoleDir?: string;
 };
@@ -39,10 +42,12 @@ export async function createApp(options: AppOptions): Promise<(request: Request)
   const mcp = createMcpHandler({ db: options.db, verifier, runtime, publicUrl, ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {}) });
   const console_ = createConsoleHandler({
     db: options.db,
+    vault,
     publicUrl,
     providers: options.providers,
     runtime,
     ...(options.consoleDir ? { staticDir: options.consoleDir } : {}),
+    ...(options.getDocument ? { getDocument: options.getDocument } : {}),
     ...(options.now ? { now: options.now } : {}),
   });
   return async (request) => (await auth(request)) ?? (await console_(request)) ?? mcp(request);

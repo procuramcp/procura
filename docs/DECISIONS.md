@@ -647,3 +647,30 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** replacing direct grants with profiles (more churn for no gain; a one-person
   exception is common); a policy language (D-023: Cedar or OPA if declarative rules stop being
   enough).
+
+## D-035 Adding APIs in the console: find, preview, add, then the key
+
+- **Decision:** owners and admins add an API from its OpenAPI description in the console:
+  1. **Find:** a URL, pasted text, or an uploaded file. A URL may be the document, a Swagger UI
+     page (followed through its `swagger-config`), or the API's address (the usual paths such as
+     `/openapi.json` and `/v3/api-docs`); at most 12 fetches.
+  2. **Preview:** the ingestor runs and nothing is stored: name, base URL, operations by side
+     effect, auth schemes, warnings. A basic-auth fixed username is pre-filled when the scheme's
+     description states one ("Username is API_KEY").
+  3. **Add:** the source and, optionally, a first toolset with only reads enabled (D-016).
+     Everything is checked before anything is written, so a refusal leaves nothing half-added.
+  4. **Key:** per auth scheme, a key is sent once, stored encrypted (D-019), and never returned;
+     the page shows only "key set" with Replace and Remove.
+- **Fetching untrusted URLs:** https only, port 443, no credentials in the URL. The host is
+  resolved once and every address must be public (no loopback, private, link-local and cloud
+  metadata, carrier-grade NAT, unique-local, or multicast ranges); the connection is pinned to
+  the checked address, so DNS can't change between check and request; redirects are re-checked;
+  10 MB and 15 seconds at most. The same checks will move into the runtime's egress guard
+  (milestone 3).
+- **Shared with the CLI:** `mapSource` (ingest plus curation) is used by both `admin.sh source add`
+  and the console, so they can't drift.
+- **Not yet:** replacing an existing source with a new version (a 409 for now). That needs a diff
+  of operations and a check of the toolsets and profiles that use removed ones, which is phase 2.
+- **Benchmark:** the Intervals.icu Swagger UI page
+  (`https://intervals.icu/api/v1/docs/swagger-ui/index.html`) leads to `/api/v1/docs` in three
+  fetches; the preview shows 153 operations, two auth schemes, and `API_KEY` pre-filled.

@@ -31,18 +31,25 @@ import {
   memberProfileIds,
   memberRole,
   putProfile,
+  putSource,
   putToolset,
   schema,
   setMemberProfiles,
   setToolsetAccess,
   type Database,
 } from "@cairnmcp/db";
+import { AdminError, mapSource, setCredential, summarize } from "./admin.ts";
+import { discoverDocument, FetchRefused, MAX_DOCUMENT_FETCH_BYTES, safeGet, type DocumentGetter } from "./fetch-document.ts";
 import type { Runtime } from "@cairnmcp/runtime";
+import { CredentialInput, type Vault } from "@cairnmcp/vault";
 import { and, eq, gt, lt } from "drizzle-orm";
 import { z } from "zod";
 
 export type ConsoleOptions = {
   db: Database;
+  vault: Vault;
+  /** How API descriptions are fetched from URLs (D-035). Injected in tests. */
+  getDocument?: DocumentGetter;
   publicUrl: string;
   providers: IdentityProvider[];
   runtime: Runtime;
@@ -200,6 +207,15 @@ export function createConsoleHandler(options: ConsoleOptions): Handler {
         }),
       );
     }
+    if ((m = /^\/tenants\/([^/]+)\/sources\/preview$/.exec(path)) && method === "POST") return previewRoute(request, user, m[1]!);
+    if ((m = /^\/tenants\/([^/]+)\/sources$/.exec(path)) && method === "POST") return createSourceRoute(request, user, m[1]!);
+    if ((m = /^\/tenants\/([^/]+)\/sources\/([^/]+)$/.exec(path)) && method === "GET") {
+      const sourceId = m[2]!;
+      return result(await asEditor(user, m[1]!, (tx, tenantId) => sourceView(tx, tenantId, sourceId)));
+    }
+    if ((m = /^\/tenants\/([^/]+)\/sources\/([^/]+)\/credentials\/([^/]+)$/.exec(path)) && (method === "PUT" || method === "DELETE")) {
+      return credentialRoute(request, user, m[1]!, m[2]!, decodeURIComponent(m[3]!));
+    }
     if ((m = /^\/tenants\/([^/]+)\/access$/.exec(path)) && method === "GET") {
       return result(await asEditor(user, m[1]!, (tx) => accessView(tx, user)));
     }
@@ -353,6 +369,130 @@ export function createConsoleHandler(options: ConsoleOptions): Handler {
     );
   }
 
+  // --- Sources (D-035) ---------------------------------------------------------------
+
+  const getDocument = options.getDocument ?? safeGet;
+
+  /** The document text from a URL (found by discovery) or pasted directly. */
+  async function loadDocument(input: { url?: string | undefined; document?: string | undefined }): Promise<{ text: string; documentUrl?: string; via: string }> {
+    if (input.document) return { text: input.document, via: "pasted or uploaded" };
+    if (!input.url) throw new FetchRefused("give a URL or the document itself");
+    const found = await discoverDocument(input.url, getDocument);
+    return { text: found.text, documentUrl: found.documentUrl, via: found.via };
+  }
+
+  function previewOf(mapped: ReturnType<typeof mapSource>) {
+    const { ir } = mapped;
+    const count = (c: string) => ir.operations.filter((o) => o.sideEffect.class === c).length;
+    return {
+      suggestedId: ir.source.id,
+      name: ir.source.name,
+      ...(ir.source.description ? { description: ir.source.description.slice(0, 500) } : {}),
+      baseUrl: ir.source.baseUrl,
+      operations: { total: ir.operations.length, read: count("read"), write: count("write"), destructive: count("destructive") },
+      authSchemes: ir.source.authSchemes.map(schemeView),
+      warnings: mapped.warnings.slice(0, 50),
+      warningCount: mapped.warnings.length,
+    };
+  }
+
+  async function previewRoute(request: Request, user: Session, tenantInput: string): Promise<Response> {
+    const body = SourcePreviewInput.safeParse(await readJson(request, MAX_DOCUMENT_BODY_BYTES));
+    if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+    const taken = await asEditor(user, tenantInput, async (tx) => (await listSources(tx)).map((s) => s.id as string));
+    if (taken instanceof Response) return taken;
+    try {
+      const doc = await loadDocument(body.data);
+      const provisionalId = body.data.id ?? slugFromText(titleOf(doc.text)) ?? "api";
+      const mapped = mapSource({ sourceId: provisionalId, openapi: doc.text, ...(doc.documentUrl ? { documentUrl: doc.documentUrl } : {}), ...(body.data.baseUrl ? { baseUrl: body.data.baseUrl } : {}) });
+      return json(200, { documentUrl: doc.documentUrl ?? null, via: doc.via, preview: previewOf(mapped), takenIds: taken });
+    } catch (e) {
+      return sourceProblem(e);
+    }
+  }
+
+  async function createSourceRoute(request: Request, user: Session, tenantInput: string): Promise<Response> {
+    const body = SourceInput.safeParse(await readJson(request, MAX_DOCUMENT_BODY_BYTES));
+    if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+    // Check the tenant and the id before fetching anything.
+    const exists = await asEditor(user, tenantInput, async (tx) => (await getSource(tx, body.data.id)) !== undefined);
+    if (exists instanceof Response) return exists;
+    if (exists) return json(409, { error: "conflict", message: `a source ${body.data.id} already exists (updating a source comes later)` });
+    let mapped;
+    try {
+      const doc = await loadDocument(body.data);
+      mapped = mapSource({
+        sourceId: body.data.id,
+        openapi: doc.text,
+        ...(doc.documentUrl ? { documentUrl: doc.documentUrl } : {}),
+        ...(body.data.baseUrl ? { baseUrl: body.data.baseUrl } : {}),
+        fixedUsernames: body.data.fixedUsernames,
+      });
+    } catch (e) {
+      return sourceProblem(e);
+    }
+    const toolset = body.data.toolset;
+    return result(
+      await asEditor(user, tenantInput, async (tx, tenantId) => {
+        // Check everything before writing anything, so a refusal leaves nothing half-added.
+        if (await getSource(tx, mapped.ir.source.id)) return json(409, { error: "conflict", message: `a source ${mapped.ir.source.id} already exists` });
+        if (toolset && (await getToolset(tx, toolset.id))) return json(409, { error: "conflict", message: `a toolset ${toolset.id} already exists; pick another name` });
+        await putSource(tx, mapped.ir);
+        if (toolset) {
+          await putToolset(tx, defaultToolset(mapped.ir, { id: toolset.id, name: toolset.name }));
+          await setToolsetAccess(tx, toolset.id, user.userId, "use");
+        }
+        return json(201, { source: summarize(mapped), ...(toolset ? { toolset: { id: toolset.id, endpoint: endpointUrl(tenantId, toolset.id) } } : {}) });
+      }),
+    );
+  }
+
+  async function sourceView(tx: TxOf<Database>, tenantId: TenantId, sourceId: string): Promise<Response> {
+    const source = await getSource(tx, sourceId);
+    if (!source) return json(404, { error: "not_found", message: `no source ${sourceId}` });
+    const credentials = await options.vault.listCredentials(tenantId, source.id);
+    const count = (c: string) => source.ir.operations.filter((o) => o.sideEffect.class === c).length;
+    const toolsets = (await listToolsets(tx)).filter((t) => t.sourceId === source.id).map((t) => ({ id: t.id, name: t.name }));
+    return json(200, {
+      id: source.id,
+      name: source.name,
+      baseUrl: source.ir.source.baseUrl,
+      documentUrl: source.ir.source.derivation.documentUrl ?? null,
+      operations: { total: source.ir.operations.length, read: count("read"), write: count("write"), destructive: count("destructive") },
+      authSchemes: source.ir.source.authSchemes.map((scheme) => ({
+        ...schemeView(scheme),
+        // Which kinds of credential fit, and whether one is stored. Never the value.
+        accepts: credentialKinds(scheme.type),
+        stored: credentials.filter((c) => c.schemeId === scheme.id).map((c) => ({ kind: c.kind })),
+      })),
+      toolsets,
+    });
+  }
+
+  async function credentialRoute(request: Request, user: Session, tenantInput: string, sourceId: string, schemeId: string): Promise<Response> {
+    const body = request.method === "PUT" ? CredentialBody.safeParse(await readJson(request)) : undefined;
+    if (body && !body.success) return json(400, { error: "invalid_request", message: "expected { credential: { kind, ... } }" });
+    const loaded = await asEditor(user, tenantInput, async (tx, tenantId) => {
+      const source = await getSource(tx, sourceId);
+      const scheme = source?.ir.source.authSchemes.find((s) => s.id === schemeId);
+      if (!source || !scheme) return json(404, { error: "not_found", message: `no auth scheme ${schemeId} on source ${sourceId}` });
+      return { tenantId, scheme };
+    });
+    if (loaded instanceof Response) return loaded;
+    if (body) {
+      const credential = body.data!.credential;
+      if (!credentialKinds(loaded.scheme.type).includes(credential.kind)) {
+        return json(422, { error: "wrong_kind", message: `${schemeId} takes ${credentialKinds(loaded.scheme.type).join(" or ")}, not ${credential.kind}` });
+      }
+      await setCredential(options.vault, { tenantId: loaded.tenantId, sourceId, schemeId, credential });
+    } else {
+      for (const c of await options.vault.listCredentials(loaded.tenantId, sourceId)) {
+        if (c.schemeId === schemeId) await options.vault.deleteCredential(loaded.tenantId, c.id);
+      }
+    }
+    return result(await asEditor(user, tenantInput, (tx, tenantId) => sourceView(tx, tenantId, sourceId)));
+  }
+
   async function testRoute(request: Request, user: Session, tenantInput: string, toolsetId: ToolsetId): Promise<Response> {
     const body = ToolTest.safeParse(await readJson(request));
     if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
@@ -449,7 +589,67 @@ const ToolsetEdit = z.object({ name: z.string().min(1).max(200), description: z.
 const AccessEdit = z.object({ userId: UserId, level: z.union([ToolsetAccessLevel, z.literal("none")]) });
 const ProfileEdit = z.object({ name: z.string(), description: z.string().optional(), rules: z.array(z.unknown()).max(200) });
 const MemberProfiles = z.object({ profiles: z.array(z.string().max(64)).max(100) });
+const MAX_DOCUMENT_BODY_BYTES = MAX_DOCUMENT_FETCH_BYTES + 64 * 1024;
+const SourceFields = z.object({
+  id: SourceId,
+  url: z.string().max(2000).optional(),
+  document: z.string().max(MAX_DOCUMENT_FETCH_BYTES).optional(),
+  baseUrl: z.string().max(2000).optional(),
+  fixedUsernames: z.record(z.string(), z.string().max(200)).default({}),
+  toolset: z.object({ id: ToolsetId, name: z.string().trim().min(1).max(200) }).optional(),
+});
+const oneDocument = (b: { url?: string | undefined; document?: string | undefined }) => Boolean(b.url) !== Boolean(b.document);
+const ONE_DOCUMENT = { message: "give either a URL or the document, not both" };
+const SourceInput = SourceFields.refine(oneDocument, ONE_DOCUMENT);
+const SourcePreviewInput = SourceFields.partial({ id: true }).refine(oneDocument, ONE_DOCUMENT);
+const CredentialBody = z.object({ credential: CredentialInput });
 const ToolTest = z.object({ tool: ToolBinding, args: z.record(z.string(), z.unknown()).default({}), confirm: z.boolean().optional() });
+
+type SchemeLike = { id: string; type: string; description?: string | undefined; fixedUsername?: string | undefined; in?: string; name?: string };
+function schemeView(scheme: SchemeLike) {
+  return {
+    id: scheme.id,
+    type: scheme.type,
+    ...(scheme.description ? { description: scheme.description.slice(0, 500) } : {}),
+    ...(scheme.fixedUsername ? { fixedUsername: scheme.fixedUsername } : {}),
+    ...(scheme.in ? { in: scheme.in, name: scheme.name } : {}),
+  };
+}
+
+/** Credential kinds the vault can store for an auth scheme type. */
+function credentialKinds(type: string): Array<CredentialInput["kind"]> {
+  switch (type) {
+    case "http_basic":
+      return ["basic"];
+    case "http_bearer":
+      return ["bearer"];
+    case "api_key":
+      return ["api_key"];
+    case "oauth2":
+    case "oidc":
+      return ["oauth2", "bearer"];
+    default:
+      return [];
+  }
+}
+
+function titleOf(text: string): string {
+  const json = /"title"\s*:\s*"([^"]{1,200})"/.exec(text);
+  const yaml = /^\s{2}title:\s*['"]?([^'"\n]{1,200})/m.exec(text);
+  return json?.[1] ?? yaml?.[1] ?? "";
+}
+
+function slugFromText(text: string): string | undefined {
+  const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64).replace(/-+$/, "");
+  return slug || undefined;
+}
+
+/** A refused fetch or a document that didn't map: the person can fix these, so say what happened. */
+function sourceProblem(e: unknown): Response {
+  if (e instanceof FetchRefused) return json(422, { error: "fetch_refused", message: e.message });
+  if (e instanceof AdminError) return json(422, { error: "invalid_document", message: e.message });
+  throw e;
+}
 
 function operationView(op: Operation) {
   const props = (op.input.properties ?? {}) as Record<string, { type?: unknown; description?: string }>;
@@ -486,9 +686,11 @@ type TxOf<D extends Database> = Parameters<Parameters<D["withTenant"]>[1]>[0];
 
 class BodyError extends Error {}
 
-async function readJson(request: Request): Promise<unknown> {
+async function readJson(request: Request, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
+  // Refuse a declared oversize body before reading it.
+  if (Number(request.headers.get("content-length") ?? 0) > maxBytes) throw new BodyError("request body is too large");
   const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) throw new BodyError("request body is too large");
+  if (Buffer.byteLength(text) > maxBytes) throw new BodyError("request body is too large");
   try {
     return JSON.parse(text);
   } catch {
