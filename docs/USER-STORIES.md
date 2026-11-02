@@ -44,7 +44,7 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 | P-13 | Each plan has limits: requests per minute and a daily or monthly allowance per customer. | Limits enforced per customer across restarts and instances; a tool can count for more than one call. | — |
 | P-14 | One customer can't use up my API's own rate limit for everyone. | Per-customer limits sit under the tenant-wide limit and the upstream's `Retry-After` (D-020). | partial: tenant and source limits, in memory |
 | P-15 | Plans can limit arguments, not just tools (e.g. Free may read at most 100 items). | Per-plan input pins and bounds, extending today's toolset pins (D-015, D-023). | — |
-| P-16 | I find a customer, see their plan and usage, give them an exception, or suspend them. | Customer list that scales to tens of thousands: search, per-customer override, suspend. | — |
+| P-16 | I find a customer, see their plan and usage, give them an exception, or suspend them. | Customer list that scales to tens of thousands: search, per-customer override, suspend. | partial: search, paging, profiles, direct grants, suspend, notes (D-038); usage comes with P-30 |
 
 ## Provider: how my API knows who's calling
 
@@ -69,14 +69,14 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 | C-2 | I see only the tools my plan includes. | `tools/list` filtered per caller; `tools/call` re-checked (D-023). | built |
 | C-3 | When I hit a limit, I'm told which one, when it resets, and how to get more. | Limit errors as tool results with reset time and the provider's upgrade link (D-020). | partial: rate errors give a retry time; no allowances or upgrade link |
 | C-4 | When I upgrade, the new tools appear without reconnecting. | Plan from refreshed claims (P-12); access checked per request (D-034). | — |
-| C-5 | My data stays mine: my calls use my account, not someone else's. | Per-user credentials (P-20); isolation tests cover customers. | — |
+| C-5 | My data stays mine: my calls use my account, not someone else's. | Per-user credentials (P-20); isolation tests cover customers. | partial: isolation tests cover customers (D-038); per-user credentials not yet |
 
 ## Team
 
 | Id | Story | Done when | Status |
 | --- | --- | --- | --- |
-| T-1 | As an owner, I invite teammates as admins or editors. | Invite by email; roles owner, admin, editor; separate from customers. | partial: owner, admin, member added through the admin CLI |
-| T-2 | Editors curate tools and plans; only owners and admins change keys, sign-in, and billing settings. | Role checks in the console API. | partial: owner and admin edit, members only view |
+| T-1 | As an owner, I invite teammates as admins or editors. | Invite by email; roles owner, admin, editor, viewer; separate from customers. | partial: added by account id in the console (D-038), no email invites yet |
+| T-2 | Editors curate tools and plans; only owners and admins change keys, sign-in, and billing settings. | Role checks in the console API. | built: viewer, editor, admin, owner (D-038) |
 | T-3 | I see who changed a toolset, plan, or key, and when. | Change history for console edits. | — |
 
 ## Individual
@@ -84,7 +84,7 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 | Id | Story | Done when | Status |
 | --- | --- | --- | --- |
 | I-1 | I host an MCP server for an API I use, with my own key, in a few minutes. | Sign up, add API, set key, copy URL (P-1, P-2, D-035). | partial: tenants created through the admin CLI |
-| I-2 | I share it with a few people and choose what each may do. | Members and profiles (D-034). | built |
+| I-2 | I share it with a few people and choose what each may do. | Customers or viewers, with profiles (D-034, D-038). | built |
 | I-3 | When I'm ready to offer it to others, I turn on provider features without starting over. | Same tenant, same toolsets; plans and provider sign-in are added on. | — |
 
 ## Open questions

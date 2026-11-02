@@ -57,9 +57,9 @@ Done when someone can run their own cairnmcp with only Docker, a Postgres URL, a
 For an API provider serving all its customers from one MCP server (D-032, D-037). In this order;
 each step is usable on its own:
 
-1. **Customers separate from the team** (P-16, T-1): customer records created on first sign-in,
-   searchable, with suspend and per-customer exceptions; team roles owner, admin, editor. Isolation
-   tests cover customers as they cover members today.
+1. **Customers separate from the team** (P-16, T-1), ✅ D-038: roles owner, admin, editor, viewer,
+   and customer; customers searchable and paged, with suspend, notes, and per-customer grants and
+   profiles; isolation tests cover them. Creating them on first sign-in comes with step 3.
 2. **Plans with limits** (P-11, P-13, P-14, C-3): an access profile gains per-customer requests per
    minute and a daily or monthly allowance, optionally a cost per tool. Counters in Postgres, so
    they hold across restarts and instances. Limit errors say which limit, when it resets, and the

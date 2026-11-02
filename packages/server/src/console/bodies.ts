@@ -1,6 +1,6 @@
 // Request bodies the console API accepts, and how to read them.
 import type * as Contract from "@cairnmcp/console-api";
-import { JsonValue, SourceId, ToolBinding, ToolsetAccessLevel, ToolsetId, UserId } from "@cairnmcp/core";
+import { JsonValue, MemberRole, MemberStatus, SourceId, ToolBinding, ToolsetAccessLevel, ToolsetId, UserId } from "@cairnmcp/core";
 import { readJson } from "@cairnmcp/http";
 import { CredentialInput } from "@cairnmcp/vault";
 import { z } from "zod";
@@ -26,6 +26,8 @@ export const ToolsetEdit = z.object({ name: z.string().min(1).max(200), descript
 export const AccessEdit = z.object({ userId: UserId, level: z.union([ToolsetAccessLevel, z.literal("none")]) });
 export const ProfileEdit = z.object({ name: z.string(), description: z.string().optional(), rules: z.array(z.unknown()).max(200) });
 export const MemberProfiles = z.object({ profiles: z.array(z.string().max(64)).max(100) });
+export const RoleEdit = z.object({ role: MemberRole });
+export const MemberEdit = z.object({ status: MemberStatus.optional(), note: z.string().trim().max(2000).nullable().optional() });
 export const CredentialBody = z.object({ credential: CredentialInput });
 export const ToolTest = z.object({ tool: ToolBinding, args: z.record(z.string(), JsonValue).default({}), confirm: z.boolean().optional() });
 
@@ -51,6 +53,8 @@ export type BodiesMatchContract = [
   Accepts<typeof AccessEdit, Contract.AccessEdit>,
   Accepts<typeof ProfileEdit, Contract.ProfileEdit>,
   Accepts<typeof MemberProfiles, Contract.MemberProfilesEdit>,
+  Accepts<typeof RoleEdit, Contract.RoleEdit>,
+  Accepts<typeof MemberEdit, Contract.MemberEdit>,
   Accepts<typeof CredentialBody, Contract.CredentialBody>,
   Accepts<typeof ToolTest, Contract.ToolTestInput>,
   Accepts<typeof SourceInput, Contract.SourceInput>,

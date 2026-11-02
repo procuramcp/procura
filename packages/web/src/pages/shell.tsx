@@ -71,7 +71,7 @@ export function Shell() {
                           <span>{t.name}</span>
                         </NavLink>
                       </SidebarMenuButton>
-                      {t.id === tenantId && t.role !== "member" && (
+                      {t.id === tenantId && (
                         <SidebarMenuSub>
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={!pathname.endsWith("/access")}>

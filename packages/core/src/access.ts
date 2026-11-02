@@ -14,6 +14,30 @@ export type Caller = {
 };
 
 /**
+ * Someone's role in a tenant (D-038). The team (owner, admin, editor, viewer)
+ * may open the console; customers only call tools. Calling tools is decided by
+ * grants and profiles for everyone, whatever their role.
+ */
+export const MemberRole = z.enum(["owner", "admin", "editor", "viewer", "customer"]);
+export type MemberRole = z.infer<typeof MemberRole>;
+export const TeamRole = MemberRole.exclude(["customer"]);
+export type TeamRole = z.infer<typeof TeamRole>;
+/** Suspended people are refused everywhere but keep their grants and profiles. */
+export const MemberStatus = z.enum(["active", "suspended"]);
+export type MemberStatus = z.infer<typeof MemberStatus>;
+
+const TEAM_RANK: Record<MemberRole, number> = { customer: 0, viewer: 1, editor: 2, admin: 3, owner: 4 };
+
+/**
+ * Whether `role` may do what `need` may in the console (D-038): viewers look,
+ * editors curate tools, plans, and customers, admins also manage keys and the
+ * team, owners also manage owners. Customers never pass.
+ */
+export function hasTeamRole(role: MemberRole | undefined, need: TeamRole): boolean {
+  return role !== undefined && role !== "customer" && TEAM_RANK[role] >= TEAM_RANK[need];
+}
+
+/**
  * A member's access to one toolset (D-023): `use` calls its read tools,
  * `use_writes` also calls its enabled write and destructive tools.
  * No access at all is the absence of a level.

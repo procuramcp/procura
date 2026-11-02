@@ -8,7 +8,7 @@ import { credentialKindsFor } from "@cairnmcp/vault";
 import { AdminError, mapSource, summarize, type MappedSource } from "../admin.ts";
 import { discoverDocument, FetchRefused } from "../fetch-document.ts";
 import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SourceInput, SourcePreviewInput } from "./bodies.ts";
-import { asEditor, editorResponse, endpointUrl, type ApiRoute, type ConsoleContext } from "./context.ts";
+import { asTeam, endpointUrl, teamResponse, type ApiRoute, type ConsoleContext } from "./context.ts";
 import { schemeView } from "./views.ts";
 
 export const sourceRoutes: ApiRoute[] = [
@@ -18,7 +18,7 @@ export const sourceRoutes: ApiRoute[] = [
     handle: async (api, [tenant]) => {
       const body = await readBody(api.request, SourcePreviewInput, MAX_DOCUMENT_BODY_BYTES);
       if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
-      const taken = await asEditor(api, tenant!, (tx) => listSourceIds(tx));
+      const taken = await asTeam(api, tenant!, "editor", (tx) => listSourceIds(tx));
       if (taken instanceof Response) return taken;
       try {
         const doc = await loadDocument(api.ctx, body.data);
@@ -37,7 +37,7 @@ export const sourceRoutes: ApiRoute[] = [
       const body = await readBody(api.request, SourceInput, MAX_DOCUMENT_BODY_BYTES);
       if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
       // Check the tenant and the id before fetching anything.
-      const exists = await asEditor(api, tenant!, async (tx) => (await getSource(tx, body.data.id)) !== undefined);
+      const exists = await asTeam(api, tenant!, "editor", async (tx) => (await getSource(tx, body.data.id)) !== undefined);
       if (exists instanceof Response) return exists;
       if (exists) return json(409, { error: "conflict", message: `a source ${body.data.id} already exists (updating a source comes later)` });
       let mapped: MappedSource;
@@ -48,7 +48,7 @@ export const sourceRoutes: ApiRoute[] = [
         return sourceProblem(e);
       }
       const toolset = body.data.toolset;
-      return editorResponse(api, tenant!, async (tx, tenantId) => {
+      return teamResponse(api, tenant!, "editor", async (tx, tenantId) => {
         // Check everything before writing anything, so a refusal leaves nothing half-added.
         if (await getSource(tx, mapped.ir.source.id)) return json(409, { error: "conflict", message: `a source ${mapped.ir.source.id} already exists` });
         if (toolset && (await getToolset(tx, toolset.id))) return json(409, { error: "conflict", message: `a toolset ${toolset.id} already exists; pick another name` });
@@ -64,7 +64,7 @@ export const sourceRoutes: ApiRoute[] = [
   {
     method: "GET",
     path: /^\/tenants\/([^/]+)\/sources\/([^/]+)$/,
-    handle: (api, [tenant, sourceId]) => editorResponse(api, tenant!, (tx, tenantId) => sourceView(api.ctx, tx, tenantId, sourceId!)),
+    handle: (api, [tenant, sourceId]) => teamResponse(api, tenant!, "viewer", (tx, tenantId) => sourceView(api.ctx, tx, tenantId, sourceId!)),
   },
   {
     method: ["PUT", "DELETE"],
@@ -73,7 +73,8 @@ export const sourceRoutes: ApiRoute[] = [
       const schemeId = decodeURIComponent(schemeInput!);
       const body = api.request.method === "PUT" ? await readBody(api.request, CredentialBody) : undefined;
       if (body && !body.success) return json(400, { error: "invalid_request", message: "expected { credential: { kind, ... } }" });
-      const loaded = await asEditor(api, tenant!, async (tx, tenantId) => {
+      // Keys: admins and owners only (D-038).
+      const loaded = await asTeam(api, tenant!, "admin", async (tx, tenantId) => {
         const source = await getSource(tx, sourceId!);
         const scheme = source?.ir.source.authSchemes.find((s) => s.id === schemeId);
         if (!source || !scheme) return json(404, { error: "not_found", message: `no auth scheme ${schemeId} on source ${sourceId}` });
@@ -91,7 +92,7 @@ export const sourceRoutes: ApiRoute[] = [
       } else {
         await vault.deleteSchemeCredentials(loaded.tenantId, sourceId!, schemeId);
       }
-      return editorResponse(api, tenant!, (tx, tenantId) => sourceView(api.ctx, tx, tenantId, sourceId!));
+      return teamResponse(api, tenant!, "admin", (tx, tenantId) => sourceView(api.ctx, tx, tenantId, sourceId!));
     },
   },
 ];

@@ -19,6 +19,7 @@ export const users = cairnmcp.table("users", {
   id: text("id").primaryKey(),
   issuer: text("issuer").notNull(),
   subject: text("subject").notNull(),
+  label: text("label"),
   createdAt: createdAt(),
 });
 
@@ -27,7 +28,9 @@ export const memberships = cairnmcp.table(
   {
     tenantId: text("tenant_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role", { enum: ["owner", "admin", "member"] }).notNull(),
+    role: text("role", { enum: ["owner", "admin", "editor", "viewer", "customer"] }).notNull(),
+    status: text("status", { enum: ["active", "suspended"] }).notNull().default("active"),
+    note: text("note"),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.userId] })],

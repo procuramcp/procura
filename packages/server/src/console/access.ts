@@ -1,16 +1,17 @@
-// Access profiles and who holds them (D-034).
+// Access profiles (D-034) and the access page: profiles, the team, and how many customers (D-038).
 import type { AccessView } from "@cairnmcp/console-api";
-import { AccessProfile, UserId } from "@cairnmcp/core";
-import { deleteProfile, ensureMember, listMembers, listOperationEffects, listProfiles, listToolsets, memberProfileIds, memberRole, PG, pgErrorCode, putProfile, setMemberProfiles, type TenantTx } from "@cairnmcp/db";
+import { AccessProfile } from "@cairnmcp/core";
+import { deleteProfile, listCustomers, listOperationEffects, listProfiles, listTeam, listToolsets, memberProfileIds, putProfile, type TenantTx } from "@cairnmcp/db";
 import { json } from "@cairnmcp/http";
-import { issuesText, MemberProfiles, ProfileEdit, readBody } from "./bodies.ts";
-import { editorResponse, type ApiRoute, type Session } from "./context.ts";
+import { issuesText, ProfileEdit, readBody } from "./bodies.ts";
+import { teamResponse, type ApiRoute, type Session } from "./context.ts";
+import { person } from "./people.ts";
 
 export const accessRoutes: ApiRoute[] = [
   {
     method: "GET",
     path: /^\/tenants\/([^/]+)\/access$/,
-    handle: (api, [tenant]) => editorResponse(api, tenant!, (tx) => accessView(tx, api.user)),
+    handle: (api, [tenant]) => teamResponse(api, tenant!, "viewer", (tx) => accessView(tx, api.user)),
   },
   {
     method: ["PUT", "DELETE"],
@@ -18,7 +19,7 @@ export const accessRoutes: ApiRoute[] = [
     handle: async (api, [tenant, profileId]) => {
       const body = api.request.method === "PUT" ? await readBody(api.request, ProfileEdit) : undefined;
       if (body && !body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
-      return editorResponse(api, tenant!, async (tx) => {
+      return teamResponse(api, tenant!, "editor", async (tx) => {
         if (!body) {
           if (!(await deleteProfile(tx, profileId!))) return json(404, { error: "not_found", message: `no profile ${profileId}` });
           return accessView(tx, api.user);
@@ -40,41 +41,20 @@ export const accessRoutes: ApiRoute[] = [
       });
     },
   },
-  {
-    method: "PUT",
-    path: /^\/tenants\/([^/]+)\/members\/([^/]+)\/profiles$/,
-    handle: async (api, [tenant, userInput]) => {
-      const body = await readBody(api.request, MemberProfiles);
-      const userId = UserId.safeParse(userInput).data;
-      if (!body.success || !userId) return json(400, { error: "invalid_request", message: body.success ? "invalid account id" : issuesText(body.error) });
-      return editorResponse(api, tenant!, async (tx) => {
-        try {
-          // Giving someone a profile makes them a member, like a direct grant does (they must have signed in once).
-          if (body.data.profiles.length === 0 && !(await memberRole(tx, userId))) {
-            return json(404, { error: "not_found", message: "that account isn't a member of this tenant" });
-          }
-          await ensureMember(tx, userId);
-          await setMemberProfiles(tx, userId, body.data.profiles);
-        } catch (e) {
-          if (pgErrorCode(e) === PG.FOREIGN_KEY_VIOLATION) return json(404, { error: "not_found", message: "no such account (they need to sign in once first) or no such profile" });
-          throw e;
-        }
-        return accessView(tx, api.user);
-      });
-    },
-  },
 ];
 
-/** Profiles, who holds them, and what they can point at. */
-async function accessView(tx: TenantTx, user: Session): Promise<Response> {
+/** Profiles, the team, how many customers, and what profiles can point at. */
+export async function accessView(tx: TenantTx, user: Session): Promise<Response> {
   const profiles = await listProfiles(tx);
-  const members = await listMembers(tx);
-  const held = await memberProfileIds(tx);
+  const team = await listTeam(tx);
+  const held = await memberProfileIds(tx, team.map((m) => m.userId));
+  const { total: customers } = await listCustomers(tx, { limit: 1 });
   const toolsets = await listToolsets(tx);
   const effects = await listOperationEffects(tx);
   return json(200, {
     profiles,
-    members: members.map((m) => ({ ...m, you: m.userId === user.userId, profiles: held.get(m.userId) ?? [] })),
+    team: team.map((m) => person(m, held.get(m.userId) ?? [], user.userId)),
+    customers,
     toolsets: toolsets.map((t) => {
       const ops = effects.get(t.sourceId);
       return {

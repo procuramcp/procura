@@ -6,6 +6,9 @@ import {
   allowsTool,
   instantOf,
   IrDocument,
+  MemberRole,
+  MemberStatus,
+  omitUndefined,
   SourceId,
   TenantId,
   Toolset,
@@ -13,20 +16,34 @@ import {
   ToolsetId,
   UserId,
   type AccessRule,
+  type Instant,
   type SideEffect,
   type SideEffectCounts,
 } from "@cairnmcp/core";
 import type { AuditEvent } from "@cairnmcp/runtime";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import type { TenantTx } from "./client.ts";
-import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets } from "./schema.ts";
+import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
 
 const currentTenant = sql<string>`cairnmcp.current_tenant_id()`;
 
-export type MemberRole = "owner" | "admin" | "member";
+// --- People: the team and customers (D-038) ---------------------------------------
+
+export type Member = { userId: UserId; label: string | null; role: MemberRole; status: MemberStatus; note: string | null; createdAt: Instant };
+
+const memberColumns = {
+  userId: memberships.userId,
+  label: users.label,
+  role: memberships.role,
+  status: memberships.status,
+  note: memberships.note,
+  createdAt: memberships.createdAt,
+};
+type MemberRow = { userId: string; label: string | null; role: MemberRole; status: MemberStatus; note: string | null; createdAt: Date };
+const toMember = (r: MemberRow): Member => ({ ...r, userId: UserId.parse(r.userId), createdAt: instantOf(r.createdAt) });
 
 export async function addMember(tx: TenantTx, userId: UserId, role: MemberRole): Promise<void> {
-  await tx.insert(memberships).values({ tenantId: currentTenant, userId: UserId.parse(userId), role });
+  await tx.insert(memberships).values({ tenantId: currentTenant, userId: UserId.parse(userId), role: MemberRole.parse(role) });
 }
 
 export async function removeMember(tx: TenantTx, userId: UserId): Promise<boolean> {
@@ -34,25 +51,130 @@ export async function removeMember(tx: TenantTx, userId: UserId): Promise<boolea
   return rows.length > 0;
 }
 
+/**
+ * The role of an active member, or undefined for non-members and suspended
+ * people. Every access check goes through this, so suspending someone shuts
+ * them out of the MCP endpoint, consent, and the console at once.
+ */
 export async function memberRole(tx: TenantTx, userId: UserId): Promise<MemberRole | undefined> {
-  const [row] = await tx.select({ role: memberships.role }).from(memberships).where(eq(memberships.userId, userId));
+  const [row] = await tx
+    .select({ role: memberships.role })
+    .from(memberships)
+    .where(and(eq(memberships.userId, userId), eq(memberships.status, "active")));
   return row?.role;
 }
 
-/**
- * Make `userId` a member (role `member`) unless they already are. Returns
- * whether they were added. Throws a foreign-key violation (`PG.FOREIGN_KEY_VIOLATION`)
- * if no such user exists: they have to sign in once first.
- */
-export async function ensureMember(tx: TenantTx, userId: UserId): Promise<boolean> {
-  if (await memberRole(tx, userId)) return false;
-  await addMember(tx, userId, "member");
-  return true;
+/** Someone's membership whatever their status, with their label. */
+export async function getMember(tx: TenantTx, userId: UserId): Promise<Member | undefined> {
+  const [row] = await tx.select(memberColumns).from(memberships).leftJoin(users, eq(users.id, memberships.userId)).where(eq(memberships.userId, userId));
+  return row && toMember(row);
 }
 
-export async function listMembers(tx: TenantTx): Promise<Array<{ userId: UserId; role: MemberRole }>> {
-  const rows = await tx.select({ userId: memberships.userId, role: memberships.role }).from(memberships).orderBy(asc(memberships.createdAt));
-  return rows.map((r) => ({ userId: UserId.parse(r.userId), role: r.role }));
+/**
+ * Add `userId` with `role` (a customer unless said otherwise) unless they're
+ * already in the tenant, in any role or status. Returns whether they were
+ * added. Throws a foreign-key violation (`PG.FOREIGN_KEY_VIOLATION`) if no
+ * such user exists: they have to sign in once first.
+ */
+export async function ensureMember(tx: TenantTx, userId: UserId, role: MemberRole = "customer"): Promise<boolean> {
+  const rows = await tx
+    .insert(memberships)
+    .values({ tenantId: currentTenant, userId: UserId.parse(userId), role: MemberRole.parse(role) })
+    .onConflictDoNothing()
+    .returning({ userId: memberships.userId });
+  return rows.length > 0;
+}
+
+/** Change someone's role. False if they aren't in the tenant. */
+export async function setMemberRole(tx: TenantTx, userId: UserId, role: MemberRole): Promise<boolean> {
+  const rows = await tx.update(memberships).set({ role: MemberRole.parse(role) }).where(eq(memberships.userId, userId)).returning({ userId: memberships.userId });
+  return rows.length > 0;
+}
+
+/** Suspend or resume someone, or change the team's note on them (`null` clears it). */
+export async function updateMember(tx: TenantTx, userId: UserId, change: { status?: MemberStatus; note?: string | null }): Promise<boolean> {
+  if (change.status === undefined && change.note === undefined) return (await getMember(tx, userId)) !== undefined;
+  const rows = await tx
+    .update(memberships)
+    .set(omitUndefined({ status: change.status === undefined ? undefined : MemberStatus.parse(change.status), note: change.note }))
+    .where(eq(memberships.userId, userId))
+    .returning({ userId: memberships.userId });
+  return rows.length > 0;
+}
+
+/** Active owners. A tenant must always keep at least one. */
+export async function countOwners(tx: TenantTx): Promise<number> {
+  const [row] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(memberships)
+    .where(and(eq(memberships.role, "owner"), eq(memberships.status, "active")));
+  return row?.n ?? 0;
+}
+
+/** Everyone who isn't a customer, oldest first. A team is small, so no paging. */
+export async function listTeam(tx: TenantTx): Promise<Member[]> {
+  const rows = await tx
+    .select(memberColumns)
+    .from(memberships)
+    .leftJoin(users, eq(users.id, memberships.userId))
+    .where(ne(memberships.role, "customer"))
+    .orderBy(asc(memberships.createdAt), asc(memberships.userId));
+  return rows.map(toMember);
+}
+
+export type CustomerPage = { customers: Member[]; total: number; next?: string };
+
+/**
+ * One page of customers, newest first. `query` matches the label, account id,
+ * or note (case-insensitive, substring). `after` is the `next` of the previous
+ * page.
+ */
+export async function listCustomers(tx: TenantTx, options: { query?: string; after?: string; limit?: number } = {}): Promise<CustomerPage> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+  const query = options.query?.trim();
+  const like = query ? `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : undefined;
+  const matches = like ? or(ilike(users.label, like), ilike(memberships.userId, like), ilike(memberships.note, like)) : undefined;
+  const cursor = options.after ? decodeCursor(options.after) : undefined;
+  const before = cursor
+    ? sql`(${memberships.createdAt}, ${memberships.userId}) < (${cursor.at}::timestamptz, ${cursor.userId})`
+    : undefined;
+  const isCustomer = eq(memberships.role, "customer");
+
+  const rows = await tx
+    // The cursor keeps Postgres's own text for the time: a JS Date would drop microseconds.
+    .select({ ...memberColumns, at: sql<string>`${memberships.createdAt}::text` })
+    .from(memberships)
+    .leftJoin(users, eq(users.id, memberships.userId))
+    .where(and(isCustomer, matches, before))
+    .orderBy(desc(memberships.createdAt), desc(memberships.userId))
+    .limit(limit + 1);
+  const [count] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(memberships)
+    .leftJoin(users, eq(users.id, memberships.userId))
+    .where(and(isCustomer, matches));
+  const page = rows.slice(0, limit);
+  const last = page.at(-1);
+  return omitUndefined({
+    customers: page.map(({ at: _, ...r }) => toMember(r)),
+    total: count?.n ?? 0,
+    next: rows.length > limit && last ? encodeCursor(last.at, last.userId) : undefined,
+  });
+}
+
+// Keyset paging on (created_at, user_id), newest first. Opaque to callers.
+function encodeCursor(at: string, userId: string): string {
+  return Buffer.from(JSON.stringify([at, userId])).toString("base64url");
+}
+function decodeCursor(value: string): { at: string; userId: string } | undefined {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(value, "base64url").toString());
+    if (!Array.isArray(parsed) || typeof parsed[0] !== "string" || typeof parsed[1] !== "string") return undefined;
+    // Only a timestamp reaches the ::timestamptz cast, so a bad cursor can't make the query fail.
+    return Number.isNaN(Date.parse(parsed[0])) ? undefined : { at: parsed[0], userId: parsed[1] };
+  } catch {
+    return undefined;
+  }
 }
 
 /** The current tenant's display name. */

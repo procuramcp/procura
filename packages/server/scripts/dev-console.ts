@@ -12,8 +12,8 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { IdentityProvider } from "@cairnmcp/auth";
-import { Toolset, type TenantId } from "@cairnmcp/core";
-import { addMember, Database, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@cairnmcp/db";
+import { AccessProfile, Toolset, type TenantId } from "@cairnmcp/core";
+import { addMember, Database, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess, updateMember } from "@cairnmcp/db";
 import { intervalsIr, scratchDatabase } from "@cairnmcp/db/test-support";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
 import { createApp, serve } from "../src/index.ts";
@@ -38,7 +38,9 @@ const devProvider: IdentityProvider = {
     return url;
   },
   async finish() {
-    return { issuer: ISSUER, subject: "dev-user", label: "dev@localhost" };
+    // DEV_USER=friend signs in as the viewer instead, to see the read-only console.
+    const subject = process.env["DEV_USER"] ?? "dev-user";
+    return { issuer: ISSUER, subject, label: `${subject === "dev-user" ? "dev" : subject}@localhost` };
   },
 };
 
@@ -47,16 +49,26 @@ const db = await Database.connect({ url: scratch.appUrl, max: 4 });
 const keyWrapper = new LocalKeyWrapper(randomBytes(32));
 
 // A tenant like the one set up with the admin CLI: Intervals.icu and the starter toolset.
-const me = await db.ensureUser(ISSUER, "dev-user");
-const friend = await db.ensureUser(ISSUER, "friend");
+const me = await db.ensureUser(ISSUER, "dev-user", "dev@localhost");
+const friend = await db.ensureUser(ISSUER, "friend", "friend@localhost");
 const tenant = await db.createTenant("Colter", me, { id: "colter" as TenantId });
 const starter = JSON.parse(readFileSync(new URL("../../../examples/intervals-icu/toolset.json", import.meta.url), "utf8")) as object;
 await db.withTenant(tenant, async (tx) => {
   await putSource(tx, intervalsIr());
   await putToolset(tx, Toolset.parse({ ...starter, id: "intervals", sourceId: "intervals-icu" }));
   await setToolsetAccess(tx, "intervals" as never, me, "use");
-  await addMember(tx, friend, "member");
+  await addMember(tx, friend, "viewer");
+  await putProfile(tx, AccessProfile.parse({ id: "athlete", name: "Athlete", rules: [{ toolsetId: "intervals", level: "use" }] }));
 });
+// Customers to search and page through (D-038). One transaction each, so they get distinct join times.
+for (let i = 1; i <= 60; i++) {
+  const customer = await db.ensureUser(ISSUER, `customer-${i}`, `athlete${i}@example.com`);
+  await db.withTenant(tenant, async (tx) => {
+    await addMember(tx, customer, "customer");
+    if (i % 2 === 0) await setMemberProfiles(tx, customer, ["athlete"]);
+    if (i % 10 === 0) await updateMember(tx, customer, { status: "suspended", note: "Card declined" });
+  });
+}
 await new Vault({ store: new PgVaultStore(db), keyWrapper }).putCredential({
   tenantId: tenant,
   sourceId: "intervals-icu",

@@ -733,3 +733,37 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** one tenant per customer (D-032); building billing into cairnmcp (above); keeping
   the individual case as the main design target (the provider case can't be added later without
   reworking members, limits, and sign-in).
+
+## D-038 Team and customers: one membership table, five roles, suspension
+
+- **Context:** D-037 puts the team (a provider's few staff) and customers (up to tens of thousands
+  calling tools) on separate footing. Until now everyone was a `memberships` row with role owner,
+  admin, or member, where "member" meant "calls tools, no console".
+- **Decision:** keep one `memberships` row per person and say who they are with the role:
+  `owner`, `admin`, `editor`, `viewer` (the team, who may open the console) or `customer` (calls
+  tools only). Grants (`toolset_access`) and profiles (`member_profiles`) already point at
+  memberships and work the same for both, so nothing about calling tools changes. A separate
+  customers table would have needed a second copy of both, or foreign keys that can't point at
+  either table.
+- **Console roles:** viewers look at everything and change nothing; editors curate toolsets,
+  sources, profiles, and customers; admins also set API keys and manage the team; only owners
+  make, change, or remove owners. Nobody changes their own role or status or removes themselves,
+  so a tenant always keeps an owner. Customers get the same 404 as an outsider. The console asks
+  for the least role per route (`asTeam(api, tenant, "editor", …)`).
+- **Existing members became viewers** (migration 0006): they keep their tool access and can now
+  look at the console. Anyone added from now on by a grant or profile joins as a customer.
+- **Suspension:** a `status` (active or suspended) on the row. `memberRole` treats suspended
+  people as non-members, so the MCP endpoint, consent, and the console all refuse them on their
+  next request. Grants and profiles stay, so resuming restores exactly what they had. Removing
+  someone deletes their row and, through the foreign keys, their grants and profiles.
+- **Finding people:** users get a `label` (usually an email) from their latest sign-in, through a
+  three-argument `ensure_user`. Customers are listed newest first with keyset paging on
+  (joined time, id); search is a case-insensitive substring of label, id, or note. Fine for tens of
+  thousands; a trigram index is the next step if search gets slow. The cursor carries Postgres's
+  own time text, since a JS `Date` drops microseconds and would skip rows.
+- **Notes:** a short free-text note per person, seen only by the team.
+- **Not yet:** customers created on first sign-in through the provider's own sign-in (3c step 3);
+  inviting teammates by email (today they sign in once and an admin adds their account id);
+  last-seen times (with usage, 3c step 4).
+- **Rejected:** a separate `customers` table (above); a `kind` column beside the role (two fields
+  that must agree); letting viewers run test calls (they spend the tenant's upstream key).

@@ -62,7 +62,7 @@ describe.skipIf(!adminUrl)("embedded authorization server (Postgres)", () => {
         await setToolsetAccess(tx, toolset.id, owner, "use_writes");
       });
     }
-    await db.withTenant(a, (tx) => addMember(tx, carol, "member"));
+    await db.withTenant(a, (tx) => addMember(tx, carol, "customer"));
 
     const fetch: FetchLike = async () => (upstreamCalls++, new Response("[]", { status: 200, headers: { "content-type": "application/json" } }));
     app = await createApp({
@@ -374,7 +374,7 @@ describe.skipIf(!adminUrl)("embedded authorization server (Postgres)", () => {
     it("access is still checked per call: a token stops working when access is revoked", async () => {
       const temp = await db.ensureUser(op.issuer, "temp");
       await db.withTenant(a, async (tx) => {
-        await addMember(tx, temp, "member");
+        await addMember(tx, temp, "customer");
         await setToolsetAccess(tx, "mine" as never, temp, "use");
       });
       const clientId = await newClient();

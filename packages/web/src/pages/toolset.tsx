@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, CircleAlertIcon, PinIcon, SearchIcon, UndoIcon } from "lucide-react";
+import { ArrowLeftIcon, CircleAlertIcon, EyeIcon, PinIcon, SearchIcon, UndoIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useBlocker, useParams } from "react-router";
 import { toast } from "sonner";
@@ -28,9 +28,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
 import { api, ApiError, type Issue, type JsonValue, type Level, type OperationView, type ToolBinding, type ToolsetView } from "@/lib/api";
-import { useLoad, useMe } from "@/lib/hooks";
+import { useLoad, useMe, useRole } from "@/lib/hooks";
 import { display, parseValue } from "@/lib/values";
-import { CopyText, Endpoint, SideEffectBadge } from "@/pages/parts";
+import { CopyText, Endpoint, PersonName, SideEffectBadge } from "@/pages/parts";
 import { Problem } from "@/pages/shell";
 import { TestPanel } from "@/pages/test-panel";
 
@@ -48,6 +48,7 @@ export function ToolsetPage() {
 }
 
 function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetView; onSaved: (v: ToolsetView) => void }) {
+  const readOnly = !useRole(tenantId).canEdit;
   const [draft, setDraft] = useState<Draft>(() => toDraft(view));
   const [saved, setSaved] = useState<Draft>(() => toDraft(view));
   const [issues, setIssues] = useState<Issue[]>(view.issues);
@@ -98,6 +99,14 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
         <CopyText value={view.endpoint} className="w-full max-w-md" />
       </div>
 
+      {readOnly && (
+        <Alert>
+          <EyeIcon />
+          <AlertTitle>You can look, not change</AlertTitle>
+          <AlertDescription>You're a viewer here. Editors, admins, and owners can change tools and access.</AlertDescription>
+        </Alert>
+      )}
+
       {issues.length > 0 && (
         <Alert variant="destructive">
           <CircleAlertIcon />
@@ -121,13 +130,13 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="tools">
-          <ToolsTab tenantId={tenantId} view={view} draft={draft} setDraft={setDraft} ops={ops} />
+          <ToolsTab tenantId={tenantId} view={view} draft={draft} setDraft={setDraft} ops={ops} readOnly={readOnly} />
         </TabsContent>
         <TabsContent value="access">
-          <AccessTab tenantId={tenantId} view={view} onChanged={onSaved} />
+          <AccessTab tenantId={tenantId} view={view} onChanged={onSaved} readOnly={readOnly} />
         </TabsContent>
         <TabsContent value="settings">
-          <SettingsTab view={view} draft={draft} setDraft={setDraft} />
+          <SettingsTab view={view} draft={draft} setDraft={setDraft} readOnly={readOnly} />
         </TabsContent>
       </Tabs>
 
@@ -163,8 +172,8 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
 
 type Filter = "all" | "enabled" | "read" | "write";
 
-function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; setDraft: (d: Draft) => void; ops: Map<string, OperationView> }) {
-  const { view, draft, setDraft, ops } = props;
+function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; setDraft: (d: Draft) => void; ops: Map<string, OperationView>; readOnly: boolean }) {
+  const { view, draft, setDraft, ops, readOnly } = props;
   const [query, setQuery] = useState("");
   // Open on the tools already in use; "All" shows the rest of the source.
   const [filter, setFilter] = useState<Filter>(() => (draft.tools.some((t) => t.enabled) ? "enabled" : "all"));
@@ -228,7 +237,7 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
                 return (
                   <TableRow key={op.id} data-state={op.id === selected ? "selected" : undefined} className="cursor-pointer" onClick={() => setSelected(op.id)}>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Switch checked={b?.enabled ?? false} onCheckedChange={(on) => update(op, { enabled: on })} aria-label={`Enable ${op.id}`} />
+                      <Switch checked={b?.enabled ?? false} disabled={readOnly} onCheckedChange={(on) => update(op, { enabled: on })} aria-label={`Enable ${op.id}`} />
                     </TableCell>
                     <TableCell className="max-w-0">
                       <div className="flex items-center gap-1.5 truncate font-medium">
@@ -268,9 +277,10 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
           binding={bindings.get(current.id) ?? { ...newBinding(current), enabled: false }}
           names={draft.tools.filter((t) => t.operationId !== current.id).map((t) => t.name)}
           onChange={(change) => update(current, change)}
+          readOnly={readOnly}
         />
       ) : (
-        <Card className="items-center justify-center p-8 text-muted-foreground">Pick an operation to edit it.</Card>
+        <Card className="items-center justify-center p-8 text-muted-foreground">Pick an operation to {readOnly ? "see" : "edit"} it.</Card>
       )}
       </div>
     </div>
@@ -288,8 +298,9 @@ function ToolEditor(props: {
   binding: ToolBinding;
   names: string[];
   onChange: (change: Partial<ToolBinding>) => void;
+  readOnly: boolean;
 }) {
-  const { op, binding, onChange } = props;
+  const { op, binding, onChange, readOnly } = props;
   const nameProblem = !/^[a-z][a-z0-9_]{0,63}$/.test(binding.name)
     ? "Lowercase letters, digits and _, starting with a letter"
     : props.names.includes(binding.name)
@@ -311,7 +322,7 @@ function ToolEditor(props: {
           <div className="flex items-center gap-2">
             <SideEffectBadge effect={op.sideEffect.class} reason={op.sideEffect.reason} />
             <label className="flex items-center gap-2 text-sm">
-              <Switch checked={binding.enabled} onCheckedChange={(on) => onChange({ enabled: on })} />
+              <Switch checked={binding.enabled} disabled={readOnly} onCheckedChange={(on) => onChange({ enabled: on })} />
               {binding.enabled ? "Enabled" : "Off"}
             </label>
           </div>
@@ -326,12 +337,12 @@ function ToolEditor(props: {
         <FieldGroup>
           <Field data-invalid={nameProblem ? true : undefined}>
             <FieldLabel htmlFor="tool-name">Tool name</FieldLabel>
-            <Input id="tool-name" className="font-mono" value={binding.name} onChange={(e) => onChange({ name: e.target.value })} aria-invalid={!!nameProblem} />
+            <Input id="tool-name" className="font-mono" value={binding.name} readOnly={readOnly} onChange={(e) => onChange({ name: e.target.value })} aria-invalid={!!nameProblem} />
             <FieldDescription>{nameProblem ?? "What agents call. Short and specific, like list_activities."}</FieldDescription>
           </Field>
           <Field>
             <FieldLabel htmlFor="tool-description">Description for agents</FieldLabel>
-            <Textarea id="tool-description" rows={5} value={binding.description} onChange={(e) => onChange({ description: e.target.value })} />
+            <Textarea id="tool-description" rows={5} value={binding.description} readOnly={readOnly} onChange={(e) => onChange({ description: e.target.value })} />
             <FieldDescription className="flex justify-between gap-2">
               <span>Say what it returns and when to use it; mention inputs that keep responses small.</span>
               <span className="tabular-nums">{binding.description.length}/4000</span>
@@ -350,18 +361,20 @@ function ToolEditor(props: {
         ) : (
           <div className="flex flex-col divide-y">
             {op.inputs.map((input) => (
-              <PinRow key={input.name} input={input} value={binding.pinnedInputs[input.name]} onChange={(v) => setPin(input.name, v)} />
+              <PinRow key={input.name} input={input} value={binding.pinnedInputs[input.name]} onChange={(v) => setPin(input.name, v)} readOnly={readOnly} />
             ))}
           </div>
         )}
       </Card>
 
-      <TestPanel tenantId={props.tenantId} toolsetId={props.toolsetId} op={op} binding={binding} />
+      {/* Test calls use the tenant's upstream key, so they're for editors (D-038). */}
+      {!readOnly && <TestPanel tenantId={props.tenantId} toolsetId={props.toolsetId} op={op} binding={binding} />}
     </div>
   );
 }
 
-function PinRow({ input, value, onChange }: { input: OperationView["inputs"][number]; value: JsonValue | undefined; onChange: (v: JsonValue | undefined) => void }) {
+function PinRow(props: { input: OperationView["inputs"][number]; value: JsonValue | undefined; onChange: (v: JsonValue | undefined) => void; readOnly: boolean }) {
+  const { input, value, onChange, readOnly } = props;
   const pinned = value !== undefined;
   const [text, setText] = useState(pinned ? display(value) : "");
   return (
@@ -375,7 +388,7 @@ function PinRow({ input, value, onChange }: { input: OperationView["inputs"][num
           {input.required && <Badge variant="secondary">required</Badge>}
         </div>
         <label className="flex shrink-0 items-center gap-2 text-sm">
-          <Switch checked={pinned} onCheckedChange={(on) => onChange(on ? parseValue(text, input.type) : undefined)} />
+          <Switch checked={pinned} disabled={readOnly} onCheckedChange={(on) => onChange(on ? parseValue(text, input.type) : undefined)} />
           Pin
         </label>
       </div>
@@ -384,6 +397,7 @@ function PinRow({ input, value, onChange }: { input: OperationView["inputs"][num
         <Input
           className="font-mono"
           value={text}
+          readOnly={readOnly}
           placeholder="value"
           onChange={(e) => {
             setText(e.target.value);
@@ -397,12 +411,13 @@ function PinRow({ input, value, onChange }: { input: OperationView["inputs"][num
 
 // --- Access -----------------------------------------------------------------------------
 
-function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: ToolsetView; onChanged: (v: ToolsetView) => void }) {
+function AccessTab({ tenantId, view, onChanged, readOnly }: { tenantId: string; view: ToolsetView; onChanged: (v: ToolsetView) => void; readOnly: boolean }) {
   const me = useMe();
   const [userId, setUserId] = useState("");
   const [level, setLevel] = useState<Level>("use");
   const [busy, setBusy] = useState(false);
-  const withoutAccess = view.members.filter((m) => !view.access.some((a) => a.userId === m.userId));
+  // The team, for a one-click grant; customers are granted by account id or through profiles.
+  const withoutAccess = view.team.filter((m) => !view.access.some((a) => a.userId === m.userId));
   const viaProfiles = (userId: string) =>
     view.profiles
       .filter((p) => p.members.includes(userId))
@@ -430,26 +445,26 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
           <TableBody>
             {view.access.map((a) => (
               <TableRow key={a.userId}>
-                <TableCell className="font-mono text-xs">
-                  {a.userId} {a.userId === me.user.id && <Badge variant="secondary">you</Badge>}
+                <TableCell>
+                  <PersonName person={a} you={a.userId === me.user.id} />
                 </TableCell>
                 <TableCell>
-                  <LevelSelect value={a.level} disabled={busy} onChange={(v) => set(a.userId, v)} allowNone />
+                  {readOnly ? <Badge variant="outline">{a.level}</Badge> : <LevelSelect value={a.level} disabled={busy} onChange={(v) => set(a.userId, v)} allowNone />}
                 </TableCell>
               </TableRow>
             ))}
             {withoutAccess.map((m) => (
               <TableRow key={m.userId} className="text-muted-foreground">
-                <TableCell className="font-mono text-xs">
-                  {m.userId}{" "}
-                  <Badge variant="outline">
-                    {m.role}, {viaProfiles(m.userId) ? `via ${viaProfiles(m.userId)}` : "no access"}
-                  </Badge>
+                <TableCell>
+                  <PersonName person={m} you={m.userId === me.user.id} />
+                  <span className="text-xs"> {viaProfiles(m.userId) ? `via ${viaProfiles(m.userId)}` : "no access"}</span>
                 </TableCell>
                 <TableCell>
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => set(m.userId, "use")}>
-                    Grant use
-                  </Button>
+                  {!readOnly && (
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => set(m.userId, "use")}>
+                      Grant use
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -457,6 +472,7 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
         </Table>
       </Card>
 
+      {!readOnly && (
       <Card className="gap-3 p-4">
         <div>
           <h3 className="font-medium">Add someone</h3>
@@ -471,7 +487,9 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
             Grant
           </Button>
         </div>
+        <p className="text-muted-foreground text-xs">Someone new joins as a customer: they call tools but don't see this console.</p>
       </Card>
+      )}
       <Card className="gap-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -479,7 +497,7 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
             <p className="text-muted-foreground text-sm">People also get access from the profiles they hold.</p>
           </div>
           <Button asChild size="sm" variant="outline">
-            <Link to={`/t/${tenantId}/access`}>Edit profiles</Link>
+            <Link to={`/t/${tenantId}/access`}>{readOnly ? "See profiles" : "Edit profiles"}</Link>
           </Button>
         </div>
         {view.profiles.length === 0 ? (
@@ -520,18 +538,18 @@ function LevelSelect({ value, onChange, disabled, allowNone }: { value: Level; o
 
 // --- Settings ---------------------------------------------------------------------------
 
-function SettingsTab({ view, draft, setDraft }: { view: ToolsetView; draft: Draft; setDraft: (d: Draft) => void }) {
+function SettingsTab({ view, draft, setDraft, readOnly }: { view: ToolsetView; draft: Draft; setDraft: (d: Draft) => void; readOnly: boolean }) {
   return (
     <Card className="max-w-3xl gap-4 p-4">
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="ts-name">Name</FieldLabel>
-          <Input id="ts-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <Input id="ts-name" value={draft.name} readOnly={readOnly} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <FieldDescription>Shown to MCP clients as the server's title.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="ts-description">Instructions for agents</FieldLabel>
-          <Textarea id="ts-description" rows={4} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+          <Textarea id="ts-description" rows={4} value={draft.description} readOnly={readOnly} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
           <FieldDescription>Sent as the server's instructions: what this toolset is for, units, date formats.</FieldDescription>
         </Field>
         <Field>

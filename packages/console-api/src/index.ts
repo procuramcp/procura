@@ -10,7 +10,10 @@
 
 // ---- Shared values ----
 
-export type Role = "owner" | "admin" | "member";
+/** Someone's role in a tenant (D-038): the team may open the console, customers only call tools. */
+export type Role = "owner" | "admin" | "editor" | "viewer" | "customer";
+export type TeamRole = Exclude<Role, "customer">;
+export type MemberStatus = "active" | "suspended";
 /** A toolset access level (D-034). */
 export type Level = "use" | "use_writes";
 export type SideEffect = "read" | "write" | "destructive";
@@ -30,7 +33,24 @@ export type ApiErrorBody = { error?: string; message?: string; issues?: Issue[];
 // ---- Session ----
 
 /** `GET /me` */
-export type Me = { user: { id: string; label: string }; tenants: Array<{ id: string; name: string; role: Role }> };
+export type Me = { user: { id: string; label: string }; tenants: Array<{ id: string; name: string; role: TeamRole }> };
+
+// ---- People (D-038) ----
+
+/** Someone in a tenant: on the team or a customer. */
+export type Person = {
+  userId: string;
+  /** From their latest sign-in, usually an email; null until they sign in again after it was added. */
+  label: string | null;
+  role: Role;
+  status: MemberStatus;
+  note: string | null;
+  /** When they joined the tenant (ISO 8601). */
+  since: string;
+  /** Profile ids they hold. */
+  profiles: string[];
+  you: boolean;
+};
 
 // ---- Tenant ----
 
@@ -39,7 +59,7 @@ export type TenantView = {
   tenant: { id: string; name: string };
   sources: Array<{ id: string; name: string; operations: number; reads: number }>;
   toolsets: Array<{ id: string; name: string; sourceId: string; enabledTools: number; endpoint: string }>;
-  members: Array<{ userId: string; role: Role; you: boolean }>;
+  people: { team: number; customers: number };
 };
 
 /** `POST /tenants/:t/toolsets` body. */
@@ -83,8 +103,10 @@ export type ToolsetView = {
   endpoint: string;
   source: { id: string; name: string; baseUrl: string };
   operations: OperationView[];
-  access: Array<{ userId: string; level: Level }>;
-  members: Array<{ userId: string; role: Role }>;
+  /** Direct grants, with who they are. */
+  access: Array<{ userId: string; label: string | null; role: Role; level: Level }>;
+  /** The team, to grant access to; customers are granted by account id. */
+  team: Array<{ userId: string; label: string | null; role: Role }>;
   issues: Issue[];
 };
 
@@ -120,17 +142,28 @@ export type TestResult = {
 export type ProfileRule = { toolsetId: string; level: Level; operations: string[] | null };
 export type AccessProfile = { id: string; name: string; description?: string | undefined; rules: ProfileRule[]; members: string[] };
 
-/** `GET /tenants/:t/access`, and every profile or member change. */
+/** `GET /tenants/:t/access`, and every profile or team change. */
 export type AccessView = {
   profiles: AccessProfile[];
-  members: Array<{ userId: string; role: Role; you: boolean; profiles: string[] }>;
+  team: Person[];
+  /** How many customers there are; `GET …/customers` pages through them. */
+  customers: number;
   toolsets: Array<{ id: string; name: string; tools: Array<{ operationId: string; name: string; enabled: boolean; sideEffect: SideEffect }> }>;
 };
 
 /** `PUT /tenants/:t/profiles/:id` body. */
 export type ProfileEdit = { name: string; description?: string | undefined; rules: ProfileRule[] };
-/** `PUT /tenants/:t/members/:user/profiles` body. */
+/** `PUT /tenants/:t/members/:user/profiles` body. Adds them as a customer if they aren't in the tenant. */
 export type MemberProfilesEdit = { profiles: string[] };
+
+/** `GET /tenants/:t/customers?q=&after=`: newest first; pass `next` as `after` for the next page. */
+export type CustomerPage = { customers: Person[]; total: number; next?: string | undefined };
+/** `PUT /tenants/:t/members/:user/role` body. Adds them if they aren't in the tenant (they must have signed in once). */
+export type RoleEdit = { role: Role };
+/** `PUT /tenants/:t/members/:user` body: suspend or resume, or change the note (`null` clears it). Returns the `Person`. */
+export type MemberEdit = { status?: MemberStatus | undefined; note?: string | null | undefined };
+/** `DELETE /tenants/:t/members/:user` */
+export type Removed = { ok: true };
 
 // ---- Sources (D-035) ----
 

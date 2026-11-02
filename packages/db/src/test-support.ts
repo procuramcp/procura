@@ -10,7 +10,7 @@ import { IrDocument, TenantId, UserId } from "@cairnmcp/core";
 import { ingestOpenApiText } from "@cairnmcp/ingest";
 import pg from "pg";
 import { Database } from "./client.ts";
-import { migrate } from "./migrate.ts";
+import { migrate, type Migration } from "./migrate.ts";
 
 const ENV = "CAIRNMCP_TEST_DATABASE_URL";
 
@@ -38,8 +38,11 @@ export type ScratchDatabase = {
   drop(): Promise<void>;
 };
 
-/** Create roles (if needed) and a fresh, migrated database. */
-export async function scratchDatabase(adminUrl: string): Promise<ScratchDatabase> {
+/**
+ * Create roles (if needed) and a fresh database, migrated with every
+ * migration, or only `options.migrations` (to test a later one on old data).
+ */
+export async function scratchDatabase(adminUrl: string, options: { migrations?: Migration[] } = {}): Promise<ScratchDatabase> {
   const name = `cairnmcp_test_${randomBytes(6).toString("hex")}`;
   await withAdmin(adminUrl, async (admin) => {
     // Serialize role setup across concurrent test files.
@@ -57,7 +60,7 @@ export async function scratchDatabase(adminUrl: string): Promise<ScratchDatabase
   const ownerUrl = roleUrl(adminUrl, TEST_OWNER_ROLE, name);
   const drop = () => withAdmin(adminUrl, (admin) => admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`).then(() => undefined));
   try {
-    await migrate(ownerUrl);
+    await migrate(ownerUrl, options);
   } catch (e) {
     await drop();
     throw e;
