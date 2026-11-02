@@ -23,6 +23,8 @@ export type AppOptions = {
   consoleDir?: string;
   /** How tenants' own sign-in providers are reached (D-040). Public https only by default; injected for tests. */
   signInFetch?: ProviderFetch;
+  /** MCP access token lifetime; shorter in local testing so refreshes (and D-040's claim re-checks) come sooner. */
+  accessTokenSeconds?: number;
 };
 
 /**
@@ -47,6 +49,7 @@ export async function createApp(options: AppOptions): Promise<(request: Request)
     publicUrl,
     tenantSignIn: { vault, fetch: options.signInFetch ?? (publicFetch as ProviderFetch) },
     ...(options.now ? { now: options.now } : {}),
+    ...(options.accessTokenSeconds ? { accessTokenSeconds: options.accessTokenSeconds } : {}),
   });
   const mcp = createMcpHandler({ db: options.db, verifier, runtime, publicUrl, ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {}) });
   const console_ = createConsoleHandler({
