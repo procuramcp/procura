@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Shell } from "@/pages/shell";
+import { AccessPage } from "@/pages/access";
 import { Home } from "@/pages/home";
 import { TenantPage } from "@/pages/tenant";
 import { ToolsetPage } from "@/pages/toolset";
@@ -24,6 +25,7 @@ const router = createBrowserRouter(
         { index: true, element: <Home /> },
         { path: "t/:tenantId", element: <TenantPage /> },
         { path: "t/:tenantId/toolsets/:toolsetId", element: <ToolsetPage /> },
+        { path: "t/:tenantId/access", element: <AccessPage /> },
       ],
     },
   ],

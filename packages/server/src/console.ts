@@ -6,6 +6,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import type { IdentityProvider } from "@cairnmcp/auth";
 import {
+  AccessProfile,
   canCall,
   defaultToolset,
   resolveToolset,
@@ -19,7 +20,23 @@ import {
   type Caller,
   type Operation,
 } from "@cairnmcp/core";
-import { addMember, getSource, getToolset, listSources, listToolsets, memberRole, putToolset, schema, setToolsetAccess, type Database } from "@cairnmcp/db";
+import {
+  addMember,
+  deleteProfile,
+  getSource,
+  getToolset,
+  listProfiles,
+  listSources,
+  listToolsets,
+  memberProfileIds,
+  memberRole,
+  putProfile,
+  putToolset,
+  schema,
+  setMemberProfiles,
+  setToolsetAccess,
+  type Database,
+} from "@cairnmcp/db";
 import type { Runtime } from "@cairnmcp/runtime";
 import { and, eq, gt, lt } from "drizzle-orm";
 import { z } from "zod";
@@ -183,6 +200,15 @@ export function createConsoleHandler(options: ConsoleOptions): Handler {
         }),
       );
     }
+    if ((m = /^\/tenants\/([^/]+)\/access$/.exec(path)) && method === "GET") {
+      return result(await asEditor(user, m[1]!, (tx) => accessView(tx, user)));
+    }
+    if ((m = /^\/tenants\/([^/]+)\/profiles\/([^/]+)$/.exec(path)) && (method === "PUT" || method === "DELETE")) {
+      return profileRoute(request, user, m[1]!, m[2]!);
+    }
+    if ((m = /^\/tenants\/([^/]+)\/members\/([^/]+)\/profiles$/.exec(path)) && method === "PUT") {
+      return memberProfilesRoute(request, user, m[1]!, m[2]!);
+    }
     const ts = /^\/tenants\/([^/]+)\/toolsets\/([^/]+)(\/access|\/test)?$/.exec(path);
     if (ts) {
       const [, tenantInput, toolsetInput, sub] = ts;
@@ -203,8 +229,12 @@ export function createConsoleHandler(options: ConsoleOptions): Handler {
     const access = await tx.select({ userId: toolsetAccess.userId, level: toolsetAccess.level }).from(toolsetAccess).where(eq(toolsetAccess.toolsetId, toolsetId));
     const members = await tx.select({ userId: memberships.userId, role: memberships.role }).from(memberships);
     const resolved = resolveToolset(toolset, source.ir);
+    const profiles = (await listProfiles(tx)).flatMap((p) =>
+      p.rules.filter((r) => r.toolsetId === toolsetId).map((r) => ({ profileId: p.id, name: p.name, level: r.level, operations: r.operations, members: p.members })),
+    );
     return json(200, {
       toolset,
+      profiles,
       endpoint: endpointUrl(tenantId, toolsetId),
       source: { id: source.id, name: source.name, baseUrl: source.ir.source.baseUrl },
       operations: source.ir.operations.map(operationView),
@@ -249,6 +279,76 @@ export function createConsoleHandler(options: ConsoleOptions): Handler {
         }
         await setToolsetAccess(tx, toolsetId, body.data.userId, body.data.level === "none" ? undefined : body.data.level);
         return toolsetView(tx, tenantId, toolsetId);
+      }),
+    );
+  }
+
+  /** Profiles, who holds them, and what they can point at (D-034). */
+  async function accessView(tx: TxOf<Database>, user: Session): Promise<Response> {
+    const profiles = await listProfiles(tx);
+    const members = await tx.select({ userId: memberships.userId, role: memberships.role }).from(memberships);
+    const held = await memberProfileIds(tx);
+    const toolsets = await listToolsets(tx);
+    const sourcesById = new Map((await listSources(tx)).map((s) => [s.id as string, s]));
+    return json(200, {
+      profiles,
+      members: members.map((m) => ({ ...m, you: m.userId === user.userId, profiles: held.get(UserId.parse(m.userId)) ?? [] })),
+      toolsets: toolsets.map((t) => {
+        const ops = new Map(sourcesById.get(t.sourceId)?.ir.operations.map((o) => [o.id as string, o]) ?? []);
+        return {
+          id: t.id,
+          name: t.name,
+          tools: t.tools.map((b) => ({ operationId: b.operationId, name: b.name, enabled: b.enabled, sideEffect: ops.get(b.operationId)?.sideEffect.class ?? "destructive" })),
+        };
+      }),
+    });
+  }
+
+  async function profileRoute(request: Request, user: Session, tenantInput: string, profileInput: string): Promise<Response> {
+    const body = request.method === "PUT" ? ProfileEdit.safeParse(await readJson(request)) : undefined;
+    if (body && !body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+    return result(
+      await asEditor(user, tenantInput, async (tx) => {
+        if (request.method === "DELETE") {
+          if (!(await deleteProfile(tx, profileInput))) return json(404, { error: "not_found", message: `no profile ${profileInput}` });
+          return accessView(tx, user);
+        }
+        const { description, ...rest } = body!.data;
+        const parsed = AccessProfile.safeParse({ ...rest, ...(description?.trim() ? { description } : {}), id: profileInput });
+        if (!parsed.success) return json(422, { error: "invalid_profile", message: issuesText(parsed.error) });
+        // Rules may only name toolsets and operations that exist, so a typo can't silently grant nothing.
+        const toolsets = new Map((await listToolsets(tx)).map((t) => [t.id as string, t]));
+        for (const rule of parsed.data.rules) {
+          const toolset = toolsets.get(rule.toolsetId);
+          if (!toolset) return json(422, { error: "invalid_profile", message: `no toolset ${rule.toolsetId}` });
+          const bound = new Set(toolset.tools.map((t) => t.operationId as string));
+          const unknown = rule.operations?.filter((o) => !bound.has(o)) ?? [];
+          if (unknown.length > 0) return json(422, { error: "invalid_profile", message: `${toolset.name} has no tool for ${unknown.join(", ")}` });
+        }
+        await putProfile(tx, parsed.data);
+        return accessView(tx, user);
+      }),
+    );
+  }
+
+  async function memberProfilesRoute(request: Request, user: Session, tenantInput: string, userInput: string): Promise<Response> {
+    const body = MemberProfiles.safeParse(await readJson(request));
+    const userId = UserId.safeParse(userInput).data;
+    if (!body.success || !userId) return json(400, { error: "invalid_request", message: body.success ? "invalid account id" : issuesText(body.error) });
+    return result(
+      await asEditor(user, tenantInput, async (tx) => {
+        try {
+          // Giving someone a profile makes them a member, like a direct grant does (they must have signed in once).
+          if (!(await memberRole(tx, userId))) {
+            if (body.data.profiles.length === 0) return json(404, { error: "not_found", message: "that account isn't a member of this tenant" });
+            await addMember(tx, userId, "member");
+          }
+          await setMemberProfiles(tx, userId, body.data.profiles);
+        } catch (e) {
+          if (pgCode(e) === "23503") return json(404, { error: "not_found", message: "no such account (they need to sign in once first) or no such profile" });
+          throw e;
+        }
+        return accessView(tx, user);
       }),
     );
   }
@@ -347,6 +447,8 @@ export async function purgeExpiredConsoleState(db: Database, now = new Date()): 
 const NewToolset = z.object({ id: ToolsetId, sourceId: SourceId, name: z.string().min(1).max(200) });
 const ToolsetEdit = z.object({ name: z.string().min(1).max(200), description: z.string().max(4000).optional(), tools: z.array(z.unknown()).max(2000) });
 const AccessEdit = z.object({ userId: UserId, level: z.union([ToolsetAccessLevel, z.literal("none")]) });
+const ProfileEdit = z.object({ name: z.string(), description: z.string().optional(), rules: z.array(z.unknown()).max(200) });
+const MemberProfiles = z.object({ profiles: z.array(z.string().max(64)).max(100) });
 const ToolTest = z.object({ tool: ToolBinding, args: z.record(z.string(), z.unknown()).default({}), confirm: z.boolean().optional() });
 
 function operationView(op: Operation) {

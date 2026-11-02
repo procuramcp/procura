@@ -1,5 +1,5 @@
-import { canCall, resolveToolset, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccessLevel } from "@cairnmcp/core";
-import { getSource, getToolset, memberRole, toolsetAccessLevel, type Database } from "@cairnmcp/db";
+import { allowsTool, resolveToolset, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccess } from "@cairnmcp/core";
+import { getSource, getToolset, memberRole, toolsetAccessFor, type Database } from "@cairnmcp/db";
 import type { Runtime } from "@cairnmcp/runtime";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -83,17 +83,17 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
       const toolset = await getToolset(tx, route.toolsetId);
       const source = toolset && (await getSource(tx, toolset.sourceId));
       if (!toolset || !source) return "not_found" as const;
-      return { toolset, ir: source.ir, level: await toolsetAccessLevel(tx, route.toolsetId, userId) };
+      return { toolset, ir: source.ir, access: await toolsetAccessFor(tx, route.toolsetId, userId) };
     });
     if (loaded === "forbidden") return forbidden();
     if (loaded === "not_found") return json(404, { error: "not_found", error_description: "no such toolset" });
-    if (loaded.level === undefined) return json(403, { error: "forbidden", error_description: "you don't have access to this toolset" });
+    if (loaded.access.rules.length === 0) return json(403, { error: "forbidden", error_description: "you don't have access to this toolset" });
 
     const resolved = resolveToolset(loaded.toolset, loaded.ir);
     if (!resolved.ok) return json(500, { error: "toolset_invalid", error_description: "this toolset has problems and can't be served; fix it in the toolset settings" });
 
     const caller: Caller = { userId, claims: verified.claims };
-    return serveMcp(request, { ...options, tenantId: route.tenantId, caller, toolset: loaded.toolset, ir: loaded.ir, level: loaded.level, tools: resolved.tools });
+    return serveMcp(request, { ...options, tenantId: route.tenantId, caller, toolset: loaded.toolset, ir: loaded.ir, access: loaded.access, tools: resolved.tools });
   };
 }
 
@@ -102,13 +102,14 @@ type Session = McpHandlerOptions & {
   caller: Caller;
   toolset: Toolset;
   ir: IrDocument;
-  level: ToolsetAccessLevel;
+  /** The caller's direct grant and profile rules for this toolset (D-034). */
+  access: ToolsetAccess;
   tools: ResolvedTool[];
 };
 
 async function serveMcp(request: Request, s: Session): Promise<Response> {
   // Tools the caller may not call are hidden, and calling one by name gets the same answer as a tool that doesn't exist.
-  const visible = new Map(s.tools.filter((t) => canCall(s.level, t.operation.sideEffect.class)).map((t) => [t.name as string, t]));
+  const visible = new Map(s.tools.filter((t) => allowsTool(s.access, t.operation.id, t.operation.sideEffect.class)).map((t) => [t.name as string, t]));
 
   const server = new Server(
     { name: "cairnmcp", title: s.toolset.name, version: s.version ?? "0.0.0" },

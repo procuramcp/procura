@@ -1,7 +1,7 @@
 // Tenant and member isolation against real Postgres, connected as the app role.
 // Every test here is about something that must NOT happen.
 import { randomBytes } from "node:crypto";
-import { canCall, defaultToolset, Toolset, ToolsetId, UserId, type TenantId } from "@cairnmcp/core";
+import { AccessProfile, canCall, defaultToolset, Toolset, ToolsetId, UserId, type TenantId } from "@cairnmcp/core";
 import type { AuditEvent } from "@cairnmcp/runtime";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
 import { eq, sql } from "drizzle-orm";
@@ -9,19 +9,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import {
   addMember,
+  deleteProfile,
   getSource,
   getToolset,
   listAuditEvents,
   listSources,
+  listProfiles,
   listToolsets,
   mayCallTool,
   memberRole,
+  putProfile,
   putSource,
   putToolset,
+  setMemberProfiles,
   setToolsetAccess,
   toolsetAccessLevel,
 } from "./repo.ts";
-import { auditEvents, credentials, dataKeys, memberships, sources, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
+import { auditEvents, credentials, dataKeys, memberProfiles, memberships, sources, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
 import { PgAuditSink, PgVaultStore } from "./stores.ts";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "./test-support.ts";
 
@@ -296,7 +300,7 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
 
   describe("toolset access (D-023)", () => {
     const may = (userId: UserId, sideEffect: "read" | "write" | "destructive", tenantId = a.tenantId) =>
-      db.withTenant(tenantId, (tx) => mayCallTool(tx, { toolsetId: TOOLSET_ID, userId, sideEffect }));
+      db.withTenant(tenantId, (tx) => mayCallTool(tx, { toolsetId: TOOLSET_ID, userId, operationId: "list_activities", sideEffect }));
 
     it("a member without access can't use the toolset at all", async () => {
       expect([await may(outsider, "read"), await may(outsider, "write")]).toEqual([false, false]);
@@ -333,6 +337,111 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
       expect(level).toBe("use");
       expect(canCall(level, "write")).toBe(false);
     });
+  });
+});
+
+describe.skipIf(!adminUrl)("access profiles (D-034, Postgres)", () => {
+  let scratch: ScratchDatabase;
+  let db: Database;
+  let a: { tenantId: TenantId; ownerId: UserId };
+  let b: { tenantId: TenantId; ownerId: UserId };
+  let coach: UserId;
+  const ops = () => {
+    const all = intervalsIr().operations;
+    const reads = all.filter((o) => o.sideEffect.class === "read").map((o) => o.id);
+    const writes = all.filter((o) => o.sideEffect.class === "write").map((o) => o.id);
+    return { read: reads[0]!, otherRead: reads[1]!, write: writes[0]!, otherWrite: writes[1]! };
+  };
+  const may = (userId: UserId, operationId: string, sideEffect: "read" | "write", tenantId = a.tenantId) =>
+    db.withTenant(tenantId, (tx) => mayCallTool(tx, { toolsetId: TOOLSET_ID, userId, operationId, sideEffect }));
+  const coachProfile = (rules: Array<{ level: "use" | "use_writes"; operations: string[] | null }>) =>
+    db.withTenant(a.tenantId, (tx) => putProfile(tx, AccessProfile.parse({ id: "coach", name: "Coach", rules: rules.map((r) => ({ toolsetId: TOOLSET_ID, ...r })) })));
+
+  beforeAll(async () => {
+    scratch = await scratchDatabase(adminUrl!);
+    db = await Database.connect({ url: scratch.appUrl, max: 2 });
+    a = await newTenant(db, "alpha");
+    b = await newTenant(db, "bravo");
+    coach = await db.ensureUser("https://issuer.test", "coach");
+    for (const t of [a, b]) {
+      await db.withTenant(t.tenantId, async (tx) => {
+        await putSource(tx, intervalsIr());
+        await putToolset(tx, toolset());
+      });
+    }
+    await db.withTenant(a.tenantId, (tx) => addMember(tx, coach, "member"));
+  });
+
+  afterAll(async () => {
+    await db?.close();
+    await scratch?.drop();
+  });
+
+  it("grants what the profile's rules say, narrowed to the listed operations", async () => {
+    const { read, otherRead, write, otherWrite } = ops();
+    await coachProfile([{ level: "use_writes", operations: [read, write] }]);
+    await db.withTenant(a.tenantId, (tx) => setMemberProfiles(tx, coach, ["coach"]));
+    expect([await may(coach, read, "read"), await may(coach, write, "write")]).toEqual([true, true]);
+    expect([await may(coach, otherRead, "read"), await may(coach, otherWrite, "write")]).toEqual([false, false]);
+  });
+
+  it("lists only narrow: a use rule never allows a write, listed or not", async () => {
+    const { write } = ops();
+    await coachProfile([{ level: "use", operations: [write] }]);
+    expect(await may(coach, write, "write")).toBe(false);
+  });
+
+  it("edits, unassigning, and deleting take effect on the next check", async () => {
+    const { read, otherRead } = ops();
+    await coachProfile([{ level: "use", operations: null }]);
+    await db.withTenant(a.tenantId, (tx) => setMemberProfiles(tx, coach, ["coach"]));
+    expect(await may(coach, otherRead, "read")).toBe(true);
+    await coachProfile([{ level: "use", operations: [read] }]);
+    expect(await may(coach, otherRead, "read")).toBe(false);
+    await db.withTenant(a.tenantId, (tx) => setMemberProfiles(tx, coach, []));
+    expect(await may(coach, read, "read")).toBe(false);
+    await db.withTenant(a.tenantId, (tx) => setMemberProfiles(tx, coach, ["coach"]));
+    expect(await db.withTenant(a.tenantId, (tx) => deleteProfile(tx, "coach"))).toBe(true);
+    expect(await may(coach, read, "read")).toBe(false);
+  });
+
+  it("adds up with a direct grant", async () => {
+    const { read, otherRead, write } = ops();
+    await coachProfile([{ level: "use_writes", operations: [write] }]);
+    await db.withTenant(a.tenantId, async (tx) => {
+      await setMemberProfiles(tx, coach, ["coach"]);
+      await setToolsetAccess(tx, TOOLSET_ID, coach, "use");
+    });
+    expect([await may(coach, read, "read"), await may(coach, otherRead, "read"), await may(coach, write, "write")]).toEqual([true, true, true]);
+    await db.withTenant(a.tenantId, (tx) => setToolsetAccess(tx, TOOLSET_ID, coach, undefined));
+  });
+
+  it("stays inside its tenant", async () => {
+    const { read } = ops();
+    await coachProfile([{ level: "use", operations: null }]);
+    await db.withTenant(a.tenantId, (tx) => setMemberProfiles(tx, coach, ["coach"]));
+    // B can't see A's profiles or assignments, and A's profile gives nothing in B.
+    expect(await db.withTenant(b.tenantId, (tx) => listProfiles(tx))).toEqual([]);
+    expect(await db.withTenant(b.tenantId, (tx) => tx.select().from(memberProfiles))).toEqual([]);
+    expect(await may(coach, read, "read", b.tenantId)).toBe(false);
+    // B can't assign A's profile (it doesn't exist there), nor give one to someone who isn't B's member.
+    expect(await pgError(db.withTenant(b.tenantId, (tx) => setMemberProfiles(tx, b.ownerId, ["coach"])))).toBe("23503");
+    await db.withTenant(b.tenantId, (tx) => putProfile(tx, AccessProfile.parse({ id: "own", name: "Own", rules: [] })));
+    expect(await pgError(db.withTenant(b.tenantId, (tx) => setMemberProfiles(tx, coach, ["own"])))).toBe("23503");
+    // A rule can't point at a toolset the tenant doesn't have.
+    const bad = AccessProfile.parse({ id: "bad", name: "Bad", rules: [{ toolsetId: "not-here", level: "use" }] });
+    expect(await pgError(db.withTenant(a.tenantId, (tx) => putProfile(tx, bad)))).toBe("23503");
+  });
+
+  it("leaving the tenant removes a member's profiles", async () => {
+    const temp = await db.ensureUser("https://issuer.test", "temp-coach");
+    await coachProfile([{ level: "use", operations: null }]);
+    await db.withTenant(a.tenantId, async (tx) => {
+      await addMember(tx, temp, "member");
+      await setMemberProfiles(tx, temp, ["coach"]);
+    });
+    await db.withTenant(a.tenantId, (tx) => tx.delete(memberships).where(eq(memberships.userId, temp)));
+    expect((await db.withTenant(a.tenantId, (tx) => listProfiles(tx)))[0]?.members).not.toContain(temp);
   });
 });
 

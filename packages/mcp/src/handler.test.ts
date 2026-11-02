@@ -1,8 +1,8 @@
 // The MCP endpoint end to end: real Postgres (as the app role), real vault and
 // runtime, the MCP SDK client, a local token issuer, and a fake upstream.
 import { randomBytes } from "node:crypto";
-import { Toolset, type IrDocument, type TenantId, type UserId } from "@cairnmcp/core";
-import { addMember, Database, listAuditEvents, PgAuditSink, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@cairnmcp/db";
+import { AccessProfile, Toolset, type IrDocument, type TenantId, type UserId } from "@cairnmcp/core";
+import { addMember, Database, listAuditEvents, PgAuditSink, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess } from "@cairnmcp/db";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
 import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
@@ -263,6 +263,31 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       await expect(client.callTool({ name: "update_activity", arguments: { id: "i1", body: {} } })).rejects.toThrow(/Unknown tool/);
 
       await db.withTenant(a.tenantId, (tx) => setToolsetAccess(tx, "mine" as never, temp, undefined));
+      await expect(client.listTools()).rejects.toThrow();
+      await client.close();
+    });
+  });
+
+  describe("access profiles (D-034)", () => {
+    it("a member with only a profile sees and calls exactly what it allows, and edits apply on the next request", async () => {
+      const coach = await db.ensureUser(ISSUER, "alpha-coach");
+      const profile = (operations: string[] | null) =>
+        AccessProfile.parse({ id: "coach", name: "Coach", rules: [{ toolsetId: "mine", level: "use_writes", operations }] });
+      await db.withTenant(a.tenantId, async (tx) => {
+        await addMember(tx, coach, "member");
+        await putProfile(tx, profile(["update_activity"]));
+        await setMemberProfiles(tx, coach, ["coach"]);
+      });
+      const client = await connect("alpha-coach", resource(a.tenantId));
+      expect((await client.listTools()).tools.map((t) => t.name)).toEqual(["update_activity"]);
+      await expect(client.callTool({ name: "list_activities", arguments: { oldest: "2026-10-25" } })).rejects.toThrow(/Unknown tool/);
+      const result = await client.callTool({ name: "update_activity", arguments: { id: "i1", body: { name: "x" } } });
+      expect(result.isError).toBeFalsy();
+
+      await db.withTenant(a.tenantId, (tx) => putProfile(tx, profile(null)));
+      expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual(["list_activities", "update_activity"]);
+
+      await db.withTenant(a.tenantId, (tx) => setMemberProfiles(tx, coach, []));
       await expect(client.listTools()).rejects.toThrow();
       await client.close();
     });

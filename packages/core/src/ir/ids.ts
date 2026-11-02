@@ -13,6 +13,10 @@ export const TOOL_SAFE_NAME = /^[a-z][a-z0-9_]{0,63}$/;
 export const SourceId = z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<"SourceId">();
 export type SourceId = z.infer<typeof SourceId>;
 
+/** Id of an access profile within one tenant (D-034). */
+export const ProfileId = z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<"ProfileId">();
+export type ProfileId = z.infer<typeof ProfileId>;
+
 export const ToolsetId = z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<"ToolsetId">();
 export type ToolsetId = z.infer<typeof ToolsetId>;
 
