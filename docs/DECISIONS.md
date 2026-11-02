@@ -545,3 +545,48 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** Google directly (manual setup, no IaC); Microsoft Entra (its multi-tenant issuer
   varies per tenant, which our exact issuer check rejects); self-hosted Keycloak (too heavy for the
   1 GB VM).
+
+## D-032 Provider-hosted servers: one toolset, many users, each calling as themselves
+
+- **Context:** An API provider (say Intervals.icu, for its paid tier) wants to offer one MCP server
+  to all its customers. Today a toolset belongs to a tenant whose owner stores one credential and
+  grants access per person (D-023, D-030). That fits "my own server", not thousands of customers
+  on one URL, and with one shared key the upstream can't tell users apart.
+- **Decision:** one tenant (the provider) owns the toolset and one MCP URL serves every customer.
+  Three changes make that work, all in milestone 3b:
+  - **Sign-in through the provider:** the tenant names its own OIDC provider (here, Intervals.icu's
+    OAuth), so customers sign in with the account they already have. cairnmcp users are created on
+    first sign-in; nobody runs admin commands per customer.
+  - **Per-user credentials:** each source has a credential mode, `shared` (today: one credential
+    per tenant, source, and scheme) or `per_user` (one per tenant, source, scheme, and user). Two
+    ways to fill `per_user`:
+    1. **Sign-in doubles as the API grant (first):** when the sign-in provider is also the
+       upstream's OAuth server, the sign-in also asks for the API scopes, and the user's access and
+       refresh tokens are stored in the vault under that user, refreshed as needed. One consent
+       screen, and it works with any OAuth API without the provider's help (a provider's OAuth
+       app is enough).
+    2. **Token exchange (RFC 8693, later):** for a provider running cairnmcp next to its API,
+       cairnmcp trades the caller's token for a short-lived upstream token per call and stores
+       nothing (D-022).
+  - **Access from claims, not grants:** a toolset can grant a level to everyone whose token carries
+    a claim (e.g. `plan = premium` gets `use`), checked on every request like today's grants. When
+    the plan lapses, access should end within minutes, so refreshing a cairnmcp token (access
+    tokens last 15 minutes, D-026) has to fetch the claims from the provider again rather than
+    reuse the ones from sign-in.
+- **Never token passthrough:** the MCP access token is never sent upstream. The MCP authorization
+  spec forbids it, and it would let any MCP client's token act on the API directly.
+- **Already in place:** the caller reaches the runtime and the credential lookup
+  (`credentialsForSource(tenant, source, caller)`, D-022); the vault has an `oauth2` credential
+  kind; the audit log records the acting user; pins like Intervals.icu `id = "0"` (the signed-in
+  athlete) become per-user automatically once the credential is.
+- **Also needed:** rate limits per user as well as per tenant, so one customer can't use up the
+  provider's upstream quota; the curation UI (milestone 3) for the provider to choose and describe
+  tools; a custom domain on hosted cairnmcp, or the self-hosted image (milestone 2b).
+- **Where it runs:** the provider self-hosts the image next to its API (private-network targets,
+  D-022), or uses hosted cairnmcp. Either way the security model is the same, and with per-user
+  credentials the upstream enforces its own permissions too, with cairnmcp's checks on top
+  (D-023).
+- **Rejected:** one cairnmcp tenant per customer (each would set up sources, toolsets, and keys
+  themselves, which is the inefficiency this removes); asking each customer to paste their own API
+  key (works, but worse to use and less safe than OAuth; may still be offered as a `per_user`
+  fallback for APIs without OAuth).
