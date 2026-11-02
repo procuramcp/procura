@@ -34,18 +34,21 @@ export async function createTenant(db: Database, input: { name: string; ownerUse
 
 export type SourceSummary = { id: SourceId; name: string; operations: number; reads: number; authSchemes: string[]; warnings: number };
 
+export type MappedSource = { ir: IrDocument; warnings: Array<{ code: string; message: string; pointer?: string }> };
+
 /**
- * Ingest an OpenAPI document and store it as a source. `fixedUsernames` is
- * per-API curation (e.g. Intervals.icu's basic-auth username is the literal
- * `API_KEY`), by auth scheme id.
+ * Ingest an OpenAPI document into a source, without storing it: shared by the
+ * admin CLI and the console (D-035). `fixedUsernames` is per-API curation
+ * (e.g. Intervals.icu's basic-auth username is the literal `API_KEY`), by auth
+ * scheme id; `baseUrl` overrides the document's servers.
  */
-export async function addSource(
-  db: Database,
-  input: { tenantId: string; sourceId: string; openapi: string; fixedUsernames?: Record<string, string> },
-): Promise<SourceSummary> {
-  const tenantId = TenantId.parse(input.tenantId);
+export function mapSource(input: { sourceId: string; openapi: string; documentUrl?: string; baseUrl?: string; fixedUsernames?: Record<string, string> }): MappedSource {
   const sourceId = parseOr(SourceId, input.sourceId, "source id must be a lowercase slug, e.g. intervals-icu");
-  const mapped = ingestOpenApiText(input.openapi, { sourceId });
+  const mapped = ingestOpenApiText(input.openapi, {
+    sourceId,
+    ...(input.documentUrl ? { documentUrl: input.documentUrl } : {}),
+    ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+  });
   if (!mapped.ok) {
     const errors = mapped.diagnostics.filter((d) => d.severity === "error").slice(0, 5);
     throw new AdminError(`the OpenAPI document didn't map:\n${errors.map((d) => `  ${d.code}: ${d.message}`).join("\n")}`);
@@ -59,18 +62,36 @@ export async function addSource(
     ...mapped.ir,
     source: {
       ...mapped.ir.source,
-      authSchemes: mapped.ir.source.authSchemes.map((s) => (s.type === "http_basic" && fixed[s.id] !== undefined ? { ...s, fixedUsername: fixed[s.id] } : s)),
+      authSchemes: mapped.ir.source.authSchemes.map((s) => (s.type === "http_basic" && fixed[s.id] ? { ...s, fixedUsername: fixed[s.id] } : s)),
     },
   });
-  await db.withTenant(tenantId, async (tx) => putSource(tx, ir));
+  const warnings = mapped.diagnostics
+    .filter((d) => d.severity === "warning")
+    .map((d) => ({ code: d.code, message: d.message, ...("pointer" in d && typeof d.pointer === "string" ? { pointer: d.pointer } : {}) }));
+  return { ir, warnings };
+}
+
+export function summarize(mapped: MappedSource): SourceSummary {
+  const { ir } = mapped;
   return {
     id: ir.source.id,
     name: ir.source.name,
     operations: ir.operations.length,
     reads: ir.operations.filter((o) => o.sideEffect.class === "read").length,
     authSchemes: ir.source.authSchemes.map((s) => s.id),
-    warnings: mapped.diagnostics.filter((d) => d.severity === "warning").length,
+    warnings: mapped.warnings.length,
   };
+}
+
+/** Ingest an OpenAPI document and store it as a source (replacing one with the same id). */
+export async function addSource(
+  db: Database,
+  input: { tenantId: string; sourceId: string; openapi: string; fixedUsernames?: Record<string, string> },
+): Promise<SourceSummary> {
+  const tenantId = TenantId.parse(input.tenantId);
+  const mapped = mapSource(input);
+  await db.withTenant(tenantId, async (tx) => putSource(tx, mapped.ir));
+  return summarize(mapped);
 }
 
 /**

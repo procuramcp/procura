@@ -97,7 +97,7 @@ grep CAIRNMCP_MASTER_KEY deploy/oracle/app.env
 
 ## Set up your first tenant
 
-Creating a tenant and adding sources and API keys is done with `deploy/oracle/admin.sh`, run from the repo
+Creating a tenant is done with `deploy/oracle/admin.sh` (APIs and their keys can also be added in the console at `/app`), run from the repo
 on your machine. It runs the admin CLI inside the app container on the VM (where the master key
 is), forwards files on stdin, and asks for secrets hidden. Example with Intervals.icu:
 

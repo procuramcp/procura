@@ -83,7 +83,14 @@ export function TenantPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-medium">Sources</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Sources</h2>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/t/${tenant.id}/sources/new`}>
+              <PlusIcon /> Add an API
+            </Link>
+          </Button>
+        </div>
         <Card className="py-0">
           <Table>
             <TableHeader>
@@ -99,7 +106,10 @@ export function TenantPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <DatabaseIcon className="size-4 text-muted-foreground" />
-                      {s.name} <span className="font-mono text-muted-foreground text-xs">{s.id}</span>
+                      <Link to={`/t/${tenant.id}/sources/${s.id}`} className="hover:underline">
+                        {s.name}
+                      </Link>{" "}
+                      <span className="font-mono text-muted-foreground text-xs">{s.id}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{s.operations}</TableCell>
@@ -109,14 +119,13 @@ export function TenantPage() {
               {sources.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-muted-foreground">
-                    No sources. Add one with <code>admin.sh … source add</code>.
+                    No APIs yet. <Link to={`/t/${tenant.id}/sources/new`} className="underline">Add one</Link> from its OpenAPI description.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </Card>
-        <p className="text-muted-foreground text-xs">Sources and API keys are added with the admin CLI for now.</p>
       </section>
     </div>
   );

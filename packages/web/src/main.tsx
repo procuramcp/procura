@@ -5,8 +5,10 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Shell } from "@/pages/shell";
 import { AccessPage } from "@/pages/access";
+import { AddSourcePage } from "@/pages/add-source";
 import { Home } from "@/pages/home";
 import { TenantPage } from "@/pages/tenant";
+import { SourcePage } from "@/pages/source";
 import { ToolsetPage } from "@/pages/toolset";
 import "./index.css";
 
@@ -26,6 +28,8 @@ const router = createBrowserRouter(
         { path: "t/:tenantId", element: <TenantPage /> },
         { path: "t/:tenantId/toolsets/:toolsetId", element: <ToolsetPage /> },
         { path: "t/:tenantId/access", element: <AccessPage /> },
+        { path: "t/:tenantId/sources/new", element: <AddSourcePage /> },
+        { path: "t/:tenantId/sources/:sourceId", element: <SourcePage /> },
       ],
     },
   ],
