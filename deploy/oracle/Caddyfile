@@ -1,0 +1,21 @@
+# HTTPS for the domain in CAIRNMCP_DOMAIN, with a certificate from Let's Encrypt
+# that Caddy obtains and renews on its own. Everything goes to the app.
+{
+	# No admin API listening inside the container.
+	admin off
+}
+
+{$CAIRNMCP_DOMAIN} {
+	reverse_proxy app:8080 {
+		# MCP and OAuth responses are small; never buffer, so nothing waits on the proxy.
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}

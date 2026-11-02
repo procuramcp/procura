@@ -1,0 +1,64 @@
+# cairnmcp on one VM (D-029): the app image (D-027) behind Caddy, which gets
+# and renews the HTTPS certificate. The database is Neon. See README.md.
+#
+#   docker compose -f deploy/oracle/compose.yaml run --rm migrate
+#   docker compose -f deploy/oracle/compose.yaml up -d --build
+name: cairnmcp
+
+services:
+  app:
+    build:
+      context: ../..
+    image: cairnmcp:local
+    # CAIRNMCP_PUBLIC_URL, CAIRNMCP_DATABASE_URL, CAIRNMCP_MASTER_KEY, CAIRNMCP_OIDC_PROVIDERS.
+    env_file: app.env
+    restart: unless-stopped
+    # Only Caddy reaches it; nothing is published on the host.
+    expose: ["8080"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Fits the 1 GB free x86 VM (E2.1.Micro) with swap; measured about 280 MB, under emulation.
+    mem_limit: 512m
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CAIRNMCP_DOMAIN: ${CAIRNMCP_DOMAIN:?set CAIRNMCP_DOMAIN in deploy/oracle/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: 128m
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  # One-off: the only container that sees the owner role's URL (D-024, D-027).
+  migrate:
+    image: cairnmcp:local
+    profiles: [migrate]
+    command: ["node", "packages/db/scripts/migrate.ts"]
+    # CAIRNMCP_DATABASE_OWNER_URL (Neon's direct host).
+    env_file: migrate.env
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  # Certificates and the ACME account; keep across deploys to stay within Let's Encrypt limits.
+  caddy_data:
+  caddy_config:

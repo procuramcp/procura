@@ -6,7 +6,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 | | Milestone | Status |
 | --- | --- | --- |
 | 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
-| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025); embedded authorization server with OIDC sign-in (D-026); container image built and smoke-tested in CI (D-027); Cloud Run + Neon deploy scripts, free tier (D-028). Next: first deploy, then tooling to create tenants, sources, and toolsets |
+| 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025); embedded authorization server with OIDC sign-in (D-026); container image built and smoke-tested in CI (D-027); Neon set up; deployed on an Oracle Cloud Always Free VM behind Caddy, infrastructure in Terraform (D-029). Next: tooling to create tenants, sources, and toolsets |
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | — |
 | 3b | Custom and on-behalf-of upstream auth; external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |

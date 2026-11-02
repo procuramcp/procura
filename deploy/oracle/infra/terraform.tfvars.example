@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+
+tenancy_ocid       = "ocid1.tenancy.oc1..aaaa…"   # Profile → Tenancy: <name> → OCID
+region             = "us-sanjose-1"              # your home region
+budget_alert_email = "you@example.com"
+
+# Optional
+# shape                     = "VM.Standard.A1.Flex"   # default VM.Standard.E2.1.Micro
+# availability_domain_index = 1                       # try another AD on "out of capacity"
+# ssh_source_cidr           = "203.0.113.7/32"        # only your IP may SSH in
+# compartment_ocid          = "ocid1.compartment.oc1..…"
+# manage_quota              = false                   # if others share the tenancy
