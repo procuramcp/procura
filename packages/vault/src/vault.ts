@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { TenantId } from "@cairnmcp/core";
-import { newDataKey, open, seal } from "./aead.ts";
+import { newDataKey, open, seal, type Sealed } from "./aead.ts";
 import { CredentialInput, wrapSecrets, type Credential } from "./credentials.ts";
 import type { KeyWrapper, WrappedKey } from "./key-wrapper.ts";
+import { Secret } from "./secret.ts";
 import type { CredentialRecord, VaultStore } from "./store.ts";
 
 export type StoredCredentialInfo = { id: string; sourceId: string; schemeId: string; kind: Credential["kind"] };
@@ -106,6 +107,37 @@ export class Vault {
     return this.#store.deleteCredential(TenantId.parse(tenantId), id);
   }
 
+  /**
+   * Encrypt a secret that isn't an API credential (a sign-in client secret, a
+   * customer's upstream refresh token; D-040) with the tenant's data key.
+   * `context` names where it's stored (table, row, column) and is
+   * authenticated, so a copy moved anywhere else doesn't decrypt. The caller
+   * stores the result.
+   */
+  async sealSecret(tenantId: TenantId, context: string, value: string): Promise<Sealed> {
+    const t = TenantId.parse(tenantId);
+    const dataKey = await this.#dataKey(t, { create: true });
+    try {
+      return seal(dataKey, Buffer.from(value, "utf8"), secretContext(t, context));
+    } finally {
+      dataKey.fill(0);
+    }
+  }
+
+  /** Decrypt what `sealSecret` returned, with the same tenant and context. Throws `DecryptionError` otherwise. */
+  async openSecret(tenantId: TenantId, context: string, sealed: Sealed): Promise<Secret> {
+    const t = TenantId.parse(tenantId);
+    const dataKey = await this.#dataKey(t, { create: false });
+    try {
+      const plaintext = open(dataKey, sealed, secretContext(t, context));
+      const value = plaintext.toString("utf8");
+      plaintext.fill(0);
+      return new Secret(value);
+    } finally {
+      dataKey.fill(0);
+    }
+  }
+
   /** Re-wrap a tenant's data key with the active KEK. Credentials are untouched. */
   async rotateTenantKey(tenantId: TenantId): Promise<void> {
     const t = TenantId.parse(tenantId);
@@ -150,6 +182,10 @@ function decryptWith(dataKey: Buffer, record: CredentialRecord): Credential {
   } finally {
     plaintext.fill(0);
   }
+}
+
+function secretContext(tenantId: string, context: string): string {
+  return `cairnmcp:v1:secret:${tenantId}:${context}`;
 }
 
 function tenantContext(tenantId: string): string {

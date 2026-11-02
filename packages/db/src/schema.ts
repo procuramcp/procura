@@ -222,6 +222,7 @@ export const memberProfiles = cairnmcp.table(
     tenantId: text("tenant_id").notNull(),
     userId: text("user_id").notNull(),
     profileId: text("profile_id").notNull(),
+    via: text("via", { enum: ["manual", "sign_in"] }).notNull().default("manual"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -261,6 +262,45 @@ export const usageCounters = cairnmcp.table(
   (t) => [primaryKey({ columns: [t.tenantId, t.userId, t.period, t.periodStart] })],
 );
 
+export const tenantSignIn = cairnmcp.table("tenant_sign_in", {
+  tenantId: text("tenant_id").primaryKey(),
+  config: jsonb("config").notNull(),
+  secretIv: text("secret_iv"),
+  secretCiphertext: text("secret_ciphertext"),
+  secretTag: text("secret_tag"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const profileClaims = cairnmcp.table(
+  "profile_claims",
+  {
+    tenantId: text("tenant_id").notNull(),
+    profileId: text("profile_id").notNull(),
+    claim: text("claim").notNull(),
+    value: text("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.profileId, t.claim, t.value] }),
+    foreignKey({ columns: [t.tenantId, t.profileId], foreignColumns: [accessProfiles.tenantId, accessProfiles.id] }),
+  ],
+);
+
+export const upstreamGrants = cairnmcp.table(
+  "upstream_grants",
+  {
+    tenantId: text("tenant_id").notNull(),
+    familyId: text("family_id").notNull(),
+    userId: text("user_id").notNull(),
+    iv: text("iv").notNull(),
+    ciphertext: text("ciphertext").notNull(),
+    tag: text("tag").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.familyId] })],
+);
+
 export const allTables = {
   tenants,
   users,
@@ -281,4 +321,7 @@ export const allTables = {
   profileRules,
   memberProfiles,
   usageCounters,
+  tenantSignIn,
+  profileClaims,
+  upstreamGrants,
 };

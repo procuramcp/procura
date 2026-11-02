@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { OidcIdentityProvider } from "@cairnmcp/auth";
 import { Toolset, type TenantId, type UserId } from "@cairnmcp/core";
-import { addMember, Database, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@cairnmcp/db";
+import { addMember, Database, PgVaultStore, putSource, putToolset, schema, setToolsetAccess } from "@cairnmcp/db";
 import { intervalsIr, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
 import type { FetchLike } from "@cairnmcp/runtime";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
@@ -381,6 +381,58 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       expect(await (await alice_.json("DELETE", `${API}/tenants/alpha/members/${gone}`)).json()).toEqual({ ok: true });
       expect((await alice_.json("DELETE", `${API}/tenants/alpha/members/${gone}`)).status).toBe(404);
       expect((await alice_.json("DELETE", `${API}/tenants/alpha/members/${alice}`)).status).toBe(403);
+    });
+  });
+
+  describe("customer sign-in (D-040)", () => {
+    const settings = { kind: "oidc", name: "Alpha Login", clientId: "alpha-client", issuer: "https://login.alpha.test" };
+    const CLIENT_SECRET = "fake-client-secret-0123456789";
+
+    it("lets admins set it, keeps the client secret sealed, and never sends it back", async () => {
+      const alice_ = await signIn();
+      const empty = (await (await alice_.json("GET", `${API}/tenants/alpha/sign-in`)).json()) as { settings: unknown; callbackUrl: string };
+      expect(empty).toEqual({ settings: null, secretSet: false, callbackUrl: `${BASE}/oauth/callback/tenant/alpha` });
+
+      expect((await alice_.json("PUT", `${API}/tenants/alpha/sign-in`, settings)).status).toBe(422);
+      const saved = await alice_.json("PUT", `${API}/tenants/alpha/sign-in`, { ...settings, clientSecret: CLIENT_SECRET });
+      expect(saved.status).toBe(200);
+      const text = await saved.text();
+      expect(text).not.toContain(CLIENT_SECRET);
+      expect(JSON.parse(text)).toMatchObject({ settings: { ...settings, scopes: "openid email profile offline_access" }, secretSet: true });
+      const [row] = await db.withTenant(a, (tx) => tx.select().from(schema.tenantSignIn));
+      expect(JSON.stringify(row)).not.toContain(CLIENT_SECRET);
+
+      // Changing settings without a secret keeps the saved one.
+      const renamed = (await (await alice_.json("PUT", `${API}/tenants/alpha/sign-in`, { ...settings, name: "Alpha" })).json()) as { secretSet: boolean };
+      expect(renamed.secretSet).toBe(true);
+    });
+
+    it("refuses http URLs, unknown default profiles, and anyone below admin", async () => {
+      const alice_ = await signIn();
+      expect((await alice_.json("PUT", `${API}/tenants/alpha/sign-in`, { ...settings, issuer: "http://login.alpha.test", clientSecret: "x" })).status).toBe(422);
+      expect((await alice_.json("PUT", `${API}/tenants/alpha/sign-in`, { ...settings, defaultProfileId: "nope", clientSecret: "x" })).status).toBe(422);
+      const ed_ = await signIn({ sub: "ed", email: "ed@example.com" });
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/sign-in`, { ...settings, clientSecret: "x" })).status).toBe(403);
+      expect((await ed_.json("DELETE", `${API}/tenants/alpha/sign-in`)).status).toBe(403);
+      const vic_ = await signIn({ sub: "vic", email: "vic@example.com" });
+      expect((await vic_.json("GET", `${API}/tenants/alpha/sign-in`)).status).toBe(200);
+    });
+
+    it("keeps claim rules on profiles and says which profiles came from sign-in", async () => {
+      const alice_ = await signIn();
+      const claims = [{ claim: "plan", value: "pro" }];
+      const saved = (await (await alice_.json("PUT", `${API}/tenants/alpha/profiles/pro`, { name: "Pro", rules: [], claims })).json()) as { profiles: Array<{ id: string; claims: unknown }> };
+      expect(saved.profiles.find((p) => p.id === "pro")?.claims).toEqual(claims);
+      // Saving without claims or limits keeps them.
+      const renamed = (await (await alice_.json("PUT", `${API}/tenants/alpha/profiles/pro`, { name: "Pro plan", rules: [] })).json()) as { profiles: Array<{ id: string; claims: unknown }> };
+      expect(renamed.profiles.find((p) => p.id === "pro")?.claims).toEqual(claims);
+      const page = (await (await alice_.json("GET", `${API}/tenants/alpha/customers?q=${carol}`)).json()) as { customers: Array<{ signInProfiles: string[] }> };
+      expect(page.customers[0]?.signInProfiles).toEqual([]);
+    });
+
+    it("removes it", async () => {
+      const alice_ = await signIn();
+      expect(((await (await alice_.json("DELETE", `${API}/tenants/alpha/sign-in`)).json()) as { settings: unknown }).settings).toBeNull();
     });
   });
 

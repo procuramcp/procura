@@ -1,7 +1,7 @@
 // Fetching API descriptions from untrusted URLs (D-035): the address checks,
 // and finding the document behind a Swagger UI page or a base URL.
 import { describe, expect, it } from "vitest";
-import { discoverDocument, FetchRefused, isPublicAddress, looksLikeOpenApi, vetUrl, type DocumentGetter } from "./fetch-document.ts";
+import { discoverDocument, FetchRefused, isPublicAddress, looksLikeOpenApi, publicFetch, vetUrl, type DocumentGetter } from "./fetch-document.ts";
 
 const OPENAPI = JSON.stringify({ openapi: "3.0.1", info: { title: "T", version: "1" }, paths: {} });
 
@@ -35,6 +35,11 @@ describe("address checks", () => {
     await expect(vetUrl("https://inward.test/x", resolve)).rejects.toThrow(/private or internal/);
     await expect(vetUrl("not a url", resolve)).rejects.toThrow(FetchRefused);
     expect((await vetUrl("https://example.com/openapi.json", resolve)).address).toBe("93.184.215.14");
+  });
+  it("refuses unsafe sign-in provider URLs before connecting (D-040)", async () => {
+    await expect(publicFetch("http://login.example.com/token", { method: "POST" })).rejects.toThrow(/only https/);
+    await expect(publicFetch("https://127.0.0.1/userinfo")).rejects.toThrow(/private or internal/);
+    await expect(publicFetch("https://169.254.169.254/latest/meta-data")).rejects.toThrow(/private or internal/);
   });
 });
 

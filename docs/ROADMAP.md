@@ -65,8 +65,9 @@ each step is usable on its own:
    which limit, when it starts over, and where to upgrade. Left for later: a per-minute rate per
    customer (with a shared store once there's more than one instance), a cost per tool, and
    turning the upstream's own quota errors into `limit_reached`.
-3. **The provider's sign-in, plans from claims** (P-10, P-12, C-1, C-4): moved here from 3b. The
-   tenant names its OIDC or OAuth provider; a claim picks the plan and is re-read on token refresh.
+3. **The provider's sign-in, plans from claims** (P-10, P-12, C-1, C-4), ✅ D-040: a tenant sets
+   its own OIDC or plain OAuth 2 sign-in; customers are created on first sign-in; claim rules on
+   profiles, re-read at every token refresh.
 4. **Usage** (P-30, P-31, P-32): a usage page by tool, customer, and plan; export and a webhook
    per period for the provider's billing. Small per-call counters, separate from the audit log;
    audit retention as a setting.

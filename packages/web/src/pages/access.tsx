@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, EllipsisIcon, PauseIcon, PlayIcon, PlusIcon, SearchIcon, ShieldCheckIcon, StickyNoteIcon, Trash2Icon, UndoIcon, UsersIcon } from "lucide-react";
+import { ArrowLeftIcon, EllipsisIcon, KeyRoundIcon, PauseIcon, PlayIcon, PlusIcon, SearchIcon, ShieldCheckIcon, StickyNoteIcon, Trash2Icon, UndoIcon, UsersIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
@@ -39,7 +39,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
-import { api, type AccessProfile, type AccessView, type Level, type MemberStatus, type Person, type PlanLimits, type ProfileRule, type Role } from "@/lib/api";
+import { api, type AccessProfile, type AccessView, type Level, type ClaimRule, type MemberStatus, type Person, type PlanLimits, type ProfileRule, type Role } from "@/lib/api";
 import { useLoad, useRole } from "@/lib/hooks";
 import { PersonName, SideEffectBadge, slugify } from "@/pages/parts";
 import { Problem } from "@/pages/shell";
@@ -194,7 +194,7 @@ function NewProfile({ taken, onCreate }: { taken: string[]; onCreate: (id: strin
 
 /** Limits as typed: blank means no limit. */
 type LimitFields = { perDay: string; perMonth: string; upgradeUrl: string };
-type Draft = { name: string; description: string; rules: ProfileRule[]; limits: LimitFields };
+type Draft = { name: string; description: string; rules: ProfileRule[]; limits: LimitFields; claims: ClaimRule[] };
 
 const limitFields = (l: PlanLimits): LimitFields => ({
   perDay: l.perDay?.toString() ?? "",
@@ -214,7 +214,7 @@ function planLimits(f: LimitFields): PlanLimits {
 
 function ProfileEditor(props: { tenantId: string; view: AccessView; profile: AccessProfile; onChanged: (v: AccessView) => void; onDeleted: () => void; readOnly: boolean }) {
   const { view, profile } = props;
-  const initial: Draft = { name: profile.name, description: profile.description ?? "", rules: profile.rules, limits: limitFields(profile.limits) };
+  const initial: Draft = { name: profile.name, description: profile.description ?? "", rules: profile.rules, limits: limitFields(profile.limits), claims: profile.claims };
   const [draft, setDraft] = useState<Draft>(initial);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -225,7 +225,7 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
   }
 
   async function save() {
-    const edit = { name: draft.name, ...(draft.description.trim() ? { description: draft.description } : {}), rules: draft.rules, limits: planLimits(draft.limits) };
+    const edit = { name: draft.name, ...(draft.description.trim() ? { description: draft.description } : {}), rules: draft.rules, limits: planLimits(draft.limits), claims: draft.claims.filter((c) => c.claim.trim() && c.value.trim()) };
     const next = await act(() => api.saveProfile(props.tenantId, profile.id, edit), { busy: setBusy, failure: "Not saved" });
     if (!next) return;
     props.onChanged(next);
@@ -263,6 +263,7 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
       </Card>
 
       <LimitsCard limits={draft.limits} onChange={(limits) => setDraft({ ...draft, limits })} />
+      <ClaimsCard tenantId={props.tenantId} claims={draft.claims} onChange={(claims) => setDraft({ ...draft, claims })} />
 
       {view.toolsets.map((toolset) => (
         <RuleCard key={toolset.id} toolset={toolset} rule={draft.rules.find((r) => r.toolsetId === toolset.id)} onChange={(r) => setRule(toolset.id, r)} />
@@ -305,6 +306,38 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
       </div>
       )}
     </fieldset>
+  );
+}
+
+/** Sign-in claims that give this profile automatically (D-040). */
+function ClaimsCard({ tenantId, claims, onChange }: { tenantId: string; claims: ClaimRule[]; onChange: (c: ClaimRule[]) => void }) {
+  const set = (i: number, change: Partial<ClaimRule>) => onChange(claims.map((c, n) => (n === i ? { ...c, ...change } : c)));
+  return (
+    <Card className="gap-3 p-4">
+      <div>
+        <h3 className="font-medium">From sign-in</h3>
+        <p className="text-muted-foreground text-xs">
+          Customers whose sign-in claim matches get this profile automatically, and lose it when the claim changes. Needs{" "}
+          <Link to={`/t/${tenantId}/sign-in`} className="underline">
+            customer sign-in
+          </Link>
+          .
+        </p>
+      </div>
+      {claims.map((c, i) => (
+        <div key={i} className="flex flex-wrap items-center gap-2">
+          <Input className="min-w-40 flex-1 font-mono" placeholder="Claim, like plan" aria-label="Claim" value={c.claim} onChange={(e) => set(i, { claim: e.target.value })} />
+          <span className="text-muted-foreground text-sm">is</span>
+          <Input className="min-w-32 flex-1 font-mono" placeholder="Value, like pro" aria-label="Value" value={c.value} onChange={(e) => set(i, { value: e.target.value })} />
+          <Button size="icon-sm" variant="ghost" aria-label="Remove rule" onClick={() => onChange(claims.filter((_, n) => n !== i))}>
+            <Trash2Icon />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" className="self-start" onClick={() => onChange([...claims, { claim: "", value: "" }])}>
+        <PlusIcon /> Add a claim rule
+      </Button>
+    </Card>
   );
 }
 
@@ -447,12 +480,24 @@ const ROLE_HELP: Record<Exclude<Role, "customer">, string> = {
 };
 
 /** Profiles someone holds, with a menu to add or remove them. */
-function ProfilePicker(props: { profiles: AccessProfile[]; held: string[]; busy: boolean; readOnly: boolean; onChange: (next: string[]) => void }) {
-  const { profiles, held, busy, readOnly, onChange } = props;
+/**
+ * Profiles someone holds, with a menu to add or remove the team's. Profiles
+ * from their sign-in claims (D-040) are shown apart and can't be changed here:
+ * sign-in sets them again on the next refresh.
+ */
+function ProfilePicker(props: { profiles: AccessProfile[]; held: string[]; fromSignIn: string[]; busy: boolean; readOnly: boolean; onChange: (manual: string[]) => void }) {
+  const { profiles, held, fromSignIn, busy, readOnly, onChange } = props;
+  const manual = held.filter((id) => !fromSignIn.includes(id));
+  const name = (id: string) => profiles.find((p) => p.id === id)?.name ?? id;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {held.map((id) => (
-        <Badge key={id}>{profiles.find((p) => p.id === id)?.name ?? id}</Badge>
+      {manual.map((id) => (
+        <Badge key={id}>{name(id)}</Badge>
+      ))}
+      {fromSignIn.map((id) => (
+        <Badge key={id} variant="outline" title="From their sign-in claims">
+          <KeyRoundIcon /> {name(id)}
+        </Badge>
       ))}
       {held.length === 0 && readOnly && <span className="text-muted-foreground text-xs">None</span>}
       {!readOnly && (
@@ -469,10 +514,12 @@ function ProfilePicker(props: { profiles: AccessProfile[]; held: string[]; busy:
               <DropdownMenuCheckboxItem
                 key={p.id}
                 checked={held.includes(p.id)}
-                onCheckedChange={(on) => onChange(on ? [...held, p.id] : held.filter((x) => x !== p.id))}
+                disabled={fromSignIn.includes(p.id)}
+                onCheckedChange={(on) => onChange(on ? [...manual, p.id] : manual.filter((x) => x !== p.id))}
                 onSelect={(e) => e.preventDefault()}
               >
                 {p.name}
+                {fromSignIn.includes(p.id) && <span className="ml-auto text-muted-foreground text-xs">from sign-in</span>}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
@@ -546,7 +593,14 @@ function TeamTab({ tenantId, view, onChanged }: { tenantId: string; view: Access
                 )}
               </TableCell>
               <TableCell>
-                <ProfilePicker profiles={view.profiles} held={m.profiles} busy={busy === m.userId} readOnly={!canEdit} onChange={(p) => void setProfiles(m.userId, p)} />
+                <ProfilePicker
+                  profiles={view.profiles}
+                  held={m.profiles}
+                  fromSignIn={m.signInProfiles}
+                  busy={busy === m.userId}
+                  readOnly={!canEdit}
+                  onChange={(p) => void setProfiles(m.userId, p)}
+                />
               </TableCell>
               <TableCell>{manageable(m) && <RemoveButton who={m} onConfirm={() => void remove(m)} />}</TableCell>
             </TableRow>
@@ -681,7 +735,10 @@ function CustomersTab({ tenantId, view, onCount }: { tenantId: string; view: Acc
   const replace = (p: Person) => setRows((r) => r.map((x) => (x.userId === p.userId ? p : x)));
 
   async function setProfiles(c: Person, profiles: string[]) {
-    if (await act(() => api.setMemberProfiles(tenantId, c.userId, profiles), { busy: busyFor(c.userId) })) replace({ ...c, profiles });
+    if (!(await act(() => api.setMemberProfiles(tenantId, c.userId, profiles), { busy: busyFor(c.userId) }))) return;
+    // The team's profiles now, plus what sign-in still gives (D-040).
+    const signIn = c.signInProfiles.filter((id) => !profiles.includes(id));
+    replace({ ...c, profiles: [...new Set([...profiles, ...signIn])], signInProfiles: signIn });
   }
   async function setStatus(c: Person, status: MemberStatus) {
     const updated = await act(() => api.updateMember(tenantId, c.userId, { status }), { busy: busyFor(c.userId) });
@@ -737,7 +794,14 @@ function CustomersTab({ tenantId, view, onCount }: { tenantId: string; view: Acc
                 {c.status === "suspended" ? <Badge variant="destructive">Suspended</Badge> : <Badge variant="secondary">Active</Badge>}
               </TableCell>
               <TableCell>
-                <ProfilePicker profiles={view.profiles} held={c.profiles} busy={busy === c.userId} readOnly={!canEdit} onChange={(p) => void setProfiles(c, p)} />
+                <ProfilePicker
+                  profiles={view.profiles}
+                  held={c.profiles}
+                  fromSignIn={c.signInProfiles}
+                  busy={busy === c.userId}
+                  readOnly={!canEdit}
+                  onChange={(p) => void setProfiles(c, p)}
+                />
               </TableCell>
               <TableCell className="text-right text-sm tabular-nums">
                 {c.usage ? `${c.usage.today.toLocaleString()} / ${c.usage.month.toLocaleString()}` : "–"}

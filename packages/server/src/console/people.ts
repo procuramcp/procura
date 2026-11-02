@@ -12,6 +12,7 @@ import {
   removeMember,
   setMemberProfiles,
   setMemberRole,
+  signInProfileIds,
   updateMember,
   usageFor,
   type Member,
@@ -33,13 +34,9 @@ export const peopleRoutes: ApiRoute[] = [
       teamResponse(api, tenant!, "viewer", async (tx) => {
         const params = new URL(api.request.url).searchParams;
         const page = await listCustomers(tx, { query: params.get("q") ?? "", ...(params.get("after") ? { after: params.get("after")! } : {}), limit: 50 });
-        const ids = page.customers.map((c) => c.userId);
-        const held = await memberProfileIds(tx, ids);
-        const usage = await usageFor(tx, ids, new Date());
-        return {
-          ...page,
-          customers: page.customers.map((c) => ({ ...person(c, held.get(c.userId) ?? [], api.user.userId), usage: usage.get(c.userId) ?? { today: 0, month: 0 } })),
-        } satisfies CustomerPage;
+        const usage = await usageFor(tx, page.customers.map((c) => c.userId), new Date());
+        const customers = await peopleView(tx, page.customers, api.user.userId);
+        return { ...page, customers: customers.map((c) => ({ ...c, usage: usage.get(c.userId as UserId) ?? { today: 0, month: 0 } })) } satisfies CustomerPage;
       }),
   },
   {
@@ -76,7 +73,7 @@ export const peopleRoutes: ApiRoute[] = [
         const note = body.data.note === undefined ? undefined : body.data.note || null;
         await updateMember(tx, userId, { ...(body.data.status ? { status: body.data.status } : {}), ...(note !== undefined ? { note } : {}) });
         const updated = (await getMember(tx, userId)) ?? target;
-        return person(updated, (await memberProfileIds(tx, [userId])).get(userId) ?? [], api.user.userId) satisfies Person;
+        return (await peopleView(tx, [updated], api.user.userId))[0]! satisfies Person;
       });
     },
   },
@@ -144,7 +141,20 @@ function refuse(api: ApiRequest, actor: TeamRole, userId: UserId, current: Membe
   return undefined;
 }
 
-/** A member as the console shows them; `me` is the signed-in user. */
-export function person(m: Member, profiles: string[], me: UserId): Person {
-  return { userId: m.userId, label: m.label, role: m.role, status: m.status, note: m.note, since: m.createdAt, profiles, you: m.userId === me };
+/** Members as the console shows them, with the profiles they hold and which came from sign-in; `me` is the signed-in user. */
+export async function peopleView(tx: TenantTx, members: readonly Member[], me: UserId): Promise<Person[]> {
+  const ids = members.map((m) => m.userId);
+  const held = await memberProfileIds(tx, ids);
+  const fromSignIn = await signInProfileIds(tx, ids);
+  return members.map((m) => ({
+    userId: m.userId,
+    label: m.label,
+    role: m.role,
+    status: m.status,
+    note: m.note,
+    since: m.createdAt,
+    profiles: held.get(m.userId) ?? [],
+    signInProfiles: fromSignIn.get(m.userId) ?? [],
+    you: m.userId === me,
+  }));
 }

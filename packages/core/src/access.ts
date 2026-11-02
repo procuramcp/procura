@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { JsonValue } from "./ir/json-schema.ts";
 import { OperationId, ProfileId, ToolsetId, type UserId } from "./ir/ids.ts";
 import type { SideEffect } from "./ir/side-effect.ts";
+import { ClaimRule } from "./sign-in.ts";
 import { omitUndefined } from "./util.ts";
 
 /**
@@ -135,6 +136,8 @@ export const AccessProfile = z
     rules: z.array(ProfileRule).max(200),
     /** What a plan allows each customer who holds it (D-039). */
     limits: PlanLimits.default({}),
+    /** Sign-in claims that give someone this profile automatically (D-040). */
+    claims: z.array(ClaimRule).max(50).default([]),
   })
   .superRefine((p, ctx) => {
     const seen = new Set<string>();

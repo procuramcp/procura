@@ -34,6 +34,10 @@ const router = createBrowserRouter(
           lazy: async () => ({ Component: (await import("@/pages/access")).AccessPage }),
         },
         {
+          path: "t/:tenantId/sign-in",
+          lazy: async () => ({ Component: (await import("@/pages/customer-sign-in")).CustomerSignInPage }),
+        },
+        {
           path: "t/:tenantId/sources/new",
           lazy: async () => ({ Component: (await import("@/pages/add-source")).AddSourcePage }),
         },

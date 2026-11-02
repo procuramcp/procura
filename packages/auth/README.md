@@ -9,6 +9,10 @@ The embedded OAuth 2.1 authorization server that issues tokens for the MCP endpo
   (no secret); redirect URIs must be https, loopback http, or a native app's own scheme.
 - **Sign-in** is delegated to the OIDC providers in `CAIRNMCP_OIDC_PROVIDERS`; cairnmcp never
   handles passwords. A user is that provider's issuer + subject.
+- **A tenant's own sign-in** (D-040): a tenant can set its own OIDC or plain OAuth 2 provider for
+  its customers (`/oauth/login/tenant/{tenant}`, callback `/oauth/callback/tenant/{tenant}`).
+  First sign-in makes them a customer; claim rules on profiles set their plan; each token refresh
+  asks the provider again and ends the connection if it refuses.
 - **Consent:** after sign-in, the person sees the app, the toolset, their access level, and where
   the app returns, and allows or denies. Only members with access to the toolset get this far.
 - **Tokens:** `POST /oauth/token`. Authorization code with PKCE (S256 only); the code is single-use

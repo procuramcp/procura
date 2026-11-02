@@ -1,11 +1,11 @@
 // Access profiles (D-034) and the access page: profiles, the team, and how many customers (D-038).
 import type { AccessView } from "@cairnmcp/console-api";
 import { AccessProfile } from "@cairnmcp/core";
-import { deleteProfile, listCustomers, listOperationEffects, listProfiles, listTeam, listToolsets, memberProfileIds, putProfile, type TenantTx } from "@cairnmcp/db";
+import { deleteProfile, listCustomers, listOperationEffects, listProfiles, listTeam, listToolsets, putProfile, type TenantTx } from "@cairnmcp/db";
 import { json } from "@cairnmcp/http";
 import { issuesText, ProfileEdit, readBody } from "./bodies.ts";
 import { teamResponse, type ApiRoute, type Session } from "./context.ts";
-import { person } from "./people.ts";
+import { peopleView } from "./people.ts";
 
 export const accessRoutes: ApiRoute[] = [
   {
@@ -25,7 +25,10 @@ export const accessRoutes: ApiRoute[] = [
           return accessView(tx, api.user);
         }
         const { description, ...rest } = body.data!;
-        const parsed = AccessProfile.safeParse({ ...rest, ...(description?.trim() ? { description } : {}), id: profileId });
+        // Limits and claim rules left out keep their saved values, so an older client can't clear them by accident.
+        const saved = (await listProfiles(tx)).find((p) => p.id === profileId);
+        const kept = { ...(rest.limits === undefined && saved ? { limits: saved.limits } : {}), ...(rest.claims === undefined && saved ? { claims: saved.claims } : {}) };
+        const parsed = AccessProfile.safeParse({ ...rest, ...kept, ...(description?.trim() ? { description } : {}), id: profileId });
         if (!parsed.success) return json(422, { error: "invalid_profile", message: issuesText(parsed.error) });
         // Rules may only name toolsets and operations that exist, so a typo can't silently grant nothing.
         const toolsets = new Map((await listToolsets(tx)).map((t) => [t.id as string, t]));
@@ -47,13 +50,12 @@ export const accessRoutes: ApiRoute[] = [
 export async function accessView(tx: TenantTx, user: Session): Promise<Response> {
   const profiles = await listProfiles(tx);
   const team = await listTeam(tx);
-  const held = await memberProfileIds(tx, team.map((m) => m.userId));
   const { total: customers } = await listCustomers(tx, { limit: 1 });
   const toolsets = await listToolsets(tx);
   const effects = await listOperationEffects(tx);
   return json(200, {
     profiles,
-    team: team.map((m) => person(m, held.get(m.userId) ?? [], user.userId)),
+    team: await peopleView(tx, team, user.userId),
     customers,
     toolsets: toolsets.map((t) => {
       const ops = effects.get(t.sourceId);

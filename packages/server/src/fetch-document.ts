@@ -140,6 +140,60 @@ function getPinned(url: URL, address: string, family: 4 | 6, timeoutMs: number):
   });
 }
 
+const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
+
+/**
+ * `fetch` for a tenant's sign-in provider (D-040): its issuer, token, and
+ * userinfo URLs were typed in by a tenant admin, so they get the same checks
+ * as a document URL (https, public addresses only, pinned connection, capped
+ * size and time). Redirects are returned, not followed, as OAuth expects.
+ */
+export async function publicFetch(
+  raw: string,
+  init: { method?: string; headers?: Record<string, string> | Headers; body?: unknown; signal?: AbortSignal | null } = {},
+): Promise<Response> {
+  const { url, address, family } = await vetUrl(raw);
+  const headers = Object.fromEntries(new Headers(init.headers ?? {}).entries());
+  const body = init.body === undefined || init.body === null ? undefined : String(init.body);
+  return new Promise((resolve, reject) => {
+    const req = request(
+      url,
+      {
+        method: init.method ?? "GET",
+        headers: { "user-agent": "cairnmcp", ...headers },
+        lookup: ((_host: string, opts: { all?: boolean }, cb: (...args: unknown[]) => void) =>
+          opts.all ? cb(null, [{ address, family }]) : cb(null, address, family)) as never,
+        timeout: TIMEOUT_MS,
+        ...(init.signal ? { signal: init.signal } : {}),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > MAX_PROVIDER_RESPONSE_BYTES) {
+            req.destroy(new FetchRefused("the provider's answer is too large"));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on("end", () => {
+          const responseHeaders = new Headers();
+          for (const [k, v] of Object.entries(res.headers)) if (v !== undefined) responseHeaders.set(k, Array.isArray(v) ? v.join(", ") : v);
+          const status = res.statusCode ?? 502;
+          const nullBody = status === 204 || status === 304;
+          resolve(new Response(nullBody ? null : Buffer.concat(chunks), { status, headers: responseHeaders }));
+        });
+        res.on("error", reject);
+      },
+    );
+    req.on("timeout", () => req.destroy(new FetchRefused("the provider took too long to answer")));
+    req.on("error", (e) => reject(e instanceof FetchRefused ? e : new FetchRefused(`couldn't reach ${url.host}: ${e.message}`)));
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
+}
+
 // --- Discovery ----------------------------------------------------------------------------
 
 export type Discovered = { documentUrl: string; text: string; via: string; tried: string[] };

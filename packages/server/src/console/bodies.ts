@@ -24,7 +24,15 @@ export function issuesText(error: z.ZodError): string {
 export const NewToolset = z.object({ id: ToolsetId, sourceId: SourceId, name: z.string().min(1).max(200) });
 export const ToolsetEdit = z.object({ name: z.string().min(1).max(200), description: z.string().max(4000).optional(), tools: z.array(z.unknown()).max(2000) });
 export const AccessEdit = z.object({ userId: UserId, level: z.union([ToolsetAccessLevel, z.literal("none")]) });
-export const ProfileEdit = z.object({ name: z.string(), description: z.string().optional(), rules: z.array(z.unknown()).max(200), limits: z.unknown().optional() });
+export const ProfileEdit = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  rules: z.array(z.unknown()).max(200),
+  limits: z.unknown().optional(),
+  claims: z.array(z.unknown()).max(50).optional(),
+});
+/** Checked again as core's SignInConfig; this only reads it and the secret. */
+export const SignInEdit = z.looseObject({ kind: z.enum(["oidc", "oauth2"]), clientSecret: z.string().trim().min(1).max(2000).optional() });
 export const MemberProfiles = z.object({ profiles: z.array(z.string().max(64)).max(100) });
 export const RoleEdit = z.object({ role: MemberRole });
 export const MemberEdit = z.object({ status: MemberStatus.optional(), note: z.string().trim().max(2000).nullable().optional() });
@@ -55,6 +63,7 @@ export type BodiesMatchContract = [
   Accepts<typeof MemberProfiles, Contract.MemberProfilesEdit>,
   Accepts<typeof RoleEdit, Contract.RoleEdit>,
   Accepts<typeof MemberEdit, Contract.MemberEdit>,
+  Accepts<typeof SignInEdit, Contract.SignInEdit>,
   Accepts<typeof CredentialBody, Contract.CredentialBody>,
   Accepts<typeof ToolTest, Contract.ToolTestInput>,
   Accepts<typeof SourceInput, Contract.SourceInput>,

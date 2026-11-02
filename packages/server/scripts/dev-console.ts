@@ -8,6 +8,9 @@
 //
 // Then open http://localhost:8787/app/. Never point this at a real database:
 // it needs a local superuser URL and creates and drops its own database.
+//
+// DEV_USER=friend signs in as the viewer; DEV_ACCESS_TOKEN_SECONDS=60 shortens MCP
+// access tokens for testing customer sign-in (deploy/auth0/README.md).
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -40,7 +43,7 @@ const devProvider: IdentityProvider = {
   async finish() {
     // DEV_USER=friend signs in as the viewer instead, to see the read-only console.
     const subject = process.env["DEV_USER"] ?? "dev-user";
-    return { issuer: ISSUER, subject, label: `${subject === "dev-user" ? "dev" : subject}@localhost` };
+    return { issuer: ISSUER, subject, label: `${subject === "dev-user" ? "dev" : subject}@localhost`, claims: {} };
   },
 };
 
@@ -65,6 +68,17 @@ await db.withTenant(tenant, async (tx) => {
       name: "Athlete",
       rules: [{ toolsetId: "intervals", level: "use" }],
       limits: { perDay: 200, perMonth: 3000, upgradeUrl: "https://example.com/pricing" },
+    }),
+  );
+  // Write tools for whoever's sign-in says plan = pro. The claim name matches the Action in
+  // deploy/auth0/customer-sign-in-test.tf, for testing customer sign-in against Auth0 (D-040).
+  await putProfile(
+    tx,
+    AccessProfile.parse({
+      id: "pro",
+      name: "Pro",
+      rules: [{ toolsetId: "intervals", level: "use_writes" }],
+      claims: [{ claim: "https://cairnmcp.test/plan", value: "pro" }],
     }),
   );
 });
@@ -98,6 +112,8 @@ const handler = await createApp({
       headers: { "content-type": "application/json" },
     }),
   consoleDir: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+  // DEV_ACCESS_TOKEN_SECONDS=60 makes MCP clients refresh every minute, so claim changes show up quickly.
+  ...(process.env["DEV_ACCESS_TOKEN_SECONDS"] ? { accessTokenSeconds: Number(process.env["DEV_ACCESS_TOKEN_SECONDS"]) } : {}),
 });
 const server = serve(handler, { port, publicUrl });
 console.log(`console at ${publicUrl}/app/ (database ${scratch.name}, dropped on exit)`);

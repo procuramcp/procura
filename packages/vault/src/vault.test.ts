@@ -24,6 +24,17 @@ const putKey = (tenantId = A) =>
   vault.putCredential({ tenantId, sourceId: "intervals-icu", schemeId: "APIKey", credential: { kind: "basic", password: SECRET } });
 
 describe("Vault", () => {
+  it("seals a secret that opens only for the same tenant and context (D-040)", async () => {
+    const sealed = await vault.sealSecret(A, "tenant_sign_in:client_secret", SECRET);
+    expect(JSON.stringify(sealed)).not.toContain(SECRET);
+    const opened = await vault.openSecret(A, "tenant_sign_in:client_secret", sealed);
+    expect(opened.reveal()).toBe(SECRET);
+    expect(inspect(opened)).toBe("[redacted]");
+    await expect(vault.openSecret(A, "upstream_grants:refresh_token", sealed)).rejects.toThrow(/decryption failed/);
+    await vault.sealSecret(B, "anything", "x");
+    await expect(vault.openSecret(B, "tenant_sign_in:client_secret", sealed)).rejects.toThrow(/decryption failed/);
+  });
+
   it("stores and returns a credential with the secret wrapped", async () => {
     const { id } = await putKey();
     const cred = await vault.getCredential(A, id);

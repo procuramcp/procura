@@ -89,8 +89,9 @@ resource "auth0_connection" "google" {
 }
 
 resource "auth0_connection_clients" "users" {
-  connection_id   = auth0_connection.users.id
-  enabled_clients = [auth0_client.cairnmcp.id]
+  connection_id = auth0_connection.users.id
+  # This list is the whole list, so the optional test app (customer-sign-in-test.tf) is added here.
+  enabled_clients = concat([auth0_client.cairnmcp.id], auth0_client.customer_test[*].id)
 }
 
 resource "auth0_connection_clients" "google" {
