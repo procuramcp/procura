@@ -213,9 +213,9 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
             </SelectContent>
           </Select>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div>
           <Table>
-            <TableHeader className="sticky top-0 z-[1] bg-card">
+            <TableHeader>
               <TableRow>
                 <TableHead className="w-12">On</TableHead>
                 <TableHead>Tool</TableHead>
@@ -257,6 +257,8 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
         </div>
       </Card>
 
+      {/* The list scrolls with the page; the editor stays in view beside it, with its own scroll. */}
+      <div className="min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100svh-2rem)] lg:self-start lg:overflow-y-auto">
       {current ? (
         <ToolEditor
           key={current.id}
@@ -270,6 +272,7 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
       ) : (
         <Card className="items-center justify-center p-8 text-muted-foreground">Pick an operation to edit it.</Card>
       )}
+      </div>
     </div>
   );
 }
