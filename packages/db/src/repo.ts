@@ -4,7 +4,7 @@
 import {
   AccessProfile,
   allowsTool,
-  Instant,
+  instantOf,
   IrDocument,
   SourceId,
   TenantId,
@@ -14,11 +14,12 @@ import {
   UserId,
   type AccessRule,
   type SideEffect,
+  type SideEffectCounts,
 } from "@cairnmcp/core";
 import type { AuditEvent } from "@cairnmcp/runtime";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { TenantTx } from "./client.ts";
-import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, toolsetAccess, toolsets } from "./schema.ts";
+import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets } from "./schema.ts";
 
 const currentTenant = sql<string>`cairnmcp.current_tenant_id()`;
 
@@ -38,6 +39,28 @@ export async function memberRole(tx: TenantTx, userId: UserId): Promise<MemberRo
   return row?.role;
 }
 
+/**
+ * Make `userId` a member (role `member`) unless they already are. Returns
+ * whether they were added. Throws a foreign-key violation (`PG.FOREIGN_KEY_VIOLATION`)
+ * if no such user exists: they have to sign in once first.
+ */
+export async function ensureMember(tx: TenantTx, userId: UserId): Promise<boolean> {
+  if (await memberRole(tx, userId)) return false;
+  await addMember(tx, userId, "member");
+  return true;
+}
+
+export async function listMembers(tx: TenantTx): Promise<Array<{ userId: UserId; role: MemberRole }>> {
+  const rows = await tx.select({ userId: memberships.userId, role: memberships.role }).from(memberships).orderBy(asc(memberships.createdAt));
+  return rows.map((r) => ({ userId: UserId.parse(r.userId), role: r.role }));
+}
+
+/** The current tenant's display name. */
+export async function tenantName(tx: TenantTx): Promise<string | undefined> {
+  const [row] = await tx.select({ name: tenants.name }).from(tenants);
+  return row?.name;
+}
+
 export type StoredSource = { id: SourceId; name: string; ir: IrDocument };
 
 /** Insert or replace a source's IR. */
@@ -54,9 +77,53 @@ export async function getSource(tx: TenantTx, id: string): Promise<StoredSource 
   return row ? { id: SourceId.parse(row.id), name: row.name, ir: IrDocument.parse(row.ir) } : undefined;
 }
 
+/**
+ * Every source with its full, validated IR. Loads and parses every document,
+ * which is slow for big APIs: prefer `listSourceSummaries`, `listSourceIds`,
+ * or `listOperationEffects` when they are enough.
+ */
 export async function listSources(tx: TenantTx): Promise<StoredSource[]> {
   const rows = await tx.select().from(sources).orderBy(asc(sources.id));
   return rows.map((row) => ({ id: SourceId.parse(row.id), name: row.name, ir: IrDocument.parse(row.ir) }));
+}
+
+export async function listSourceIds(tx: TenantTx): Promise<SourceId[]> {
+  const rows = await tx.select({ id: sources.id }).from(sources).orderBy(asc(sources.id));
+  return rows.map((r) => SourceId.parse(r.id));
+}
+
+export type SourceSummary = { id: SourceId; name: string; operations: SideEffectCounts };
+
+/** Each source's name and operation counts, computed in Postgres without loading the IR. */
+export async function listSourceSummaries(tx: TenantTx): Promise<SourceSummary[]> {
+  const count = (effect: SideEffect) =>
+    sql<number>`(SELECT count(*)::int FROM jsonb_array_elements(${sources.ir}->'operations') o WHERE o->'sideEffect'->>'class' = ${effect})`;
+  const rows = await tx
+    .select({
+      id: sources.id,
+      name: sources.name,
+      total: sql<number>`jsonb_array_length(${sources.ir}->'operations')`,
+      read: count("read"),
+      write: count("write"),
+      destructive: count("destructive"),
+    })
+    .from(sources)
+    .orderBy(asc(sources.id));
+  return rows.map((r) => ({ id: SourceId.parse(r.id), name: r.name, operations: { total: r.total, read: r.read, write: r.write, destructive: r.destructive } }));
+}
+
+/** Each source's operations and their side effects (source id → operation id → effect), without loading the IR. */
+export async function listOperationEffects(tx: TenantTx): Promise<Map<string, Map<string, SideEffect>>> {
+  const { rows } = await tx.execute<{ source_id: string; operation_id: string; effect: SideEffect }>(sql`
+    SELECT s.id AS source_id, o->>'id' AS operation_id, o->'sideEffect'->>'class' AS effect
+    FROM ${sources} s, jsonb_array_elements(s.ir->'operations') o`);
+  const out = new Map<string, Map<string, SideEffect>>();
+  for (const r of rows) {
+    const ops = out.get(r.source_id) ?? new Map<string, SideEffect>();
+    ops.set(r.operation_id, r.effect);
+    out.set(r.source_id, ops);
+  }
+  return out;
 }
 
 export async function deleteSource(tx: TenantTx, id: string): Promise<boolean> {
@@ -80,6 +147,27 @@ export async function getToolset(tx: TenantTx, id: string): Promise<Toolset | un
 export async function listToolsets(tx: TenantTx): Promise<Toolset[]> {
   const rows = await tx.select().from(toolsets).orderBy(asc(toolsets.id));
   return rows.map((row) => Toolset.parse(row.definition));
+}
+
+/** A toolset with the source it curates, or undefined if either is missing. */
+export async function getToolsetWithSource(tx: TenantTx, toolsetId: string): Promise<{ toolset: Toolset; source: StoredSource } | undefined> {
+  const toolset = await getToolset(tx, toolsetId);
+  const source = toolset && (await getSource(tx, toolset.sourceId));
+  return toolset && source ? { toolset, source } : undefined;
+}
+
+/**
+ * A version of a toolset and its source together: it changes whenever either
+ * row is written (Postgres `xmin` is the writing transaction). Cheap, so
+ * callers can cache what they derive from the full rows and check it per request.
+ */
+export async function toolsetVersion(tx: TenantTx, toolsetId: string): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ version: sql<string>`${toolsets}.xmin::text || ':' || ${sources}.xmin::text` })
+    .from(toolsets)
+    .innerJoin(sources, and(eq(sources.tenantId, toolsets.tenantId), eq(sources.id, toolsets.sourceId)))
+    .where(eq(toolsets.id, toolsetId));
+  return row?.version;
 }
 
 /** Grant, change, or (with `undefined`) revoke a member's access to a toolset. */
@@ -185,7 +273,10 @@ export async function memberProfileIds(tx: TenantTx, userIds?: readonly UserId[]
     .from(memberProfiles)
     .where(userIds ? inArray(memberProfiles.userId, [...userIds]) : undefined);
   const out = new Map<UserId, string[]>();
-  for (const r of rows) out.set(UserId.parse(r.userId), [...(out.get(UserId.parse(r.userId)) ?? []), r.profileId]);
+  for (const r of rows) {
+    const user = UserId.parse(r.userId);
+    out.set(user, [...(out.get(user) ?? []), r.profileId]);
+  }
   return out;
 }
 
@@ -201,7 +292,7 @@ export async function listAuditEvents(tx: TenantTx, options: { invocationId?: st
     invocationId: r.invocationId,
     tenantId: TenantId.parse(r.tenantId),
     actorUserId: UserId.parse(r.actorUserId),
-    at: toInstant(r.at),
+    at: instantOf(r.at),
     phase: r.phase,
     sourceId: r.sourceId,
     toolName: r.toolName,
@@ -212,8 +303,4 @@ export async function listAuditEvents(tx: TenantTx, options: { invocationId?: st
     input: r.input as AuditEvent["input"],
     ...(r.outcome !== null ? { outcome: r.outcome as NonNullable<AuditEvent["outcome"]> } : {}),
   }));
-}
-
-export function toInstant(date: Date): Instant {
-  return Instant.parse(date.toISOString().replace(/\.000Z$/, "Z"));
 }

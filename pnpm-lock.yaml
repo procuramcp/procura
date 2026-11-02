@@ -47,6 +47,9 @@ importers:
       '@cairnmcp/db':
         specifier: workspace:*
         version: link:../db
+      '@cairnmcp/http':
+        specifier: workspace:*
+        version: link:../http
       '@cairnmcp/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -72,6 +75,8 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
+
+  packages/console-api: {}
 
   packages/core:
     dependencies:
@@ -125,6 +130,8 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  packages/http: {}
+
   packages/ingest:
     dependencies:
       '@cairnmcp/core':
@@ -149,6 +156,9 @@ importers:
       '@cairnmcp/db':
         specifier: workspace:*
         version: link:../db
+      '@cairnmcp/http':
+        specifier: workspace:*
+        version: link:../http
       '@cairnmcp/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -193,12 +203,18 @@ importers:
       '@cairnmcp/auth':
         specifier: workspace:*
         version: link:../auth
+      '@cairnmcp/console-api':
+        specifier: workspace:*
+        version: link:../console-api
       '@cairnmcp/core':
         specifier: workspace:*
         version: link:../core
       '@cairnmcp/db':
         specifier: workspace:*
         version: link:../db
+      '@cairnmcp/http':
+        specifier: workspace:*
+        version: link:../http
       '@cairnmcp/ingest':
         specifier: workspace:*
         version: link:../ingest
@@ -236,6 +252,9 @@ importers:
 
   packages/web:
     devDependencies:
+      '@cairnmcp/console-api':
+        specifier: workspace:*
+        version: link:../console-api
       '@fontsource-variable/geist':
         specifier: ^5.3.0
         version: 5.3.0

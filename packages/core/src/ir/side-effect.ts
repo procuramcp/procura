@@ -31,6 +31,15 @@ export function isAtLeast(effect: SideEffect, floor: SideEffect): boolean {
   return RANK[effect] >= RANK[floor];
 }
 
+export type SideEffectCounts = { total: number } & Record<SideEffect, number>;
+
+/** How many operations read, write, or destroy: the summary every source view shows. */
+export function countBySideEffect(operations: readonly { sideEffect: { class: SideEffect } }[]): SideEffectCounts {
+  const counts: SideEffectCounts = { total: operations.length, read: 0, write: 0, destructive: 0 };
+  for (const op of operations) counts[op.sideEffect.class] += 1;
+  return counts;
+}
+
 /** What HTTP semantics alone imply about a method. */
 export function httpMethodSideEffect(method: HttpMethod): SideEffect {
   switch (method) {

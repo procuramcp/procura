@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import type { Diagnostic, Operation, SideEffect } from "@cairnmcp/core";
+import { isRecord, type Diagnostic, type Operation, type SideEffect } from "@cairnmcp/core";
 import { ingestOpenApiText } from "@cairnmcp/ingest";
 import { parse as parseYaml } from "yaml";
 import { DEFAULT_MANIFEST_PATH, loadCorpusManifest, resolveCorpusFile, type CorpusEntry } from "./manifest.ts";
@@ -241,10 +241,6 @@ function countDocumentOperations(raw: unknown): number {
     }
   }
   return count;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function countCodes(diagnostics: Diagnostic[], severity: Diagnostic["severity"]): CodeCounts {

@@ -4,6 +4,22 @@ import { InMemoryRateLimiter, parseRetryAfter } from "./limiter.ts";
 const limits = { requestsPerMinute: 2, maxConcurrent: 5 };
 
 describe("InMemoryRateLimiter", () => {
+  it("forgets idle, refilled buckets so memory stays bounded", () => {
+    let now = 0;
+    const l = new InMemoryRateLimiter({ nowMs: () => now });
+    const busy = l.acquire([{ key: "busy", limits }]);
+    for (let i = 0; i < 998; i++) {
+      const slot = l.acquire([{ key: `tenant-${i}`, limits }]);
+      if (slot.ok) slot.release();
+    }
+    expect(l.size).toBe(999);
+    now += 60_000; // everything refills
+    l.acquire([{ key: "next", limits }]); // the 1000th acquire sweeps first
+    // Kept: "busy" (still in flight) and "next" (created after the sweep).
+    expect(l.size).toBe(2);
+    if (busy.ok) busy.release();
+  });
+
   it("allows a burst up to the per-minute limit, then refills evenly", () => {
     let now = 0;
     const l = new InMemoryRateLimiter({ nowMs: () => now });

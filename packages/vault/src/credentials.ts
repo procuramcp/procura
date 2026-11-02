@@ -49,3 +49,23 @@ export function wrapSecrets(input: CredentialInput): Credential {
       };
   }
 }
+
+/**
+ * Which credential kinds fit an auth scheme type (`AuthScheme["type"]` in the
+ * IR). OAuth and OIDC schemes take a stored token or a plain bearer token.
+ */
+export function credentialKindsFor(schemeType: string): Array<CredentialInput["kind"]> {
+  switch (schemeType) {
+    case "http_basic":
+      return ["basic"];
+    case "http_bearer":
+      return ["bearer"];
+    case "api_key":
+      return ["api_key"];
+    case "oauth2":
+    case "oidc":
+      return ["oauth2", "bearer"];
+    default:
+      return [];
+  }
+}

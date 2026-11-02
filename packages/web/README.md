@@ -26,4 +26,6 @@ proxies the API and sign-in to the dev server.
 - Components in `src/components/ui` come from shadcn (`pnpm dlx shadcn add …`) and those in
   `src/components/ai-elements` from AI Elements. Local change: the code block loads only JSON in
   Shiki, with its JavaScript engine, so the console's CSP needs no WebAssembly.
-- The server's API is in `packages/server/src/console.ts`, with its tests in `console.test.ts`.
+- The server's API is in `packages/server/src/console/` (one route table per area), with its tests in `packages/server/src/console.test.ts`.
+  Its request and response types live once in `packages/console-api`; `src/lib/api.ts` imports them
+  (types only, so nothing from it ships in the bundle).

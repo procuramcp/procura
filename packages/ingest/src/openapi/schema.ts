@@ -1,5 +1,5 @@
-import type { JsonSchema } from "@cairnmcp/core";
-import { isRecord, MappingError, resolvePointer, unescapePointerToken } from "./refs.ts";
+import { isRecord, type JsonSchema } from "@cairnmcp/core";
+import { MappingError, resolvePointer, unescapePointerToken } from "./refs.ts";
 
 /**
  * `input`: the schema describes data the agent sends (drop `readOnly` properties).

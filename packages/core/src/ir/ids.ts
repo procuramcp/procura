@@ -10,22 +10,30 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  */
 export const TOOL_SAFE_NAME = /^[a-z][a-z0-9_]{0,63}$/;
 
-export const SourceId = z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<"SourceId">();
+/** A lowercase-slug id (`intervals-icu`), at most 64 characters. */
+const slugId = <B extends string>() => z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<B>();
+/** An opaque id (a UUID in practice): 1-64 letters, digits, - or _. */
+const opaqueId = <B extends string>() =>
+  z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, "must be 1-64 letters, digits, - or _").brand<B>();
+/** A tool-safe name: snake_case, at most 64 characters. */
+const toolSafeId = <B extends string>() => z.string().regex(TOOL_SAFE_NAME, "must be snake_case, max 64 chars").brand<B>();
+
+export const SourceId = slugId<"SourceId">();
 export type SourceId = z.infer<typeof SourceId>;
 
 /** Id of an access profile within one tenant (D-034). */
-export const ProfileId = z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<"ProfileId">();
+export const ProfileId = slugId<"ProfileId">();
 export type ProfileId = z.infer<typeof ProfileId>;
 
-export const ToolsetId = z.string().max(64).regex(SLUG, "must be a lowercase slug").brand<"ToolsetId">();
+export const ToolsetId = slugId<"ToolsetId">();
 export type ToolsetId = z.infer<typeof ToolsetId>;
 
 /** Stable id of an operation within one source. */
-export const OperationId = z.string().regex(TOOL_SAFE_NAME, "must be snake_case, max 64 chars").brand<"OperationId">();
+export const OperationId = toolSafeId<"OperationId">();
 export type OperationId = z.infer<typeof OperationId>;
 
 /** Name an agent sees. Chosen per toolset; defaults to the operation id. */
-export const ToolName = z.string().regex(TOOL_SAFE_NAME, "must be snake_case, max 64 chars").brand<"ToolName">();
+export const ToolName = toolSafeId<"ToolName">();
 export type ToolName = z.infer<typeof ToolName>;
 
 /** Id of an auth scheme within a source, e.g. the OpenAPI securitySchemes key. */
@@ -37,7 +45,7 @@ export type AuthSchemeId = z.infer<typeof AuthSchemeId>;
  * slug-like value in tests and self-hosted setups. Not part of the IR itself
  * (D-004); used by the vault, runtime, and storage layers.
  */
-export const TenantId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, "must be 1-64 letters, digits, - or _").brand<"TenantId">();
+export const TenantId = opaqueId<"TenantId">();
 export type TenantId = z.infer<typeof TenantId>;
 
 /**
@@ -45,5 +53,5 @@ export type TenantId = z.infer<typeof TenantId>;
  * not per tenant; a user joins tenants through memberships. Opaque like
  * `TenantId` (a UUID in practice).
  */
-export const UserId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, "must be 1-64 letters, digits, - or _").brand<"UserId">();
+export const UserId = opaqueId<"UserId">();
 export type UserId = z.infer<typeof UserId>;

@@ -1,9 +1,11 @@
-import { allowsTool, resolveToolset, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccess } from "@cairnmcp/core";
-import { getSource, getToolset, memberRole, toolsetAccessFor, type Database } from "@cairnmcp/db";
+import { allowsTool, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccess } from "@cairnmcp/core";
+import { getToolsetWithSource, memberRole, toolsetAccessFor, toolsetVersion, type Database } from "@cairnmcp/db";
+import { json } from "@cairnmcp/http";
 import type { Runtime } from "@cairnmcp/runtime";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js";
+import { ToolsetCache } from "./cache.ts";
 import { toCallToolResult, toMcpTool } from "./results.ts";
 import { bearerToken, type TokenVerifier } from "./token.ts";
 
@@ -16,6 +18,8 @@ export type McpHandlerOptions = {
   /** Browser origins allowed to call the endpoint. Requests with any other `Origin` are refused (DNS rebinding). */
   allowedOrigins?: string[];
   version?: string;
+  /** Resolved toolsets reused across requests. Injected for tests; one per handler by default. */
+  cache?: ToolsetCache;
 };
 
 const METADATA_PREFIX = "/.well-known/oauth-protected-resource";
@@ -27,13 +31,15 @@ const METADATA_PREFIX = "/.well-known/oauth-protected-resource";
  * token from a trusted issuer whose audience is that endpoint's URL. The
  * token resolves to a user, the user must be a member of the tenant with
  * access to the toolset, and the tools they see and may call follow their
- * access level (D-023). Stateless: each HTTP request loads everything fresh,
- * so a revoked grant applies to the very next call.
+ * access level (D-023). Stateless: each HTTP request checks membership and
+ * access fresh, so a revoked grant applies to the very next call. The toolset
+ * itself is resolved once per version and reused (`ToolsetCache`).
  */
 export function createMcpHandler(options: McpHandlerOptions): (request: Request) => Promise<Response> {
   const base = options.publicUrl.replace(/\/+$/, "");
   const allowedOrigins = new Set(options.allowedOrigins ?? []);
   const issuers = options.verifier.issuers;
+  const cache = options.cache ?? new ToolsetCache();
 
   return async (request) => {
     const url = new URL(request.url);
@@ -80,20 +86,25 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
     if (!userId) return forbidden();
     const loaded = await options.db.withTenant(route.tenantId, async (tx) => {
       if (!(await memberRole(tx, userId))) return "forbidden" as const;
-      const toolset = await getToolset(tx, route.toolsetId);
-      const source = toolset && (await getSource(tx, toolset.sourceId));
-      if (!toolset || !source) return "not_found" as const;
-      return { toolset, ir: source.ir, access: await toolsetAccessFor(tx, route.toolsetId, userId) };
+      const version = await toolsetVersion(tx, route.toolsetId);
+      const entry =
+        version &&
+        (await cache.get(route.tenantId, route.toolsetId, version, async () => {
+          const found = await getToolsetWithSource(tx, route.toolsetId);
+          return found && { toolset: found.toolset, ir: found.source.ir };
+        }));
+      if (!entry) return "not_found" as const;
+      return { entry, access: await toolsetAccessFor(tx, route.toolsetId, userId) };
     });
     if (loaded === "forbidden") return forbidden();
     if (loaded === "not_found") return json(404, { error: "not_found", error_description: "no such toolset" });
     if (loaded.access.rules.length === 0) return json(403, { error: "forbidden", error_description: "you don't have access to this toolset" });
 
-    const resolved = resolveToolset(loaded.toolset, loaded.ir);
+    const { toolset, ir, resolved } = loaded.entry;
     if (!resolved.ok) return json(500, { error: "toolset_invalid", error_description: "this toolset has problems and can't be served; fix it in the toolset settings" });
 
     const caller: Caller = { userId, claims: verified.claims };
-    return serveMcp(request, { ...options, tenantId: route.tenantId, caller, toolset: loaded.toolset, ir: loaded.ir, access: loaded.access, tools: resolved.tools });
+    return serveMcp(request, { ...options, tenantId: route.tenantId, caller, toolset, ir, access: loaded.access, tools: resolved.tools });
   };
 }
 
@@ -159,8 +170,4 @@ function parseRoute(pathname: string): Route | undefined {
   const toolsetId = ToolsetId.safeParse(match[2]);
   if (!tenantId.success || !toolsetId.success) return undefined;
   return { tenantId: tenantId.data, toolsetId: toolsetId.data, path: `/mcp/${tenantId.data}/${toolsetId.data}` };
-}
-
-function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
 }

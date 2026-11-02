@@ -2,6 +2,7 @@
 // They run as the app role, inside the tenant (RLS applies), plus the narrow
 // cross-tenant functions (D-024). Nothing here prints a secret.
 import {
+  countBySideEffect,
   defaultToolset,
   IrDocument,
   resolveToolset,
@@ -12,7 +13,7 @@ import {
   ToolsetId,
   UserId,
 } from "@cairnmcp/core";
-import { addMember, getSource, getToolset, listSources, listToolsets, memberRole, putSource, putToolset, schema, setToolsetAccess, type Database } from "@cairnmcp/db";
+import { ensureMember, getSource, getToolset, listSourceSummaries, listToolsets, PG, pgErrorCode, putSource, putToolset, schema, setToolsetAccess, type Database } from "@cairnmcp/db";
 import { ingestOpenApiText } from "@cairnmcp/ingest";
 import { CredentialInput, type Vault } from "@cairnmcp/vault";
 import { eq } from "drizzle-orm";
@@ -25,9 +26,9 @@ export async function createTenant(db: Database, input: { name: string; ownerUse
   try {
     return await db.createTenant(input.name, owner, id === undefined ? {} : { id });
   } catch (e) {
-    const code = pgCode(e);
-    if (code === "23505") throw new AdminError(`tenant ${id} already exists`);
-    if (code === "23503") throw new AdminError(`no user ${owner}: they need to sign in once first (the "No access" page shows their account id)`);
+    const code = pgErrorCode(e);
+    if (code === PG.UNIQUE_VIOLATION) throw new AdminError(`tenant ${id} already exists`);
+    if (code === PG.FOREIGN_KEY_VIOLATION) throw new AdminError(`no user ${owner}: they need to sign in once first (the "No access" page shows their account id)`);
     throw e;
   }
 }
@@ -73,11 +74,12 @@ export function mapSource(input: { sourceId: string; openapi: string; documentUr
 
 export function summarize(mapped: MappedSource): SourceSummary {
   const { ir } = mapped;
+  const counts = countBySideEffect(ir.operations);
   return {
     id: ir.source.id,
     name: ir.source.name,
-    operations: ir.operations.length,
-    reads: ir.operations.filter((o) => o.sideEffect.class === "read").length,
+    operations: counts.total,
+    reads: counts.read,
     authSchemes: ir.source.authSchemes.map((s) => s.id),
     warnings: mapped.warnings.length,
   };
@@ -131,14 +133,13 @@ export async function grantAccess(
   return db.withTenant(tenantId, async (tx) => {
     if (!(await getToolset(tx, toolsetId))) throw new AdminError(`no toolset ${toolsetId} in tenant ${tenantId}`);
     let addedMember = false;
-    if (input.level !== "none" && !(await memberRole(tx, userId))) {
+    if (input.level !== "none") {
       try {
-        await addMember(tx, userId, "member");
+        addedMember = await ensureMember(tx, userId);
       } catch (e) {
-        if (pgCode(e) === "23503") throw new AdminError(`no user ${userId}: they need to sign in once first`);
+        if (pgErrorCode(e) === PG.FOREIGN_KEY_VIOLATION) throw new AdminError(`no user ${userId}: they need to sign in once first`);
         throw e;
       }
-      addedMember = true;
     }
     await setToolsetAccess(tx, toolsetId, userId, input.level === "none" ? undefined : ToolsetAccessLevel.parse(input.level));
     return { addedMember };
@@ -154,17 +155,13 @@ export async function setCredential(
   input: { tenantId: string; sourceId: string; schemeId: string; credential: CredentialInput },
 ): Promise<{ id: string; replaced: number }> {
   const tenantId = TenantId.parse(input.tenantId);
-  const credential = CredentialInput.parse(input.credential);
-  const existing = (await vault.listCredentials(tenantId, input.sourceId)).filter((c) => c.schemeId === input.schemeId);
-  let stored;
   try {
-    stored = await vault.putCredential({ tenantId, sourceId: input.sourceId, schemeId: input.schemeId, credential });
+    const stored = await vault.replaceCredential({ ...input, tenantId, credential: CredentialInput.parse(input.credential) });
+    return { id: stored.id, replaced: stored.replaced };
   } catch (e) {
-    if (pgCode(e) === "23503") throw new AdminError(`no source ${input.sourceId} in tenant ${tenantId}`);
+    if (pgErrorCode(e) === PG.FOREIGN_KEY_VIOLATION) throw new AdminError(`no source ${input.sourceId} in tenant ${tenantId}`);
     throw e;
   }
-  for (const old of existing) await vault.deleteCredential(tenantId, old.id);
-  return { id: stored.id, replaced: existing.length };
 }
 
 export type TenantOverview = {
@@ -186,7 +183,7 @@ export async function showTenant(db: Database, vault: Vault, tenantIdInput: stri
       .from(schema.memberships)
       .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId));
     const access = await tx.select().from(schema.toolsetAccess);
-    const sources = (await listSources(tx)).map((s) => ({ id: s.id, name: s.name, operations: s.ir.operations.length }));
+    const sources = (await listSourceSummaries(tx)).map((s) => ({ id: s.id, name: s.name, operations: s.operations.total }));
     const toolsets = (await listToolsets(tx)).map((t) => ({
       id: t.id,
       sourceId: t.sourceId,
@@ -197,12 +194,6 @@ export async function showTenant(db: Database, vault: Vault, tenantIdInput: stri
   });
   const credentials = (await vault.listCredentials(tenantId)).map((c) => ({ sourceId: c.sourceId, schemeId: c.schemeId, kind: c.kind }));
   return { ...overview, credentials };
-}
-
-/** The Postgres error code, also when a library wraps the error (Drizzle puts it on `cause`). */
-function pgCode(e: unknown): string | undefined {
-  for (let err = e; err instanceof Error; err = err.cause) if ("code" in err && typeof err.code === "string") return err.code;
-  return undefined;
 }
 
 function parseOr<T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, value: string, message: string): T {

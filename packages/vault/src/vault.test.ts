@@ -48,6 +48,30 @@ describe("Vault", () => {
     expect([...creds.keys()]).toEqual(["APIKey"]);
   });
 
+  it("unwraps the data key once per credentialsForSource call, however many credentials", async () => {
+    await putKey();
+    await vault.putCredential({ tenantId: A, sourceId: "intervals-icu", schemeId: "Bearer", credential: { kind: "bearer", token: "t" } });
+    let unwraps = 0;
+    const counting = Object.assign(Object.create(wrapper) as LocalKeyWrapper, {
+      unwrap: (...args: Parameters<LocalKeyWrapper["unwrap"]>) => {
+        unwraps += 1;
+        return wrapper.unwrap(...args);
+      },
+    });
+    const creds = await new Vault({ store, keyWrapper: counting }).credentialsForSource(A, "intervals-icu");
+    expect([...creds.keys()].sort()).toEqual(["APIKey", "Bearer"]);
+    expect(unwraps).toBe(1);
+  });
+
+  it("replaceCredential leaves exactly one credential per scheme", async () => {
+    await putKey();
+    const r = await vault.replaceCredential({ tenantId: A, sourceId: "intervals-icu", schemeId: "APIKey", credential: { kind: "basic", password: "new" } });
+    expect(r.replaced).toBe(1);
+    expect((await vault.listCredentials(A)).map((c) => c.id)).toEqual([r.id]);
+    expect(await vault.deleteSchemeCredentials(A, "intervals-icu", "APIKey")).toBe(1);
+    expect(await vault.listCredentials(A)).toEqual([]);
+  });
+
   it("lists metadata without decrypting", async () => {
     const { id } = await putKey();
     expect(await vault.listCredentials(A)).toEqual([{ id, sourceId: "intervals-icu", schemeId: "APIKey", kind: "basic" }]);

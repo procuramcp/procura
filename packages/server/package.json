@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@cairnmcp/auth": "workspace:*",
+    "@cairnmcp/console-api": "workspace:*",
     "@cairnmcp/core": "workspace:*",
     "@cairnmcp/db": "workspace:*",
+    "@cairnmcp/http": "workspace:*",
     "@cairnmcp/ingest": "workspace:*",
     "@cairnmcp/mcp": "workspace:*",
     "@cairnmcp/runtime": "workspace:*",

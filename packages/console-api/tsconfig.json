@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // No Node and no DOM types: the contract must typecheck in both the server and the browser.
+  "compilerOptions": { "types": [] },
+  "include": ["src"]
+}

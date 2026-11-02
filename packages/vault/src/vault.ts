@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { TenantId } from "@cairnmcp/core";
 import { newDataKey, open, seal } from "./aead.ts";
 import { CredentialInput, wrapSecrets, type Credential } from "./credentials.ts";
-import type { KeyWrapper } from "./key-wrapper.ts";
+import type { KeyWrapper, WrappedKey } from "./key-wrapper.ts";
 import type { CredentialRecord, VaultStore } from "./store.ts";
 
 export type StoredCredentialInfo = { id: string; sourceId: string; schemeId: string; kind: Credential["kind"] };
@@ -58,12 +58,42 @@ export class Vault {
     return record ? this.#decrypt(record) : undefined;
   }
 
-  /** Credentials for one source, keyed by auth scheme id. What the runtime asks for. */
+  /**
+   * Credentials for one source, keyed by auth scheme id. What the runtime asks
+   * for on every call, so the data key is unwrapped once (one KMS call), not
+   * once per credential. The newest credential for a scheme wins.
+   */
   async credentialsForSource(tenantId: TenantId, sourceId: string): Promise<Map<string, Credential>> {
-    const records = await this.#store.listCredentials(TenantId.parse(tenantId), sourceId);
+    const t = TenantId.parse(tenantId);
+    const records = await this.#store.listCredentials(t, sourceId);
     const out = new Map<string, Credential>();
-    for (const record of records) out.set(record.schemeId, await this.#decrypt(record));
+    if (records.length === 0) return out;
+    const dataKey = await this.#dataKey(t, { create: false });
+    try {
+      for (const record of records) out.set(record.schemeId, decryptWith(dataKey, record));
+    } finally {
+      dataKey.fill(0);
+    }
     return out;
+  }
+
+  /**
+   * Store the credential for one auth scheme and delete any older ones for it,
+   * so a scheme has exactly one. The new one is written first: a failure leaves
+   * the old credential working.
+   */
+  async replaceCredential(input: { tenantId: TenantId; sourceId: string; schemeId: string; credential: CredentialInput }): Promise<StoredCredentialInfo & { replaced: number }> {
+    const older = (await this.listCredentials(input.tenantId, input.sourceId)).filter((c) => c.schemeId === input.schemeId);
+    const stored = await this.putCredential(input);
+    for (const old of older) await this.deleteCredential(input.tenantId, old.id);
+    return { ...stored, replaced: older.length };
+  }
+
+  /** Delete every credential for one auth scheme of a source. Returns how many were deleted. */
+  async deleteSchemeCredentials(tenantId: TenantId, sourceId: string, schemeId: string): Promise<number> {
+    const matching = (await this.listCredentials(tenantId, sourceId)).filter((c) => c.schemeId === schemeId);
+    for (const c of matching) await this.deleteCredential(tenantId, c.id);
+    return matching.length;
   }
 
   /** Metadata only, for UIs: never decrypts. */
@@ -89,10 +119,7 @@ export class Vault {
   async #decrypt(record: CredentialRecord): Promise<Credential> {
     const dataKey = await this.#dataKey(record.tenantId, { create: false });
     try {
-      const plaintext = open(dataKey, record.sealed, credentialContext(record));
-      const credential = wrapSecrets(CredentialInput.parse(JSON.parse(plaintext.toString("utf8"))));
-      plaintext.fill(0);
-      return credential;
+      return decryptWith(dataKey, record);
     } finally {
       dataKey.fill(0);
     }
@@ -109,10 +136,19 @@ export class Vault {
     return this.#unwrap(tenantId, wrapped);
   }
 
-  async #unwrap(tenantId: TenantId, wrapped: { keyId: string } & Parameters<KeyWrapper["unwrap"]>[0]): Promise<Buffer> {
+  async #unwrap(tenantId: TenantId, wrapped: WrappedKey): Promise<Buffer> {
     const wrapper = this.#byKeyId.get(wrapped.keyId);
     if (!wrapper) throw new Error(`no key wrapper for ${wrapped.keyId}`);
     return wrapper.unwrap(wrapped, tenantContext(tenantId));
+  }
+}
+
+function decryptWith(dataKey: Buffer, record: CredentialRecord): Credential {
+  const plaintext = open(dataKey, record.sealed, credentialContext(record));
+  try {
+    return wrapSecrets(CredentialInput.parse(JSON.parse(plaintext.toString("utf8"))));
+  } finally {
+    plaintext.fill(0);
   }
 }
 

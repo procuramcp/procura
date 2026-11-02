@@ -16,8 +16,9 @@ async function handle(handler: (request: Request) => Promise<Response>, req: Inc
     res.writeHead(response.status, nodeHeaders(response.headers));
     if (response.body) for await (const chunk of response.body) res.write(chunk);
     res.end();
-  } catch {
-    // Never echo internals to the client.
+  } catch (e) {
+    // Never echo internals to the client; log them here so they can be found.
+    console.error(`${req.method ?? "?"} ${(req.url ?? "/").split("?")[0]} failed:`, e);
     if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" });
     res.end(res.headersSent ? undefined : JSON.stringify({ error: "internal_error" }));
   }

@@ -3,7 +3,11 @@ import {
   classifyHttpOperation,
   IR_VERSION,
   IrDocument,
+  isRecord,
+  omitUndefined,
   Operation,
+  slugify,
+  truncate,
   type AuthRequirement,
   type Diagnostic,
   type HttpMethod,
@@ -20,7 +24,7 @@ import {
   PathItem,
 } from "./document.ts";
 import { humanize, operationIdFrom, propertyNameFrom, uniqueName } from "./naming.ts";
-import { deref, escapePointerToken, isRecord, MappingError } from "./refs.ts";
+import { deref, escapePointerToken, MappingError } from "./refs.ts";
 import { SchemaConverter, type OasDialect } from "./schema.ts";
 import { mapSecurityRequirement, mapSecuritySchemes } from "./security.ts";
 
@@ -95,7 +99,7 @@ export function mapOpenApi(raw: unknown, options: MapOpenApiOptions = {}): MapOp
   const schemes = mapSecuritySchemes(doc.components?.securitySchemes, baseUrl, diagnostics);
   const defaultAuth = mapSecurityRequirement(doc.security ?? [], schemes, "#/security", diagnostics);
 
-  const sourceId = options.sourceId ?? slugify(doc.info.title);
+  const sourceId = options.sourceId ?? slugify(doc.info.title) ?? "api";
   const converter = new SchemaConverter(doc, dialect, (code, message, pointer) =>
     diagnostics.push({ severity: "warning", code, message, pointer }),
   );
@@ -158,7 +162,7 @@ export function mapOpenApi(raw: unknown, options: MapOpenApiOptions = {}): MapOp
       authSchemes: [...schemes.values()],
       defaultAuth,
       rateLimits: [],
-      derivation: dropUndefined({
+      derivation: omitUndefined({
         ingestor: "openapi",
         ingestorVersion: OPENAPI_INGESTOR_VERSION,
         documentUrl: options.documentUrl,
@@ -468,22 +472,4 @@ function withAnnotations(schema: unknown, description: string | undefined, depre
 function errorDiagnostic(e: unknown, pointer: string): Diagnostic {
   if (e instanceof MappingError) return { severity: "error", code: e.code, message: e.message, pointer: e.pointer ?? pointer };
   return { severity: "error", code: "unexpected_error", message: e instanceof Error ? e.message : String(e), pointer };
-}
-
-function slugify(text: string): string {
-  const slug = text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64)
-    .replace(/-+$/, "");
-  return slug || "api";
-}
-
-function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
-}
-
-function dropUndefined<T extends Record<string, unknown>>(obj: T): T {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }

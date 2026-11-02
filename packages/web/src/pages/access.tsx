@@ -29,6 +29,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { act } from "@/lib/act";
 import { api, type AccessProfile, type AccessView, type Level, type ProfileRule } from "@/lib/api";
 import { useLoad } from "@/lib/hooks";
 import { SideEffectBadge, slugify } from "@/pages/parts";
@@ -148,16 +149,16 @@ function NewProfile({ taken, onCreate }: { taken: string[]; onCreate: (id: strin
           <Button
             disabled={busy || !id || taken.includes(id)}
             onClick={async () => {
-              setBusy(true);
-              try {
-                await onCreate(id, name.trim());
-                setOpen(false);
-                setName("");
-              } catch (e) {
-                toast.error((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
+              const created = await act(
+                async () => {
+                  await onCreate(id, name.trim());
+                  return true;
+                },
+                { busy: setBusy },
+              );
+              if (!created) return;
+              setOpen(false);
+              setName("");
             }}
           >
             Create
@@ -183,27 +184,19 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
   }
 
   async function save() {
-    setBusy(true);
-    try {
-      props.onChanged(
-        await api.saveProfile(props.tenantId, profile.id, { name: draft.name, ...(draft.description.trim() ? { description: draft.description } : {}), rules: draft.rules }),
-      );
-      toast.success(`Saved ${draft.name}`, { description: `Applies to ${profile.members.length} ${profile.members.length === 1 ? "person" : "people"} on their next request.` });
-    } catch (e) {
-      toast.error("Not saved", { description: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
+    const edit = { name: draft.name, ...(draft.description.trim() ? { description: draft.description } : {}), rules: draft.rules };
+    const next = await act(() => api.saveProfile(props.tenantId, profile.id, edit), { busy: setBusy, failure: "Not saved" });
+    if (!next) return;
+    props.onChanged(next);
+    toast.success(`Saved ${draft.name}`, { description: `Applies to ${profile.members.length} ${profile.members.length === 1 ? "person" : "people"} on their next request.` });
   }
 
   async function remove() {
-    try {
-      props.onChanged(await api.deleteProfile(props.tenantId, profile.id));
-      props.onDeleted();
-      toast.success(`Deleted ${profile.name}`);
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
+    const next = await act(() => api.deleteProfile(props.tenantId, profile.id));
+    if (!next) return;
+    props.onChanged(next);
+    props.onDeleted();
+    toast.success(`Deleted ${profile.name}`);
   }
 
   return (
@@ -359,14 +352,9 @@ function MembersTab({ tenantId, view, onChanged }: { tenantId: string; view: Acc
   const [busy, setBusy] = useState<string | undefined>();
 
   async function toggle(userId: string, current: string[], profileId: string, on: boolean) {
-    setBusy(userId);
-    try {
-      onChanged(await api.setMemberProfiles(tenantId, userId, on ? [...current, profileId] : current.filter((p) => p !== profileId)));
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(undefined);
-    }
+    const profiles = on ? [...current, profileId] : current.filter((p) => p !== profileId);
+    const next = await act(() => api.setMemberProfiles(tenantId, userId, profiles), { busy: (b) => setBusy(b ? userId : undefined) });
+    if (next) onChanged(next);
   }
 
   return (
@@ -456,17 +444,12 @@ function AddMember({ tenantId, view, onChanged }: { tenantId: string; view: Acce
         <Button
           disabled={busy || !userId || !profileId}
           onClick={async () => {
-            setBusy(true);
-            try {
-              const current = view.members.find((m) => m.userId === userId)?.profiles ?? [];
-              onChanged(await api.setMemberProfiles(tenantId, userId, [...new Set([...current, profileId])]));
-              setUserId("");
-              toast.success("Added");
-            } catch (e) {
-              toast.error((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
+            const current = view.members.find((m) => m.userId === userId)?.profiles ?? [];
+            const next = await act(() => api.setMemberProfiles(tenantId, userId, [...new Set([...current, profileId])]), { busy: setBusy });
+            if (!next) return;
+            onChanged(next);
+            setUserId("");
+            toast.success("Added");
           }}
         >
           Add

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Caller, Instant, JsonSchema, JsonValue, ResolvedTool, Source, TenantId } from "@cairnmcp/core";
+import { instantOf, type Caller, type Instant, type JsonSchema, type JsonValue, type ResolvedTool, type Source, type TenantId } from "@cairnmcp/core";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import type { Credential } from "@cairnmcp/vault";
 import { applyAuth } from "./auth.ts";
@@ -70,7 +70,7 @@ export class Runtime {
 
   constructor(options: RuntimeOptions) {
     this.#o = {
-      now: () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z") as Instant,
+      now: () => instantOf(new Date()),
       newId: randomUUID,
       throughput: DEFAULT_THROUGHPUT,
       ...options,

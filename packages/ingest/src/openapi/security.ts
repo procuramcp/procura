@@ -1,4 +1,4 @@
-import { AuthScheme, type AuthRequirement, type AuthUse, type Diagnostic } from "@cairnmcp/core";
+import { AuthScheme, omitUndefined, type AuthRequirement, type AuthUse, type Diagnostic } from "@cairnmcp/core";
 import { OaSecurityScheme } from "./document.ts";
 import { escapePointerToken } from "./refs.ts";
 
@@ -49,7 +49,7 @@ export function mapSecuritySchemes(
         const flows: Record<string, unknown> = {};
         const ac = s.flows.authorizationCode;
         if (ac) {
-          flows["authorizationCode"] = dropUndefined({
+          flows["authorizationCode"] = omitUndefined({
             authorizationUrl: abs(ac.authorizationUrl),
             tokenUrl: abs(ac.tokenUrl),
             refreshUrl: abs(ac.refreshUrl),
@@ -57,7 +57,7 @@ export function mapSecuritySchemes(
           });
         }
         const cc = s.flows.clientCredentials;
-        if (cc) flows["clientCredentials"] = dropUndefined({ tokenUrl: abs(cc.tokenUrl), refreshUrl: abs(cc.refreshUrl), scopes: cc.scopes });
+        if (cc) flows["clientCredentials"] = omitUndefined({ tokenUrl: abs(cc.tokenUrl), refreshUrl: abs(cc.refreshUrl), scopes: cc.scopes });
         candidate = { id, type: "oauth2", flows, ...description };
         break;
       }
@@ -138,8 +138,4 @@ function dedupe(req: AuthUse[][]): AuthRequirement {
 
 function absolute(url: string, base: string): string {
   return URL.canParse(url) ? url : new URL(url, `${base}/`).toString();
-}
-
-function dropUndefined(obj: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 }

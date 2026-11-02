@@ -3,7 +3,7 @@ import { PgAuditSink, PgVaultStore, type Database } from "@cairnmcp/db";
 import { createMcpHandler, TokenVerifier, type TrustedIssuer } from "@cairnmcp/mcp";
 import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
 import { Vault, type KeyWrapper } from "@cairnmcp/vault";
-import { createConsoleHandler } from "./console.ts";
+import { createConsoleHandler } from "./console/index.ts";
 import type { DocumentGetter } from "./fetch-document.ts";
 
 export type AppOptions = {
