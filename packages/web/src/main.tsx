@@ -4,12 +4,6 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Shell } from "@/pages/shell";
-import { AccessPage } from "@/pages/access";
-import { AddSourcePage } from "@/pages/add-source";
-import { Home } from "@/pages/home";
-import { TenantPage } from "@/pages/tenant";
-import { SourcePage } from "@/pages/source";
-import { ToolsetPage } from "@/pages/toolset";
 import "./index.css";
 
 // Follow the system's light or dark setting.
@@ -18,18 +12,35 @@ const applyTheme = () => document.documentElement.classList.toggle("dark", dark.
 applyTheme();
 dark.addEventListener("change", applyTheme);
 
+// Each page is its own chunk, fetched when its route is first opened, so the
+// first load carries only the shell.
 const router = createBrowserRouter(
   [
     {
       path: "/",
       element: <Shell />,
       children: [
-        { index: true, element: <Home /> },
-        { path: "t/:tenantId", element: <TenantPage /> },
-        { path: "t/:tenantId/toolsets/:toolsetId", element: <ToolsetPage /> },
-        { path: "t/:tenantId/access", element: <AccessPage /> },
-        { path: "t/:tenantId/sources/new", element: <AddSourcePage /> },
-        { path: "t/:tenantId/sources/:sourceId", element: <SourcePage /> },
+        { index: true, lazy: async () => ({ Component: (await import("@/pages/home")).Home }) },
+        {
+          path: "t/:tenantId",
+          lazy: async () => ({ Component: (await import("@/pages/tenant")).TenantPage }),
+        },
+        {
+          path: "t/:tenantId/toolsets/:toolsetId",
+          lazy: async () => ({ Component: (await import("@/pages/toolset")).ToolsetPage }),
+        },
+        {
+          path: "t/:tenantId/access",
+          lazy: async () => ({ Component: (await import("@/pages/access")).AccessPage }),
+        },
+        {
+          path: "t/:tenantId/sources/new",
+          lazy: async () => ({ Component: (await import("@/pages/add-source")).AddSourcePage }),
+        },
+        {
+          path: "t/:tenantId/sources/:sourceId",
+          lazy: async () => ({ Component: (await import("@/pages/source")).SourcePage }),
+        },
       ],
     },
   ],
