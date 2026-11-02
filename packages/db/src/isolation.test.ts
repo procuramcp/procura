@@ -10,9 +10,11 @@ import { Database } from "./client.ts";
 import {
   addMember,
   deleteProfile,
+  getMember,
   getSource,
   getToolset,
   listAuditEvents,
+  listCustomers,
   listSources,
   listProfiles,
   listToolsets,
@@ -22,8 +24,10 @@ import {
   putSource,
   putToolset,
   setMemberProfiles,
+  setMemberRole,
   setToolsetAccess,
   toolsetAccessLevel,
+  updateMember,
 } from "./repo.ts";
 import { auditEvents, credentials, dataKeys, memberProfiles, memberships, sources, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
 import { PgAuditSink, PgVaultStore } from "./stores.ts";
@@ -40,8 +44,8 @@ let vault: Vault;
 let a: { tenantId: TenantId; ownerId: UserId };
 let b: { tenantId: TenantId; ownerId: UserId };
 let aCredentialId: string;
-let reader: UserId; // A member with `use`
-let outsider: UserId; // A member with no toolset access
+let reader: UserId; // A customer with `use`
+let outsider: UserId; // A customer with no toolset access
 
 const toolset = (): Toolset => defaultToolset(intervalsIr(), { id: TOOLSET_ID, name: "Mine" });
 
@@ -94,8 +98,8 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
       });
     }
     await db.withTenant(a.tenantId, async (tx) => {
-      await addMember(tx, reader, "member");
-      await addMember(tx, outsider, "member");
+      await addMember(tx, reader, "customer");
+      await addMember(tx, outsider, "customer");
       await setToolsetAccess(tx, TOOLSET_ID, reader, "use");
     });
     aCredentialId = (await vault.putCredential({ tenantId: a.tenantId, sourceId: SOURCE_ID, schemeId: "APIKey", credential: { kind: "basic", password: SECRET } })).id;
@@ -301,6 +305,56 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
     });
   });
 
+  describe("team and customers (D-038)", () => {
+    it("another tenant can't see a tenant's customers or their labels", async () => {
+      const customer = await db.ensureUser("https://issuer.test", "alpha-customer", "customer@alpha.test");
+      await db.withTenant(a.tenantId, (tx) => addMember(tx, customer, "customer"));
+      expect((await db.withTenant(a.tenantId, (tx) => listCustomers(tx, { query: "alpha.test" }))).customers.map((c) => c.userId)).toEqual([customer]);
+
+      const fromB = await db.withTenant(b.tenantId, async (tx) => ({
+        page: await listCustomers(tx),
+        member: await getMember(tx, customer),
+        labels: await tx.select({ label: users.label }).from(users).where(eq(users.id, customer)),
+      }));
+      expect(fromB).toEqual({ page: { customers: [], total: 0 }, member: undefined, labels: [] });
+    });
+
+    it("customers and suspended people never get into the console", async () => {
+      const customer = await db.ensureUser("https://issuer.test", "console-customer");
+      const viewer = await db.ensureUser("https://issuer.test", "console-viewer");
+      await db.withTenant(a.tenantId, async (tx) => {
+        await addMember(tx, customer, "customer");
+        await addMember(tx, viewer, "viewer");
+      });
+      expect(await db.userTenants(customer)).toEqual([]);
+      expect(await db.userTenants(viewer)).toEqual([{ tenantId: a.tenantId, name: "alpha", role: "viewer" }]);
+
+      await db.withTenant(a.tenantId, (tx) => updateMember(tx, viewer, { status: "suspended" }));
+      expect(await db.userTenants(viewer)).toEqual([]);
+    });
+
+    it("suspending someone shuts them out at once and resuming restores their access", async () => {
+      const temp = await db.ensureUser("https://issuer.test", "alpha-suspended");
+      await db.withTenant(a.tenantId, async (tx) => {
+        await addMember(tx, temp, "customer");
+        await setToolsetAccess(tx, TOOLSET_ID, temp, "use");
+      });
+      const role = () => db.withTenant(a.tenantId, (tx) => memberRole(tx, temp));
+      expect(await role()).toBe("customer");
+      await db.withTenant(a.tenantId, (tx) => updateMember(tx, temp, { status: "suspended" }));
+      expect(await role()).toBeUndefined();
+      await db.withTenant(a.tenantId, (tx) => updateMember(tx, temp, { status: "active" }));
+      expect(await role()).toBe("customer");
+      expect(await db.withTenant(a.tenantId, (tx) => toolsetAccessLevel(tx, TOOLSET_ID, temp))).toBe("use");
+    });
+
+    it("can't suspend or relabel someone in another tenant", async () => {
+      expect(await db.withTenant(b.tenantId, (tx) => updateMember(tx, reader, { status: "suspended", note: "x" }))).toBe(false);
+      expect(await db.withTenant(b.tenantId, (tx) => setMemberRole(tx, reader, "owner"))).toBe(false);
+      expect(await db.withTenant(a.tenantId, (tx) => memberRole(tx, reader))).toBe("customer");
+    });
+  });
+
   describe("toolset access (D-023)", () => {
     const may = (userId: UserId, sideEffect: "read" | "write" | "destructive", tenantId = a.tenantId) =>
       db.withTenant(tenantId, (tx) => mayCallTool(tx, { toolsetId: TOOLSET_ID, userId, operationId: "list_activities", sideEffect }));
@@ -325,7 +379,7 @@ describe.skipIf(!adminUrl)("tenant isolation (Postgres, app role)", () => {
     it("revoking access or removing the member takes effect immediately", async () => {
       const temp = await db.ensureUser("https://issuer.test", "alpha-temp");
       await db.withTenant(a.tenantId, async (tx) => {
-        await addMember(tx, temp, "member");
+        await addMember(tx, temp, "customer");
         await setToolsetAccess(tx, TOOLSET_ID, temp, "use_writes");
       });
       expect(await may(temp, "write")).toBe(true);
@@ -372,7 +426,7 @@ describe.skipIf(!adminUrl)("access profiles (D-034, Postgres)", () => {
         await putToolset(tx, toolset());
       });
     }
-    await db.withTenant(a.tenantId, (tx) => addMember(tx, coach, "member"));
+    await db.withTenant(a.tenantId, (tx) => addMember(tx, coach, "customer"));
   });
 
   afterAll(async () => {
@@ -440,7 +494,7 @@ describe.skipIf(!adminUrl)("access profiles (D-034, Postgres)", () => {
     const temp = await db.ensureUser("https://issuer.test", "temp-coach");
     await coachProfile([{ level: "use", operations: null }]);
     await db.withTenant(a.tenantId, async (tx) => {
-      await addMember(tx, temp, "member");
+      await addMember(tx, temp, "customer");
       await setMemberProfiles(tx, temp, ["coach"]);
     });
     await db.withTenant(a.tenantId, (tx) => tx.delete(memberships).where(eq(memberships.userId, temp)));

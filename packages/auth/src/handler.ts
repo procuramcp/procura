@@ -198,7 +198,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
 
     const identity = await finishSignIn(provider, { callbackUrl: url, redirectUri: callbackUri(provider.id), state, nonce: row.upstreamNonce ?? "", verifier: row.upstreamVerifier ?? "" });
     if (!identity) return htmlResponse(502, errorPage("Sign-in failed", `${provider.name} didn't confirm the sign-in. Start again from your app.`));
-    const userId = await db.ensureUser(identity.issuer, identity.subject);
+    const userId = await db.ensureUser(identity.issuer, identity.subject, identity.label);
     const target = parseMcpResource(base, row.resource)!;
     const access = await db.withTenant(target.tenantId, async (tx) => {
       if (!(await memberRole(tx, userId))) return undefined;

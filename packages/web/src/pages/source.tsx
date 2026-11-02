@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { act } from "@/lib/act";
 import { api, type CredentialInput, type SourceView } from "@/lib/api";
-import { useLoad } from "@/lib/hooks";
+import { useLoad, useRole } from "@/lib/hooks";
 import { schemeLabel } from "@/pages/add-source";
 import { Problem } from "@/pages/shell";
 
@@ -30,6 +30,7 @@ import { Problem } from "@/pages/shell";
 export function SourcePage() {
   const { tenantId = "", sourceId = "" } = useParams();
   const view = useLoad(() => api.source(tenantId, sourceId), [tenantId, sourceId]);
+  const { isAdmin } = useRole(tenantId);
   if (view.error) return <Problem message={view.error.message} />;
   if (!view.data) return <Skeleton className="h-96 w-full" />;
   const source = view.data;
@@ -60,11 +61,13 @@ export function SourcePage() {
         <div>
           <h2 className="font-medium">Keys</h2>
           <p className="text-muted-foreground text-sm">
-            {missing ? "Add a key so tools can call this API. " : ""}A key is encrypted when saved and never shown again; you can replace or remove it.
+            {isAdmin
+              ? `${missing ? "Add a key so tools can call this API. " : ""}A key is encrypted when saved and never shown again; you can replace or remove it.`
+              : "Admins and owners manage keys. A key is encrypted when saved and never shown again."}
           </p>
         </div>
         {source.authSchemes.map((scheme) => (
-          <KeyCard key={scheme.id} tenantId={tenantId} source={source} scheme={scheme} onChanged={view.set} />
+          <KeyCard key={scheme.id} tenantId={tenantId} source={source} scheme={scheme} onChanged={view.set} canManage={isAdmin} />
         ))}
         {source.authSchemes.length === 0 && <p className="text-muted-foreground text-sm">This API describes no authentication.</p>}
       </section>
@@ -89,9 +92,10 @@ export function SourcePage() {
   );
 }
 
-function KeyCard({ tenantId, source, scheme, onChanged }: { tenantId: string; source: SourceView; scheme: SourceView["authSchemes"][number]; onChanged: (v: SourceView) => void }) {
+function KeyCard(props: { tenantId: string; source: SourceView; scheme: SourceView["authSchemes"][number]; onChanged: (v: SourceView) => void; canManage: boolean }) {
+  const { tenantId, source, scheme, onChanged, canManage } = props;
   const stored = scheme.stored.length > 0;
-  const [editing, setEditing] = useState(!stored);
+  const [editing, setEditing] = useState(!stored && canManage);
   const [username, setUsername] = useState("");
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
@@ -184,7 +188,7 @@ function KeyCard({ tenantId, source, scheme, onChanged }: { tenantId: string; so
         </FieldGroup>
       )}
 
-      {kind && (
+      {kind && canManage && (
         <div className="flex flex-wrap gap-2">
           {editing ? (
             <>

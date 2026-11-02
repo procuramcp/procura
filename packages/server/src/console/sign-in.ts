@@ -62,7 +62,7 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
 
       const identity = await finishSignIn(provider, { callbackUrl: url, redirectUri: callbackUri(provider.id), state, nonce: row.nonce, verifier: row.verifier });
       if (!identity) return page(502, `${provider.name} didn't confirm the sign-in`);
-      const userId = await db.ensureUser(identity.issuer, identity.subject);
+      const userId = await db.ensureUser(identity.issuer, identity.subject, identity.label);
       const token = randomToken(32);
       await db.withoutTenant((tx) => tx.insert(sessions).values({ tokenHash: sha256(token), userId, userLabel: identity.label, expiresAt: at(SESSION_SECONDS) }));
       const headers = new Headers({ location: `${base}/app/`, "cache-control": "no-store" });

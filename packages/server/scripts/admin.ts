@@ -108,7 +108,7 @@ async function main(): Promise<void> {
         const level = need("level");
         if (!["use", "use_writes", "none"].includes(level)) throw new AdminError("--level must be use, use_writes, or none");
         const r = await grantAccess(db, { tenantId: need("tenant"), toolsetId: need("toolset"), userId: need("user"), level: level as "use" | "use_writes" | "none" });
-        console.log(`${level === "none" ? "Revoked" : `Granted ${level} on`} ${values.toolset} for ${values.user}${r.addedMember ? " (added as a member)" : ""}.`);
+        console.log(`${level === "none" ? "Revoked" : `Granted ${level} on`} ${values.toolset} for ${values.user}${r.addedMember ? " (added as a customer)" : ""}.`);
         break;
       }
       case "credential set": {

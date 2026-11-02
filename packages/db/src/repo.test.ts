@@ -4,16 +4,21 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import { PG, pgErrorCode } from "./errors.ts";
 import {
+  countOwners,
   ensureMember,
+  getMember,
   getToolsetWithSource,
-  listMembers,
+  listCustomers,
+  listTeam,
   listOperationEffects,
   listSourceIds,
   listSourceSummaries,
   putSource,
   putToolset,
+  setMemberRole,
   tenantName,
   toolsetVersion,
+  updateMember,
 } from "./repo.ts";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "./test-support.ts";
 
@@ -72,16 +77,74 @@ describe.skipIf(!adminUrl)("repo queries", () => {
     expect(await db.withTenant(tenantId, (tx) => toolsetVersion(tx, "missing"))).toBeUndefined();
   });
 
-  it("adds members once and refuses unknown users with a foreign-key error", async () => {
+  it("adds people as customers once and refuses unknown users with a foreign-key error", async () => {
     const friend = await db.ensureUser("https://issuer.test", "repo-friend");
     await db.withTenant(tenantId, async (tx) => {
       expect(await ensureMember(tx, friend)).toBe(true);
-      expect(await ensureMember(tx, friend)).toBe(false);
+      expect(await ensureMember(tx, friend, "viewer")).toBe(false);
       expect(await ensureMember(tx, ownerId)).toBe(false);
-      expect((await listMembers(tx)).map((m) => m.role).sort()).toEqual(["member", "owner"]);
+      expect((await getMember(tx, friend))?.role).toBe("customer");
+      expect((await listTeam(tx)).map((m) => m.role)).toEqual(["owner"]);
       expect(await tenantName(tx)).toBe("repo");
     });
     const failure = await db.withTenant(tenantId, (tx) => ensureMember(tx, "no-such-user" as UserId)).catch((e: unknown) => e);
     expect(pgErrorCode(failure)).toBe(PG.FOREIGN_KEY_VIOLATION);
+  });
+
+  it("moves people between the team and customers, and counts owners", async () => {
+    const editor = await db.ensureUser("https://issuer.test", "repo-editor", "editor@repo.test");
+    await db.withTenant(tenantId, async (tx) => {
+      await ensureMember(tx, editor);
+      expect(await setMemberRole(tx, editor, "editor")).toBe(true);
+      expect((await listTeam(tx)).map((m) => [m.role, m.label])).toEqual([
+        ["owner", null],
+        ["editor", "editor@repo.test"],
+      ]);
+      expect(await countOwners(tx)).toBe(1);
+      expect(await setMemberRole(tx, "not-here" as UserId, "owner")).toBe(false);
+    });
+  });
+
+  it("keeps the latest sign-in label, and a sign-in without one keeps the old", async () => {
+    const user = await db.ensureUser("https://issuer.test", "repo-relabel", "old@repo.test");
+    expect(await db.ensureUser("https://issuer.test", "repo-relabel", "  new@repo.test ")).toBe(user);
+    expect(await db.ensureUser("https://issuer.test", "repo-relabel")).toBe(user);
+    await db.withTenant(tenantId, (tx) => ensureMember(tx, user));
+    expect((await db.withTenant(tenantId, (tx) => getMember(tx, user)))?.label).toBe("new@repo.test");
+  });
+
+  it("pages through customers newest first, and searches label, id, and note", async () => {
+    const ids: UserId[] = [];
+    for (let i = 0; i < 7; i++) {
+      const id = await db.ensureUser("https://issuer.test", `page-${i}`, `athlete${i}@club.test`);
+      // One transaction each: now() is the transaction's start, so these get distinct times.
+      await db.withTenant(tenantId, (tx) => ensureMember(tx, id));
+      ids.push(id);
+    }
+    await db.withTenant(tenantId, (tx) => updateMember(tx, ids[2]!, { note: "Trial ends 100% in March", status: "suspended" }));
+
+    const seen: UserId[] = [];
+    let after: string | undefined;
+    let pages = 0;
+    do {
+      const page = await db.withTenant(tenantId, (tx) => listCustomers(tx, { query: "club.test", limit: 3, ...(after ? { after } : {}) }));
+      expect(page.total).toBe(7);
+      seen.push(...page.customers.map((c) => c.userId));
+      after = page.next;
+      pages++;
+    } while (after);
+    expect(pages).toBe(3);
+    expect(seen).toEqual([...ids].reverse());
+
+    const search = (query: string) => db.withTenant(tenantId, async (tx) => (await listCustomers(tx, { query })).customers.map((c) => c.userId));
+    expect(await search("ATHLETE3@")).toEqual([ids[3]]);
+    expect(await search(ids[5]!)).toEqual([ids[5]]);
+    // % and _ match themselves, not any text.
+    expect(await search("100%")).toEqual([ids[2]]);
+    expect(await search("athlete_")).toEqual([]);
+    const suspended = await db.withTenant(tenantId, (tx) => getMember(tx, ids[2]!));
+    expect([suspended?.status, suspended?.note]).toEqual(["suspended", "Trial ends 100% in March"]);
+    // A tampered cursor reads as the first page instead of failing.
+    expect((await db.withTenant(tenantId, (tx) => listCustomers(tx, { after: "garbage" }))).customers.length).toBeGreaterThan(0);
   });
 });

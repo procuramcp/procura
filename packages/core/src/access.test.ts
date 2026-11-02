@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCall } from "./access.ts";
+import { canCall, hasTeamRole } from "./access.ts";
 
 describe("canCall", () => {
   it("allows nothing without access", () => {
@@ -18,5 +18,20 @@ describe("canCall", () => {
 
   it("fails closed on an unknown level", () => {
     expect(canCall("admin" as never, "read")).toBe(false);
+  });
+});
+
+describe("hasTeamRole (D-038)", () => {
+  it("ranks the team owner > admin > editor > viewer", () => {
+    expect(hasTeamRole("owner", "admin")).toBe(true);
+    expect(hasTeamRole("admin", "admin")).toBe(true);
+    expect(hasTeamRole("editor", "admin")).toBe(false);
+    expect(hasTeamRole("editor", "viewer")).toBe(true);
+    expect(hasTeamRole("viewer", "editor")).toBe(false);
+  });
+
+  it("never lets customers or non-members into the console", () => {
+    expect(hasTeamRole("customer", "viewer")).toBe(false);
+    expect(hasTeamRole(undefined, "viewer")).toBe(false);
   });
 });

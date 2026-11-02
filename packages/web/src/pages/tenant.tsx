@@ -14,17 +14,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { act } from "@/lib/act";
 import { api, type TenantView } from "@/lib/api";
-import { useLoad } from "@/lib/hooks";
+import { useLoad, useRole } from "@/lib/hooks";
 import { CopyText, slugify } from "@/pages/parts";
 import { Problem } from "@/pages/shell";
 
 export function TenantPage() {
   const { tenantId = "" } = useParams();
   const view = useLoad(() => api.tenant(tenantId), [tenantId]);
+  const { canEdit } = useRole(tenantId);
 
   if (view.error) return <Problem message={view.error.message} />;
   if (!view.data) return <Skeleton className="h-64 w-full" />;
-  const { tenant, toolsets, sources, members } = view.data;
+  const { tenant, toolsets, sources, people } = view.data;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -32,8 +33,8 @@ export function TenantPage() {
         <div>
           <h1 className="font-heading font-semibold text-2xl">{tenant.name}</h1>
           <p className="text-muted-foreground text-sm">
-            {toolsets.length} toolset{toolsets.length === 1 ? "" : "s"} · {sources.length} source{sources.length === 1 ? "" : "s"} · {members.length} member
-            {members.length === 1 ? "" : "s"}
+            {plural(toolsets.length, "toolset")} · {plural(sources.length, "source")} · {plural(people.team, "on the team", "on the team")} ·{" "}
+            {plural(people.customers, "customer")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -42,7 +43,7 @@ export function TenantPage() {
               <UsersIcon /> People and profiles
             </Link>
           </Button>
-          <NewToolset view={view.data} />
+          {canEdit && <NewToolset view={view.data} />}
         </div>
       </div>
 
@@ -74,7 +75,7 @@ export function TenantPage() {
                 <CardContent className="flex flex-col gap-3">
                   <CopyText value={t.endpoint} />
                   <Button asChild variant="outline" size="sm" className="self-start">
-                    <Link to={`/t/${tenant.id}/toolsets/${t.id}`}>Edit tools</Link>
+                    <Link to={`/t/${tenant.id}/toolsets/${t.id}`}>{canEdit ? "Edit tools" : "View tools"}</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -86,11 +87,13 @@ export function TenantPage() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Sources</h2>
-          <Button asChild variant="outline" size="sm">
-            <Link to={`/t/${tenant.id}/sources/new`}>
-              <PlusIcon /> Add an API
-            </Link>
-          </Button>
+          {canEdit && (
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/t/${tenant.id}/sources/new`}>
+                <PlusIcon /> Add an API
+              </Link>
+            </Button>
+          )}
         </div>
         <Card className="py-0">
           <Table>
@@ -120,7 +123,15 @@ export function TenantPage() {
               {sources.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-muted-foreground">
-                    No APIs yet. <Link to={`/t/${tenant.id}/sources/new`} className="underline">Add one</Link> from its OpenAPI description.
+                    No APIs yet.{" "}
+                    {canEdit && (
+                      <>
+                        <Link to={`/t/${tenant.id}/sources/new`} className="underline">
+                          Add one
+                        </Link>{" "}
+                        from its OpenAPI description.
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               )}
@@ -130,6 +141,10 @@ export function TenantPage() {
       </section>
     </div>
   );
+}
+
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 function NewToolset({ view }: { view: TenantView }) {

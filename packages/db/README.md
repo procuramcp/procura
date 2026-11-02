@@ -1,6 +1,6 @@
 # @cairnmcp/db
 
-Postgres storage for tenants, members, sources, toolsets, the vault, and the audit log, with
+Postgres storage for tenants, their team and customers, sources, toolsets, the vault, and the audit log, with
 tenant isolation enforced by row-level security (RLS). Design: `docs/DECISIONS.md` D-024.
 
 ## Roles

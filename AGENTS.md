@@ -53,10 +53,11 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | File | Owns |
 | --- | --- |
 | `index.ts` | `createConsoleHandler`: CSRF check, session, `/me`, `/logout`, dispatch to the route tables, static files |
-| `context.ts` | `ConsoleContext`, `ApiRequest`, `asEditor` / `editorResponse` (owner/admin check inside the tenant), `endpointUrl` |
+| `context.ts` | `ConsoleContext`, `ApiRequest`, `asTeam` / `teamResponse` (minimum team role inside the tenant: viewer, editor, admin, owner; D-038), `endpointUrl` |
 | `tenants.ts` | `GET /tenants/:t`, `POST /tenants/:t/toolsets` |
 | `toolsets.ts` | `GET`/`PUT /tenants/:t/toolsets/:id`, `PUT …/access`, `POST …/test` |
-| `access.ts` | `GET /tenants/:t/access`, `PUT`/`DELETE …/profiles/:id`, `PUT …/members/:user/profiles` |
+| `access.ts` | `GET /tenants/:t/access` (profiles, team, customer count), `PUT`/`DELETE …/profiles/:id` |
+| `people.ts` | `GET …/customers` (search, paging), `PUT …/members/:user/role`, `PUT`/`DELETE …/members/:user` (suspend, note, remove), `PUT …/members/:user/profiles` |
 | `sources.ts` | `POST …/sources/preview`, `POST …/sources`, `GET …/sources/:id`, `PUT`/`DELETE …/credentials/:scheme` |
 | `sign-in.ts` | Browser sign-in through OIDC, session cookies, `purgeExpiredConsoleState` |
 | `bodies.ts` | Zod schemas for request bodies, `readBody`, `issuesText`, size limits; `BodiesMatchContract` checks them against the contract |
@@ -73,6 +74,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | `Date` → `Instant` | `instantOf` (core); never format ISO strings by hand |
 | Count read/write/destructive | `countBySideEffect` (core) |
 | Can this level call this tool? | `canCall`, `allowsTool`, `highestLevel` (core `access.ts`) |
+| Team role at least X? Roles, statuses | `hasTeamRole`, `MemberRole`, `TeamRole`, `MemberStatus` (core `access.ts`); `useRole` in web `lib/hooks.ts` |
 | Id schemas | `TenantId`, `UserId`, `SourceId`, `ToolsetId`, `ProfileId`, `OperationId`, `ToolName` (core `ir/ids.ts`) |
 | JSON / redirect response | `json`, `redirect`, `withHeaders` (http) |
 | Read a body with a size cap | `readText`, `readJson`, `readForm` (http); they throw `BodyError` |
@@ -83,7 +85,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | Postgres error code (FK, unique) | `pgErrorCode(e) === PG.FOREIGN_KEY_VIOLATION` (db) |
 | Toolset plus its source | `getToolsetWithSource` (db) |
 | Source ids / names and counts / per-operation side effects | `listSourceIds`, `listSourceSummaries`, `listOperationEffects` (db): no IR parse |
-| Members, tenant name, add-if-missing | `listMembers`, `tenantName`, `ensureMember` (db) |
+| Team, customers, tenant name, add-if-missing | `listTeam`, `listCustomers` (search, keyset paging), `getMember`, `setMemberRole`, `updateMember`, `tenantName`, `ensureMember` (adds a customer) (db) |
 | Has a toolset or its source changed? | `toolsetVersion` (db) |
 | Replace / delete a scheme's credential | `vault.replaceCredential`, `vault.deleteSchemeCredentials` |
 | Credential kinds a scheme accepts | `credentialKindsFor` (vault) |
@@ -108,6 +110,9 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
   columns in `src/schema.ts`. Never edit an applied migration (the migrator refuses).
 - **`listSources` / `getSource` load and Zod-parse whole IR documents** (slow for big APIs). Use
   the lighter repo queries when they are enough.
+- **Who's in a tenant is one `memberships` row** with a role (owner, admin, editor, viewer: the team;
+  customer: tools only) and a status (D-038). Check access with `memberRole`, which treats suspended
+  people as non-members, so a suspension applies everywhere at once.
 - **The MCP endpoint caches resolved toolsets** by `toolsetVersion`. Anything that changes a
   toolset or source must write its row (the `putToolset` / `putSource` upserts do), or the
   cache won't notice. Access and membership are never cached.
@@ -129,7 +134,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 `packages/console-api/src/index.ts` (the one contract both sides use). Add a route to the area's
 table in `server/src/console/*.ts`: `{ method, path: /^\/tenants\/([^/]+)\/…$/, handle: (api, [tenant, …]) => … }`.
 Parse the body with `readBody(api.request, Schema)` (schema in `bodies.ts`, plus an `Accepts<…>`
-line in `BodiesMatchContract`), run tenant work in `editorResponse(api, tenant, (tx, tenantId) => …)`,
+line in `BodiesMatchContract`), run tenant work in `teamResponse(api, tenant, "editor", (tx, tenantId) => …)` (the least role that may do it),
 and return `json(200, { … } satisfies TheView)` so the server is checked against the contract.
 Then add the call to `web/src/lib/api.ts` using the contract types, and a test in
 `server/src/console.test.ts`.
@@ -149,5 +154,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-037, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-038, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{oracle,auth0}`.

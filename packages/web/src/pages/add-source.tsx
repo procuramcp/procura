@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
 import { api, type DocumentInput, type SourcePreview } from "@/lib/api";
+import { useRole } from "@/lib/hooks";
 import { slugify } from "@/pages/parts";
 
 /** Bring in an API from its OpenAPI document (D-035): find it, preview it, add it. */
@@ -150,6 +151,7 @@ function Review({ tenantId, found, onAdded }: { tenantId: string; found: { input
   const [withToolset, setWithToolset] = useState(true);
   const [toolsetName, setToolsetName] = useState(preview.name);
   const [busy, setBusy] = useState(false);
+  const { isAdmin } = useRole(tenantId);
   const taken = takenIds.includes(id);
   const basic = preview.authSchemes.filter((s) => s.type === "http_basic");
 
@@ -158,7 +160,7 @@ function Review({ tenantId, found, onAdded }: { tenantId: string; found: { input
     const toolset = withToolset && toolsetName.trim() ? { toolset: { id: slugify(toolsetName) || id, name: toolsetName.trim() } } : {};
     const added = await act(() => api.createSource(tenantId, { ...found.input, id, fixedUsernames: fixed, ...toolset }), { busy: setBusy, failure: "Not added" });
     if (!added) return;
-    toast.success(`Added ${preview.name}`, { description: "Next: add its API key so calls can be made." });
+    toast.success(`Added ${preview.name}`, { description: isAdmin ? "Next: add its API key so calls can be made." : "Next: an admin or owner adds its API key." });
     onAdded(id);
   }
 

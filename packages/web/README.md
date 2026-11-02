@@ -1,9 +1,10 @@
 # @cairnmcp/web: the curation console
 
 A React app (Vite, Tailwind, shadcn/ui, AI Elements) that the server serves at `/app` (D-033).
-Owners and admins sign in and edit toolsets: tools on or off, names, descriptions, pins, access,
-and a test panel that runs a tool for real through the same runtime as the MCP endpoint. Under
-*People and profiles* they define access profiles (D-034) and assign them to members.
+The team signs in here (D-038): viewers look, editors edit toolsets (tools on or off, names,
+descriptions, pins, access, and a test panel that runs a tool for real through the same runtime as
+the MCP endpoint), admins also set API keys and manage the team. Under *People and profiles* they
+define access profiles (D-034), set team roles, and find, suspend, or remove customers.
 
 ## Run it locally
 

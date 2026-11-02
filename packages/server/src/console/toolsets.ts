@@ -1,11 +1,11 @@
 // One toolset: view, edit, direct access grants, and test calls.
 import type { TestResult, ToolsetView } from "@cairnmcp/console-api";
 import { canCall, resolveToolset, Toolset, ToolsetId, type Caller, type TenantId } from "@cairnmcp/core";
-import { ensureMember, getToolset, getToolsetWithSource, listMembers, listProfiles, PG, pgErrorCode, putToolset, schema, setToolsetAccess, type TenantTx } from "@cairnmcp/db";
+import { ensureMember, getToolset, getToolsetWithSource, listProfiles, listTeam, PG, pgErrorCode, putToolset, schema, setToolsetAccess, type TenantTx } from "@cairnmcp/db";
 import { json } from "@cairnmcp/http";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { AccessEdit, issuesText, readBody, ToolsetEdit, ToolTest } from "./bodies.ts";
-import { asEditor, editorResponse, endpointUrl, type ApiRequest, type ApiRoute, type ConsoleContext } from "./context.ts";
+import { asTeam, endpointUrl, teamResponse, type ApiRequest, type ApiRoute, type ConsoleContext } from "./context.ts";
 import { operationView, toolNameAt } from "./views.ts";
 
 const TOOLSET = /^\/tenants\/([^/]+)\/toolsets\/([^/]+)$/;
@@ -24,7 +24,7 @@ export const toolsetRoutes: ApiRoute[] = [
   {
     method: "GET",
     path: TOOLSET,
-    handle: onToolset((api, tenant, toolsetId) => editorResponse(api, tenant, (tx, tenantId) => toolsetView(api.ctx, tx, tenantId, toolsetId))),
+    handle: onToolset((api, tenant, toolsetId) => teamResponse(api, tenant, "viewer", (tx, tenantId) => toolsetView(api.ctx, tx, tenantId, toolsetId))),
   },
   {
     method: "PUT",
@@ -32,7 +32,7 @@ export const toolsetRoutes: ApiRoute[] = [
     handle: onToolset(async (api, tenant, toolsetId) => {
       const body = await readBody(api.request, ToolsetEdit);
       if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
-      return editorResponse(api, tenant, async (tx, tenantId) => {
+      return teamResponse(api, tenant, "editor", async (tx, tenantId) => {
         const existing = await getToolsetWithSource(tx, toolsetId);
         if (!existing) return notFound(toolsetId);
         const parsed = Toolset.safeParse({ ...body.data, id: toolsetId, sourceId: existing.toolset.sourceId });
@@ -50,10 +50,11 @@ export const toolsetRoutes: ApiRoute[] = [
     handle: onToolset(async (api, tenant, toolsetId) => {
       const body = await readBody(api.request, AccessEdit);
       if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
-      return editorResponse(api, tenant, async (tx, tenantId) => {
+      return teamResponse(api, tenant, "editor", async (tx, tenantId) => {
         if (!(await getToolset(tx, toolsetId))) return notFound(toolsetId);
         if (body.data.level !== "none") {
           try {
+            // Someone new becomes a customer (D-038).
             await ensureMember(tx, body.data.userId);
           } catch (e) {
             // Only someone who has signed in once exists as a user.
@@ -79,10 +80,14 @@ async function toolsetView(ctx: ConsoleContext, tx: TenantTx, tenantId: TenantId
   const loaded = await getToolsetWithSource(tx, toolsetId);
   if (!loaded) return notFound(toolsetId);
   const { toolset, source } = loaded;
+  const { toolsetAccess, memberships, users } = schema;
   const access = await tx
-    .select({ userId: schema.toolsetAccess.userId, level: schema.toolsetAccess.level })
-    .from(schema.toolsetAccess)
-    .where(eq(schema.toolsetAccess.toolsetId, toolsetId));
+    .select({ userId: toolsetAccess.userId, label: users.label, role: memberships.role, level: toolsetAccess.level })
+    .from(toolsetAccess)
+    .innerJoin(memberships, eq(memberships.userId, toolsetAccess.userId))
+    .leftJoin(users, eq(users.id, toolsetAccess.userId))
+    .where(eq(toolsetAccess.toolsetId, toolsetId))
+    .orderBy(asc(toolsetAccess.createdAt));
   const resolved = resolveToolset(toolset, source.ir);
   const profiles = (await listProfiles(tx)).flatMap((p) =>
     p.rules.filter((r) => r.toolsetId === toolsetId).map((r) => ({ profileId: p.id, name: p.name, level: r.level, operations: r.operations, members: p.members })),
@@ -94,7 +99,7 @@ async function toolsetView(ctx: ConsoleContext, tx: TenantTx, tenantId: TenantId
     source: { id: source.id, name: source.name, baseUrl: source.ir.source.baseUrl },
     operations: source.ir.operations.map(operationView),
     access,
-    members: await listMembers(tx),
+    team: (await listTeam(tx)).map((m) => ({ userId: m.userId, label: m.label, role: m.role })),
     issues: resolved.ok ? [] : resolved.issues,
   } satisfies ToolsetView);
 }
@@ -103,7 +108,8 @@ async function toolsetView(ctx: ConsoleContext, tx: TenantTx, tenantId: TenantId
 async function testTool(api: ApiRequest, tenant: string, toolsetId: ToolsetId): Promise<Response> {
   const body = await readBody(api.request, ToolTest);
   if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
-  const loaded = await asEditor(api, tenant, async (tx, tenantId) => {
+  // Editors only: a test call uses the tenant's upstream key.
+  const loaded = await asTeam(api, tenant, "editor", async (tx, tenantId) => {
     const found = await getToolsetWithSource(tx, toolsetId);
     return found ? { tenantId, toolset: found.toolset, ir: found.source.ir } : notFound(toolsetId);
   });

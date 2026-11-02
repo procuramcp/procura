@@ -40,7 +40,9 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
   let op: FakeOidcProvider;
   let app: (request: Request) => Promise<Response>;
   let alice: UserId; // owner of Alpha
-  let carol: UserId; // plain member of Alpha
+  let carol: UserId; // a customer of Alpha: calls tools, never the console
+  let vic: UserId; // a viewer of Alpha
+  let ed: UserId; // an editor of Alpha
   let a: TenantId;
   let b: TenantId;
   let upstream: string[];
@@ -68,7 +70,13 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
         await setToolsetAccess(tx, "mine" as never, owner, "use");
       });
     }
-    await db.withTenant(a, (tx) => addMember(tx, carol, "member"));
+    vic = await db.ensureUser(op.issuer, "vic");
+    ed = await db.ensureUser(op.issuer, "ed");
+    await db.withTenant(a, async (tx) => {
+      await addMember(tx, carol, "customer");
+      await addMember(tx, vic, "viewer");
+      await addMember(tx, ed, "editor");
+    });
     const keyWrapper = new LocalKeyWrapper(randomBytes(32));
     const vault = new Vault({ store: new PgVaultStore(db), keyWrapper });
     await vault.putCredential({ tenantId: a, sourceId: "intervals-icu", schemeId: "APIKey", credential: { kind: "basic", username: "API_KEY", password: "fake-key-0000" } });
@@ -146,14 +154,49 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
     });
   });
 
-  describe("who may edit", () => {
-    it("hides other tenants and stops plain members", async () => {
+  describe("who may do what (D-038)", () => {
+    it("hides other tenants, and keeps customers out of the console entirely", async () => {
       const alice_ = await signIn();
       expect((await alice_.json("GET", `${API}/tenants/bravo`)).status).toBe(404);
       expect((await alice_.json("GET", `${API}/tenants/nope`)).status).toBe(404);
       const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
-      expect((await carol_.json("GET", `${API}/tenants/alpha`)).status).toBe(403);
-      expect((await carol_.json("PUT", `${API}/tenants/alpha/toolsets/mine`, starter)).status).toBe(403);
+      expect(((await (await carol_.json("GET", `${API}/me`)).json()) as { tenants: unknown[] }).tenants).toEqual([]);
+      // Same answer as a tenant that doesn't exist.
+      for (const path of ["", "/toolsets/mine", "/access", "/customers", "/sources/intervals-icu"]) {
+        expect((await carol_.json("GET", `${API}/tenants/alpha${path}`)).status, path).toBe(404);
+      }
+      expect((await carol_.json("PUT", `${API}/tenants/alpha/toolsets/mine`, starter)).status).toBe(404);
+    });
+
+    it("lets viewers look at everything but change nothing", async () => {
+      const vic_ = await signIn({ sub: "vic", email: "vic@example.com" });
+      expect(((await (await vic_.json("GET", `${API}/me`)).json()) as { tenants: unknown[] }).tenants).toEqual([{ id: "alpha", name: "Alpha", role: "viewer" }]);
+      for (const path of ["", "/toolsets/mine", "/access", "/customers", "/sources/intervals-icu"]) {
+        expect((await vic_.json("GET", `${API}/tenants/alpha${path}`)).status, path).toBe(200);
+      }
+      const writes: Array<[string, string, unknown?]> = [
+        ["PUT", "/toolsets/mine", starter],
+        ["PUT", "/toolsets/mine/access", { userId: vic, level: "use" }],
+        ["POST", "/toolsets", { id: "new", sourceId: "intervals-icu", name: "New" }],
+        ["POST", "/toolsets/mine/test", { tool: starter.tools[0], args: {} }],
+        ["PUT", "/profiles/x", { name: "X", rules: [] }],
+        ["PUT", `/members/${carol}/profiles`, { profiles: [] }],
+        ["PUT", `/members/${carol}`, { status: "suspended" }],
+        ["POST", "/sources/preview", { document: OPENAPI }],
+        ["PUT", "/sources/intervals-icu/credentials/APIKey", { credential: { kind: "basic", password: "x" } }],
+      ];
+      for (const [method, path, body] of writes) {
+        expect((await vic_.json(method, `${API}/tenants/alpha${path}`, body)).status, `${method} ${path}`).toBe(403);
+      }
+    });
+
+    it("lets editors curate but not touch keys or the team", async () => {
+      const ed_ = await signIn({ sub: "ed", email: "ed@example.com" });
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/toolsets/mine`, starter)).status).toBe(200);
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/sources/intervals-icu/credentials/APIKey`, { credential: { kind: "basic", password: "x" } })).status).toBe(403);
+      expect((await ed_.json("DELETE", `${API}/tenants/alpha/sources/intervals-icu/credentials/APIKey`)).status).toBe(403);
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/members/${vic}/role`, { role: "editor" })).status).toBe(403);
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/members/${vic}`, { status: "suspended" })).status).toBe(403);
     });
 
     it("refuses writes from another site or as a form", async () => {
@@ -170,9 +213,10 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
   describe("editing", () => {
     it("shows the tenant and the toolset with every operation and its side effect", async () => {
       const browser = await signIn();
-      const tenant = (await (await browser.json("GET", `${API}/tenants/alpha`)).json()) as { toolsets: unknown[]; members: Array<{ you: boolean }> };
+      const tenant = (await (await browser.json("GET", `${API}/tenants/alpha`)).json()) as { toolsets: unknown[]; people: { team: number; customers: number } };
       expect(tenant.toolsets).toEqual([{ id: "mine", name: "My training", sourceId: "intervals-icu", enabledTools: 1, endpoint: `${BASE}/mcp/alpha/mine` }]);
-      expect(tenant.members.filter((m) => m.you)).toHaveLength(1);
+      expect(tenant.people.team).toBeGreaterThanOrEqual(3);
+      expect(tenant.people.customers).toBeGreaterThanOrEqual(1);
       const view = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/mine`)).json()) as { operations: Array<{ id: string; sideEffect: { class: string } }>; issues: unknown[] };
       expect(view.operations).toHaveLength(148);
       expect(view.operations.find((o) => o.id === "list_activities")?.sideEffect.class).toBe("read");
@@ -198,7 +242,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       expect(created.status).toBe(201);
       const view = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/everything`)).json()) as { toolset: { tools: Array<{ enabled: boolean }> }; access: unknown[] };
       expect(view.toolset.tools.filter((t) => t.enabled)).toHaveLength(79);
-      expect(view.access).toEqual([{ userId: alice, level: "use" }]);
+      expect(view.access).toEqual([{ userId: alice, label: "alice@example.com", role: "owner", level: "use" }]);
       expect((await browser.json("POST", `${API}/tenants/alpha/toolsets`, { id: "everything", sourceId: "intervals-icu", name: "Again" })).status).toBe(409);
     });
 
@@ -206,7 +250,8 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       const browser = await signIn();
       const dave = await db.ensureUser(op.issuer, "dave");
       const granted = await browser.json("PUT", `${API}/tenants/alpha/toolsets/mine/access`, { userId: dave, level: "use_writes" });
-      expect(((await granted.json()) as { access: unknown[] }).access).toContainEqual({ userId: dave, level: "use_writes" });
+      // Someone new is added as a customer.
+      expect(((await granted.json()) as { access: unknown[] }).access).toContainEqual({ userId: dave, label: null, role: "customer", level: "use_writes" });
       const revoked = await browser.json("PUT", `${API}/tenants/alpha/toolsets/mine/access`, { userId: dave, level: "none" });
       expect(((await revoked.json()) as { access: Array<{ userId: string }> }).access.map((x) => x.userId)).not.toContain(dave);
       const unknown = await browser.json("PUT", `${API}/tenants/alpha/toolsets/mine/access`, { userId: "no-such-user", level: "use" });
@@ -224,9 +269,10 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       });
       expect(created.status).toBe(200);
       const assigned = await browser.json("PUT", `${API}/tenants/alpha/members/${carol}/profiles`, { profiles: ["coach"] });
-      const view = (await assigned.json()) as { profiles: Array<{ id: string; members: string[] }>; members: Array<{ userId: string; profiles: string[] }> };
+      const view = (await assigned.json()) as { profiles: Array<{ id: string; members: string[] }> };
       expect(view.profiles).toEqual([expect.objectContaining({ id: "coach", members: [carol] })]);
-      expect(view.members.find((m) => m.userId === carol)?.profiles).toEqual(["coach"]);
+      const customers = (await (await browser.json("GET", `${API}/tenants/alpha/customers?q=${carol}`)).json()) as { customers: Array<{ profiles: string[] }> };
+      expect(customers.customers.map((c) => c.profiles)).toEqual([["coach"]]);
       const toolset = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/mine`)).json()) as { profiles: unknown[] };
       expect(toolset.profiles).toEqual([{ profileId: "coach", name: "Coach", level: "use", operations: ["list_activities"], members: [carol] }]);
     });
@@ -245,23 +291,82 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       expect((await browser.json("PUT", `${API}/tenants/alpha/members/${carol}/profiles`, { profiles: ["missing"] })).status).toBe(404);
     });
 
-    it("adds someone who has signed in as a member when they get a profile", async () => {
+    it("adds someone who has signed in as a customer when they get a profile", async () => {
       const browser = await signIn();
-      const erin = await db.ensureUser(op.issuer, "erin");
+      const erin = await db.ensureUser(op.issuer, "erin", "erin@example.com");
       const added = await browser.json("PUT", `${API}/tenants/alpha/members/${erin}/profiles`, { profiles: ["coach"] });
       expect(added.status).toBe(200);
-      expect(((await added.json()) as { members: Array<{ userId: string; role: string; profiles: string[] }> }).members.find((m) => m.userId === erin)).toMatchObject({ role: "member", profiles: ["coach"] });
+      const found = (await (await browser.json("GET", `${API}/tenants/alpha/customers?q=erin@`)).json()) as { customers: unknown[] };
+      expect(found.customers).toEqual([expect.objectContaining({ userId: erin, label: "erin@example.com", role: "customer", status: "active", profiles: ["coach"] })]);
     });
 
-    it("deletes a profile, and keeps members from editing profiles", async () => {
+    it("deletes a profile", async () => {
       const browser = await signIn();
       await browser.json("PUT", `${API}/tenants/alpha/profiles/temp`, { name: "Temp", rules: [] });
       const deleted = await browser.json("DELETE", `${API}/tenants/alpha/profiles/temp`);
       expect(((await deleted.json()) as { profiles: Array<{ id: string }> }).profiles.map((p) => p.id)).not.toContain("temp");
       expect((await browser.json("DELETE", `${API}/tenants/alpha/profiles/temp`)).status).toBe(404);
-      const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
-      expect((await carol_.json("PUT", `${API}/tenants/alpha/profiles/mine`, { name: "Mine", rules: [{ toolsetId: "mine", level: "use_writes" }] })).status).toBe(403);
-      expect((await carol_.json("GET", `${API}/tenants/alpha/access`)).status).toBe(403);
+    });
+  });
+
+  describe("team and customers (D-038)", () => {
+    type Page = { customers: Array<{ userId: string; label: string | null; status: string; note: string | null }>; total: number; next?: string };
+    type Access = { team: Array<{ userId: string; role: string; label: string | null; you: boolean }>; customers: number };
+
+    it("pages through customers newest first and searches them", async () => {
+      const browser = await signIn();
+      const ids: string[] = [];
+      for (let i = 0; i < 55; i++) {
+        const id = await db.ensureUser(op.issuer, `runner-${i}`, `runner${i}@club.test`);
+        await db.withTenant(a, (tx) => addMember(tx, id, "customer"));
+        ids.push(id);
+      }
+      const first = (await (await browser.json("GET", `${API}/tenants/alpha/customers?q=club.test`)).json()) as Page;
+      expect([first.total, first.customers.length, first.customers[0]?.userId]).toEqual([55, 50, ids[54]]);
+      const second = (await (await browser.json("GET", `${API}/tenants/alpha/customers?q=club.test&after=${first.next}`)).json()) as Page;
+      expect(second.customers.map((c) => c.userId)).toEqual(ids.slice(0, 5).reverse());
+      expect(second.next).toBeUndefined();
+      const access = (await (await browser.json("GET", `${API}/tenants/alpha/access`)).json()) as Access;
+      expect(access.customers).toBeGreaterThanOrEqual(56);
+      expect(access.team.map((m) => m.role)).not.toContain("customer");
+    });
+
+    it("suspends and resumes a customer, with a note", async () => {
+      const ed_ = await signIn({ sub: "ed", email: "ed@example.com" });
+      const suspended = await ed_.json("PUT", `${API}/tenants/alpha/members/${carol}`, { status: "suspended", note: "  Card declined  " });
+      expect(await suspended.json()).toMatchObject({ userId: carol, status: "suspended", note: "Card declined", role: "customer" });
+      const resumed = await ed_.json("PUT", `${API}/tenants/alpha/members/${carol}`, { status: "active", note: "" });
+      expect(await resumed.json()).toMatchObject({ status: "active", note: null });
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/members/${ed}`, { status: "suspended" })).status).toBe(403);
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/members/no-such-user`, { status: "suspended" })).status).toBe(404);
+    });
+
+    it("lets admins build the team, and only owners make or change owners", async () => {
+      const alice_ = await signIn();
+      const frank = await db.ensureUser(op.issuer, "frank", "frank@example.com");
+      const added = (await (await alice_.json("PUT", `${API}/tenants/alpha/members/${frank}/role`, { role: "admin" })).json()) as Access;
+      expect(added.team.find((m) => m.userId === frank)).toMatchObject({ role: "admin", label: "frank@example.com" });
+
+      const frank_ = await signIn({ sub: "frank", email: "frank@example.com" });
+      expect((await frank_.json("PUT", `${API}/tenants/alpha/members/${vic}/role`, { role: "editor" })).status).toBe(200);
+      expect((await frank_.json("PUT", `${API}/tenants/alpha/members/${vic}/role`, { role: "owner" })).status).toBe(403);
+      expect((await frank_.json("PUT", `${API}/tenants/alpha/members/${alice}/role`, { role: "viewer" })).status).toBe(403);
+      expect((await frank_.json("PUT", `${API}/tenants/alpha/members/${alice}`, { status: "suspended" })).status).toBe(403);
+      expect((await frank_.json("PUT", `${API}/tenants/alpha/members/${frank}/role`, { role: "owner" })).status).toBe(403);
+      expect((await alice_.json("PUT", `${API}/tenants/alpha/members/${alice}/role`, { role: "admin" })).status).toBe(403);
+      expect((await alice_.json("PUT", `${API}/tenants/alpha/members/no-such-user/role`, { role: "viewer" })).status).toBe(404);
+
+      // Back to a viewer, for the other tests.
+      expect((await frank_.json("PUT", `${API}/tenants/alpha/members/${vic}/role`, { role: "viewer" })).status).toBe(200);
+    });
+
+    it("removes people, but not yourself", async () => {
+      const alice_ = await signIn();
+      const gone = await db.ensureUser(op.issuer, "gone");
+      await db.withTenant(a, (tx) => addMember(tx, gone, "customer"));
+      expect(await (await alice_.json("DELETE", `${API}/tenants/alpha/members/${gone}`)).json()).toEqual({ ok: true });
+      expect((await alice_.json("DELETE", `${API}/tenants/alpha/members/${gone}`)).status).toBe(404);
+      expect((await alice_.json("DELETE", `${API}/tenants/alpha/members/${alice}`)).status).toBe(403);
     });
   });
 
@@ -313,7 +418,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       expect(view.authSchemes[0]).toMatchObject({ id: "APIKey", fixedUsername: "API_KEY", accepts: ["basic"], stored: [] });
       expect(view.toolsets).toEqual([{ id: "live", name: "Live" }]);
       const toolset = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/live`)).json()) as { access: unknown[] };
-      expect(toolset.access).toEqual([{ userId: alice, level: "use" }]);
+      expect(toolset.access).toEqual([{ userId: alice, label: "alice@example.com", role: "owner", level: "use" }]);
     });
 
     it("stores, replaces, and removes an API key without ever returning it", async () => {
@@ -335,10 +440,9 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
     });
 
     it("is for editors only, and caps the body size", async () => {
-      const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
-      expect((await carol_.json("POST", `${API}/tenants/alpha/sources/preview`, { document: OPENAPI })).status).toBe(403);
-      expect((await carol_.json("POST", `${API}/tenants/alpha/sources`, { id: "x", document: OPENAPI })).status).toBe(403);
-      expect((await carol_.json("GET", `${API}/tenants/alpha/sources/intervals-icu`)).status).toBe(403);
+      const vic_ = await signIn({ sub: "vic", email: "vic@example.com" });
+      expect((await vic_.json("POST", `${API}/tenants/alpha/sources/preview`, { document: OPENAPI })).status).toBe(403);
+      expect((await vic_.json("POST", `${API}/tenants/alpha/sources`, { id: "x", document: OPENAPI })).status).toBe(403);
       const browser = await signIn();
       const huge = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { document: "x".repeat(11 * 1024 * 1024) });
       expect(huge.status).toBe(400);
@@ -367,8 +471,8 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
     });
 
     it("is for editors only", async () => {
-      const carol_ = await signIn({ sub: "carol", email: "carol@example.com" });
-      const run = await carol_.json("POST", `${API}/tenants/alpha/toolsets/mine/test`, { tool: starter.tools[0], args: {} });
+      const vic_ = await signIn({ sub: "vic", email: "vic@example.com" });
+      const run = await vic_.json("POST", `${API}/tenants/alpha/toolsets/mine/test`, { tool: starter.tools[0], args: {} });
       expect(run.status).toBe(403);
       expect(upstream).toEqual([]);
     });

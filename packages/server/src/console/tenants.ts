@@ -1,25 +1,26 @@
 // The tenant overview and creating a toolset from a source.
 import type { CreatedToolset, TenantView } from "@cairnmcp/console-api";
 import { defaultToolset } from "@cairnmcp/core";
-import { getSource, getToolset, listMembers, listSourceSummaries, listToolsets, putToolset, setToolsetAccess, tenantName } from "@cairnmcp/db";
+import { getSource, getToolset, listCustomers, listSourceSummaries, listTeam, listToolsets, putToolset, setToolsetAccess, tenantName } from "@cairnmcp/db";
 import { json } from "@cairnmcp/http";
 import { issuesText, NewToolset, readBody } from "./bodies.ts";
-import { editorResponse, endpointUrl, type ApiRoute } from "./context.ts";
+import { endpointUrl, teamResponse, type ApiRoute } from "./context.ts";
 
 export const tenantRoutes: ApiRoute[] = [
   {
     method: "GET",
     path: /^\/tenants\/([^/]+)$/,
     handle: (api, [tenant]) =>
-      editorResponse(api, tenant!, async (tx, tenantId) => {
+      teamResponse(api, tenant!, "viewer", async (tx, tenantId) => {
         const sources = await listSourceSummaries(tx);
         const toolsets = await listToolsets(tx);
-        const members = await listMembers(tx);
+        const team = await listTeam(tx);
+        const { total: customers } = await listCustomers(tx, { limit: 1 });
         return {
           tenant: { id: tenantId, name: (await tenantName(tx)) ?? tenantId },
           sources: sources.map((s) => ({ id: s.id, name: s.name, operations: s.operations.total, reads: s.operations.read })),
           toolsets: toolsets.map((t) => ({ id: t.id, name: t.name, sourceId: t.sourceId, enabledTools: t.tools.filter((b) => b.enabled).length, endpoint: endpointUrl(api.ctx, tenantId, t.id) })),
-          members: members.map((m) => ({ ...m, you: m.userId === api.user.userId })),
+          people: { team: team.length, customers },
         } satisfies TenantView;
       }),
   },
@@ -29,7 +30,7 @@ export const tenantRoutes: ApiRoute[] = [
     handle: async (api, [tenant]) => {
       const body = await readBody(api.request, NewToolset);
       if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
-      return editorResponse(api, tenant!, async (tx, tenantId) => {
+      return teamResponse(api, tenant!, "editor", async (tx, tenantId) => {
         if (await getToolset(tx, body.data.id)) return json(409, { error: "conflict", message: `a toolset ${body.data.id} already exists` });
         const source = await getSource(tx, body.data.sourceId);
         if (!source) return json(404, { error: "not_found", message: `no source ${body.data.sourceId}` });

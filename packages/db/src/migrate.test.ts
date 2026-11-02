@@ -1,5 +1,6 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
 import { Database } from "./client.ts";
 import { loadMigrations, migrate } from "./migrate.ts";
 import { allTables } from "./schema.ts";
@@ -104,5 +105,36 @@ describe.skipIf(!adminUrl)("migrations (Postgres)", () => {
     await expect(Database.connect({ url: scratch.adminUrl })).rejects.toThrow(/refusing to connect/);
     const db = await Database.connect({ url: scratch.appUrl });
     await db.close();
+  });
+});
+
+describe.skipIf(!adminUrl)("0006 team and customers (Postgres)", () => {
+  it("turns members into viewers and keeps their access", async () => {
+    const before = loadMigrations().filter((m) => m.version < "0006");
+    const scratch = await scratchDatabase(adminUrl!, { migrations: before });
+    const owner = new pg.Client({ connectionString: scratch.ownerUrl });
+    await owner.connect();
+    try {
+      await owner.query("BEGIN");
+      await owner.query("SELECT set_config('app.tenant_id', 'old', true)");
+      await owner.query("INSERT INTO cairnmcp.tenants (id, name) VALUES ('old', 'Old')");
+      await owner.query("INSERT INTO cairnmcp.users (id, issuer, subject) VALUES ('u-owner', 'i', 'owner'), ('u-friend', 'i', 'friend')");
+      await owner.query("INSERT INTO cairnmcp.memberships (tenant_id, user_id, role) VALUES ('old', 'u-owner', 'owner'), ('old', 'u-friend', 'member')");
+      await owner.query("COMMIT");
+
+      expect((await migrate(scratch.ownerUrl)).applied).toEqual(["0006_team_and_customers"]);
+
+      await owner.query("BEGIN");
+      await owner.query("SELECT set_config('app.tenant_id', 'old', true)");
+      const { rows } = await owner.query("SELECT user_id, role, status FROM cairnmcp.memberships ORDER BY user_id");
+      await owner.query("COMMIT");
+      expect(rows).toEqual([
+        { user_id: "u-friend", role: "viewer", status: "active" },
+        { user_id: "u-owner", role: "owner", status: "active" },
+      ]);
+    } finally {
+      await owner.end();
+      await scratch.drop();
+    }
   });
 });

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { SideEffect } from "@/lib/api";
+import type { Role, SideEffect } from "@/lib/api";
 
 /** A read-only value with a copy button (endpoint URLs, account ids). */
 export function CopyText({ value, className }: { value: string; className?: string }) {
@@ -88,4 +88,18 @@ export function slugify(text: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 64)
     .replace(/-+$/, "");
+}
+
+/** Someone in a tenant: their sign-in name if known, the account id, and their role (D-038). */
+export function PersonName({ person, you, showRole = true }: { person: { userId: string; label: string | null; role: Role }; you?: boolean; showRole?: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <span className="flex items-center gap-1.5 truncate">
+        {person.label ?? <span className="text-muted-foreground">No name yet</span>}
+        {showRole && person.role !== "customer" && <Badge variant="outline">{person.role}</Badge>}
+        {you && <Badge variant="secondary">you</Badge>}
+      </span>
+      <span className="truncate font-mono text-muted-foreground text-xs">{person.userId}</span>
+    </div>
+  );
 }

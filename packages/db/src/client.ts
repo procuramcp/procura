@@ -1,4 +1,4 @@
-import { TenantId, UserId } from "@cairnmcp/core";
+import { TenantId, UserId, type TeamRole } from "@cairnmcp/core";
 import { sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
@@ -72,9 +72,9 @@ export class Database {
     return TenantId.parse(rows[0]!.id);
   }
 
-  /** The tenants `userId` is a member of, with their role there (for the console, D-033). */
-  async userTenants(userId: UserId): Promise<Array<{ tenantId: TenantId; name: string; role: "owner" | "admin" | "member" }>> {
-    const { rows } = await this.#pool.query<{ tenant_id: string; tenant_name: string; role: "owner" | "admin" | "member" }>(
+  /** The tenants where `userId` is on the active team, with their role there (for the console, D-033, D-038). */
+  async userTenants(userId: UserId): Promise<Array<{ tenantId: TenantId; name: string; role: TeamRole }>> {
+    const { rows } = await this.#pool.query<{ tenant_id: string; tenant_name: string; role: TeamRole }>(
       "SELECT tenant_id, tenant_name, role FROM cairnmcp.user_tenants($1)",
       [UserId.parse(userId)],
     );
@@ -87,9 +87,13 @@ export class Database {
     return rows[0]?.id ? UserId.parse(rows[0].id) : undefined;
   }
 
-  /** Find or create the user for a validated token's issuer and subject. */
-  async ensureUser(issuer: string, subject: string): Promise<UserId> {
-    const { rows } = await this.#pool.query<{ id: string }>("SELECT cairnmcp.ensure_user($1, $2) AS id", [issuer, subject]);
+  /**
+   * Find or create the user for a validated token's issuer and subject. A
+   * `label` (usually an email, from the sign-in) replaces the stored one, so
+   * the team can find people by it (D-038).
+   */
+  async ensureUser(issuer: string, subject: string, label?: string): Promise<UserId> {
+    const { rows } = await this.#pool.query<{ id: string }>("SELECT cairnmcp.ensure_user($1, $2, $3) AS id", [issuer, subject, label ?? null]);
     return UserId.parse(rows[0]!.id);
   }
 

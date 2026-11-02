@@ -2,7 +2,7 @@
 // runtime, the MCP SDK client, a local token issuer, and a fake upstream.
 import { randomBytes } from "node:crypto";
 import { AccessProfile, Toolset, type IrDocument, type TenantId, type UserId } from "@cairnmcp/core";
-import { addMember, Database, listAuditEvents, PgAuditSink, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess } from "@cairnmcp/db";
+import { addMember, Database, listAuditEvents, PgAuditSink, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess, updateMember } from "@cairnmcp/db";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
 import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
@@ -92,8 +92,8 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       });
     }
     await db.withTenant(a.tenantId, async (tx) => {
-      await addMember(tx, reader, "member");
-      await addMember(tx, outsider, "member");
+      await addMember(tx, reader, "customer");
+      await addMember(tx, outsider, "customer");
       await setToolsetAccess(tx, toolset.id, reader, "use");
     });
 
@@ -273,7 +273,7 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
     it("downgrading access hides and blocks write tools immediately", async () => {
       const temp = await db.ensureUser(ISSUER, "alpha-temp");
       await db.withTenant(a.tenantId, async (tx) => {
-        await addMember(tx, temp, "member");
+        await addMember(tx, temp, "customer");
         await setToolsetAccess(tx, "mine" as never, temp, "use_writes");
       });
       const client = await connect("alpha-temp", resource(a.tenantId));
@@ -287,6 +287,23 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       await expect(client.listTools()).rejects.toThrow();
       await client.close();
     });
+    it("suspending a customer refuses them on the next request, and resuming lets them back (D-038)", async () => {
+      const temp = await db.ensureUser(ISSUER, "alpha-suspended");
+      await db.withTenant(a.tenantId, async (tx) => {
+        await addMember(tx, temp, "customer");
+        await setToolsetAccess(tx, "mine" as never, temp, "use");
+      });
+      const client = await connect("alpha-suspended", resource(a.tenantId));
+      expect((await client.listTools()).tools).toHaveLength(1);
+
+      await db.withTenant(a.tenantId, (tx) => updateMember(tx, temp, { status: "suspended" }));
+      await expect(client.listTools()).rejects.toThrow();
+      await expect(client.callTool({ name: "list_activities", arguments: {} })).rejects.toThrow();
+
+      await db.withTenant(a.tenantId, (tx) => updateMember(tx, temp, { status: "active" }));
+      expect((await client.listTools()).tools).toHaveLength(1);
+      await client.close();
+    });
   });
 
   describe("access profiles (D-034)", () => {
@@ -295,7 +312,7 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       const profile = (operations: string[] | null) =>
         AccessProfile.parse({ id: "coach", name: "Coach", rules: [{ toolsetId: "mine", level: "use_writes", operations }] });
       await db.withTenant(a.tenantId, async (tx) => {
-        await addMember(tx, coach, "member");
+        await addMember(tx, coach, "customer");
         await putProfile(tx, profile(["update_activity"]));
         await setMemberProfiles(tx, coach, ["coach"]);
       });

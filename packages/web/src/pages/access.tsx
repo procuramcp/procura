@@ -1,5 +1,5 @@
-import { ArrowLeftIcon, PlusIcon, ShieldCheckIcon, Trash2Icon, UndoIcon, UsersIcon } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeftIcon, EllipsisIcon, PauseIcon, PlayIcon, PlusIcon, SearchIcon, ShieldCheckIcon, StickyNoteIcon, Trash2Icon, UndoIcon, UsersIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import {
@@ -18,21 +18,30 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
-import { api, type AccessProfile, type AccessView, type Level, type ProfileRule } from "@/lib/api";
-import { useLoad } from "@/lib/hooks";
-import { SideEffectBadge, slugify } from "@/pages/parts";
+import { api, type AccessProfile, type AccessView, type Level, type MemberStatus, type Person, type ProfileRule, type Role } from "@/lib/api";
+import { useLoad, useRole } from "@/lib/hooks";
+import { PersonName, SideEffectBadge, slugify } from "@/pages/parts";
 import { Problem } from "@/pages/shell";
 
 /** Profiles and who holds them (D-034). */
@@ -49,19 +58,24 @@ export function AccessPage() {
         </Link>
         <h1 className="font-heading font-semibold text-2xl">People and profiles</h1>
         <p className="text-muted-foreground text-sm">
-          A profile is a set of permissions you assign to people. Change a profile and everyone who has it changes on their next request.
+          A profile is a set of permissions you assign to people. Change a profile and everyone who has it changes on their next request. Your team
+          works in this console; customers only call tools.
         </p>
       </div>
       <Tabs defaultValue="profiles">
         <TabsList>
           <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="team">Team ({view.data.team.length})</TabsTrigger>
+          <TabsTrigger value="customers">Customers ({view.data.customers})</TabsTrigger>
         </TabsList>
         <TabsContent value="profiles">
           <ProfilesTab tenantId={tenantId} view={view.data} onChanged={view.set} />
         </TabsContent>
-        <TabsContent value="members">
-          <MembersTab tenantId={tenantId} view={view.data} onChanged={view.set} />
+        <TabsContent value="team">
+          <TeamTab tenantId={tenantId} view={view.data} onChanged={view.set} />
+        </TabsContent>
+        <TabsContent value="customers">
+          <CustomersTab tenantId={tenantId} view={view.data} onCount={view.reload} />
         </TabsContent>
       </Tabs>
     </div>
@@ -71,6 +85,7 @@ export function AccessPage() {
 // --- Profiles ---------------------------------------------------------------------------
 
 function ProfilesTab({ tenantId, view, onChanged }: { tenantId: string; view: AccessView; onChanged: (v: AccessView) => void }) {
+  const { canEdit } = useRole(tenantId);
   const [selected, setSelected] = useState<string | undefined>(view.profiles[0]?.id);
   const current = view.profiles.find((p) => p.id === selected);
 
@@ -93,6 +108,7 @@ function ProfilesTab({ tenantId, view, onChanged }: { tenantId: string; view: Ac
             <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{p.description || summary(p, view)}</p>
           </button>
         ))}
+        {canEdit && (
         <NewProfile
           taken={view.profiles.map((p) => p.id)}
           onCreate={async (id, name) => {
@@ -100,9 +116,10 @@ function ProfilesTab({ tenantId, view, onChanged }: { tenantId: string; view: Ac
             setSelected(id);
           }}
         />
+        )}
       </div>
       {current ? (
-        <ProfileEditor key={current.id} tenantId={tenantId} view={view} profile={current} onChanged={onChanged} onDeleted={() => setSelected(undefined)} />
+        <ProfileEditor key={current.id} tenantId={tenantId} view={view} profile={current} onChanged={onChanged} onDeleted={() => setSelected(undefined)} readOnly={!canEdit} />
       ) : (
         <Empty className="border">
           <EmptyHeader>
@@ -171,7 +188,7 @@ function NewProfile({ taken, onCreate }: { taken: string[]; onCreate: (id: strin
 
 type Draft = { name: string; description: string; rules: ProfileRule[] };
 
-function ProfileEditor(props: { tenantId: string; view: AccessView; profile: AccessProfile; onChanged: (v: AccessView) => void; onDeleted: () => void }) {
+function ProfileEditor(props: { tenantId: string; view: AccessView; profile: AccessProfile; onChanged: (v: AccessView) => void; onDeleted: () => void; readOnly: boolean }) {
   const { view, profile } = props;
   const initial: Draft = { name: profile.name, description: profile.description ?? "", rules: profile.rules };
   const [draft, setDraft] = useState<Draft>(initial);
@@ -200,7 +217,8 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    // A disabled fieldset turns every control inside read-only for viewers.
+    <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-4">
       <Card className="gap-4 p-4">
         <FieldGroup>
           <Field>
@@ -215,7 +233,7 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
         <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-sm">
           <UsersIcon className="size-4" />
           {profile.members.length === 0
-            ? "Nobody has this profile yet. Assign it under Members."
+            ? "Nobody has this profile yet. Assign it under Team or Customers."
             : `${profile.members.length} ${profile.members.length === 1 ? "person has" : "people have"} this profile.`}
         </div>
       </Card>
@@ -225,6 +243,7 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
       ))}
       {view.toolsets.length === 0 && <p className="text-muted-foreground text-sm">This tenant has no toolsets yet.</p>}
 
+      {!props.readOnly && (
       <div className="flex items-center justify-between gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -258,7 +277,8 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
           </Button>
         </div>
       </div>
-    </div>
+      )}
+    </fieldset>
   );
 }
 
@@ -346,85 +366,446 @@ function RuleCard(props: {
   );
 }
 
-// --- Members ----------------------------------------------------------------------------
+// --- People (D-038) -----------------------------------------------------------------------
 
-function MembersTab({ tenantId, view, onChanged }: { tenantId: string; view: AccessView; onChanged: (v: AccessView) => void }) {
+const ROLE_HELP: Record<Exclude<Role, "customer">, string> = {
+  owner: "Everything, including other owners",
+  admin: "Everything but owners: keys and the team too",
+  editor: "Tools, profiles, and customers",
+  viewer: "Looks at everything, changes nothing",
+};
+
+/** Profiles someone holds, with a menu to add or remove them. */
+function ProfilePicker(props: { profiles: AccessProfile[]; held: string[]; busy: boolean; readOnly: boolean; onChange: (next: string[]) => void }) {
+  const { profiles, held, busy, readOnly, onChange } = props;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {held.map((id) => (
+        <Badge key={id}>{profiles.find((p) => p.id === id)?.name ?? id}</Badge>
+      ))}
+      {held.length === 0 && readOnly && <span className="text-muted-foreground text-xs">None</span>}
+      {!readOnly && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="xs" variant="outline" disabled={busy || profiles.length === 0}>
+              {busy ? <Spinner /> : <PlusIcon />} Profiles
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel>Profiles</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {profiles.map((p) => (
+              <DropdownMenuCheckboxItem
+                key={p.id}
+                checked={held.includes(p.id)}
+                onCheckedChange={(on) => onChange(on ? [...held, p.id] : held.filter((x) => x !== p.id))}
+                onSelect={(e) => e.preventDefault()}
+              >
+                {p.name}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
+function TeamTab({ tenantId, view, onChanged }: { tenantId: string; view: AccessView; onChanged: (v: AccessView) => void }) {
+  const { canEdit, isAdmin, isOwner } = useRole(tenantId);
   const [busy, setBusy] = useState<string | undefined>();
+  const busyFor = (userId: string) => (b: boolean) => setBusy(b ? userId : undefined);
 
-  async function toggle(userId: string, current: string[], profileId: string, on: boolean) {
-    const profiles = on ? [...current, profileId] : current.filter((p) => p !== profileId);
-    const next = await act(() => api.setMemberProfiles(tenantId, userId, profiles), { busy: (b) => setBusy(b ? userId : undefined) });
+  async function setProfiles(userId: string, profiles: string[]) {
+    const next = await act(() => api.setMemberProfiles(tenantId, userId, profiles), { busy: busyFor(userId) });
     if (next) onChanged(next);
   }
+  async function setRole(m: Person, role: Role) {
+    const next = await act(() => api.setRole(tenantId, m.userId, role), { busy: busyFor(m.userId) });
+    if (!next) return;
+    onChanged(next);
+    toast.success(role === "customer" ? `${m.label ?? m.userId} is now a customer` : `${m.label ?? m.userId} is now ${role === "admin" || role === "editor" ? "an" : "a"} ${role}`);
+  }
+  async function remove(m: Person) {
+    if (!(await act(() => api.removeMember(tenantId, m.userId), { busy: busyFor(m.userId) }))) return;
+    const next = await act(() => api.access(tenantId));
+    if (next) onChanged(next);
+    toast.success(`Removed ${m.label ?? m.userId}`);
+  }
+  // Owners manage owners; admins manage everyone else; nobody changes themselves.
+  const manageable = (m: Person) => isAdmin && !m.you && (isOwner || m.role !== "owner");
 
   return (
     <Card className="py-0">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Account</TableHead>
-            <TableHead className="w-28">Role</TableHead>
+            <TableHead>Person</TableHead>
+            <TableHead className="w-40">Role</TableHead>
             <TableHead>Profiles</TableHead>
+            <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {view.members.map((m) => (
+          {view.team.map((m) => (
             <TableRow key={m.userId}>
-              <TableCell className="font-mono text-xs">
-                {m.userId} {m.you && <Badge variant="secondary">you</Badge>}
+              <TableCell className="max-w-0">
+                <PersonName person={m} you={m.you} showRole={false} />
               </TableCell>
               <TableCell>
-                <Badge variant="outline">{m.role}</Badge>
+                {manageable(m) ? (
+                  <Select value={m.role} onValueChange={(v) => void setRole(m, v as Role)} disabled={busy === m.userId}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(["owner", "admin", "editor", "viewer"] as const)
+                        .filter((r) => isOwner || r !== "owner")
+                        .map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
+                      <SelectSeparator />
+                      <SelectItem value="customer">Make a customer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge variant="outline">{m.role}</Badge>
+                )}
               </TableCell>
               <TableCell>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {m.profiles.map((id) => (
-                    <Badge key={id}>{view.profiles.find((p) => p.id === id)?.name ?? id}</Badge>
-                  ))}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="xs" variant="outline" disabled={busy === m.userId || view.profiles.length === 0}>
-                        {busy === m.userId ? <Spinner /> : <PlusIcon />} Profiles
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuLabel>Profiles</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {view.profiles.map((p) => (
-                        <DropdownMenuCheckboxItem
-                          key={p.id}
-                          checked={m.profiles.includes(p.id)}
-                          onCheckedChange={(on) => void toggle(m.userId, m.profiles, p.id, on)}
-                          onSelect={(e) => e.preventDefault()}
-                        >
-                          {p.name}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <ProfilePicker profiles={view.profiles} held={m.profiles} busy={busy === m.userId} readOnly={!canEdit} onChange={(p) => void setProfiles(m.userId, p)} />
               </TableCell>
+              <TableCell>{manageable(m) && <RemoveButton who={m} onConfirm={() => void remove(m)} />}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-      <AddMember tenantId={tenantId} view={view} onChanged={onChanged} />
-      <p className="border-t px-4 py-3 text-muted-foreground text-xs">
-        Owners and admins edit this tenant; profiles only decide which tools someone can call.
-      </p>
+      {isAdmin && <AddTeammate tenantId={tenantId} isOwner={isOwner} onChanged={onChanged} />}
+      <dl className="grid gap-x-4 gap-y-1 border-t px-4 py-3 text-muted-foreground text-xs sm:grid-cols-[auto_1fr]">
+        {Object.entries(ROLE_HELP).map(([role, help]) => (
+          <div key={role} className="contents">
+            <dt className="font-medium">{role}</dt>
+            <dd>{help}</dd>
+          </div>
+        ))}
+      </dl>
     </Card>
   );
 }
 
-function AddMember({ tenantId, view, onChanged }: { tenantId: string; view: AccessView; onChanged: (v: AccessView) => void }) {
+function AddTeammate({ tenantId, isOwner, onChanged }: { tenantId: string; isOwner: boolean; onChanged: (v: AccessView) => void }) {
   const [userId, setUserId] = useState("");
-  const [profileId, setProfileId] = useState(view.profiles[0]?.id ?? "");
+  const [role, setRole] = useState<Role>("viewer");
   const [busy, setBusy] = useState(false);
-  if (view.profiles.length === 0) return null;
   return (
     <div className="flex flex-col gap-2 border-t p-4">
       <div>
-        <h3 className="font-medium text-sm">Add someone</h3>
+        <h3 className="font-medium text-sm">Add a teammate</h3>
+        <p className="text-muted-foreground text-xs">They sign in to this console once; the page they land on shows their account id.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Input className="min-w-64 flex-1 font-mono" placeholder="Account id" value={userId} onChange={(e) => setUserId(e.target.value.trim())} />
+        <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(["owner", "admin", "editor", "viewer"] as const)
+              .filter((r) => isOwner || r !== "owner")
+              .map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        <Button
+          disabled={busy || !userId}
+          onClick={async () => {
+            const next = await act(() => api.setRole(tenantId, userId, role), { busy: setBusy });
+            if (!next) return;
+            onChanged(next);
+            setUserId("");
+            toast.success("Added to the team");
+          }}
+        >
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RemoveButton({ who, onConfirm }: { who: Person; onConfirm: () => void }) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="icon-sm" variant="ghost" className="text-muted-foreground hover:text-destructive" aria-label={`Remove ${who.label ?? who.userId}`}>
+          <Trash2Icon />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove {who.label ?? who.userId}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            They lose their access and profiles here. Suspending keeps both, if they may come back.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>Remove</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function CustomersTab({ tenantId, view, onCount }: { tenantId: string; view: AccessView; onCount: () => void }) {
+  const { canEdit } = useRole(tenantId);
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [rows, setRows] = useState<Person[]>([]);
+  const [total, setTotal] = useState(0);
+  const [next, setNext] = useState<string | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | undefined>();
+  const busyFor = (userId: string) => (b: boolean) => setBusy(b ? userId : undefined);
+
+  // Search as you type, a moment after the last key.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    api.customers(tenantId, search).then(
+      (page) => {
+        if (!live) return;
+        setRows(page.customers);
+        setTotal(page.total);
+        setNext(page.next);
+        setLoading(false);
+      },
+      (e: Error) => {
+        if (!live) return;
+        toast.error("Couldn't load customers", { description: e.message });
+        setLoading(false);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [tenantId, search]);
+
+  async function more() {
+    const page = await act(() => api.customers(tenantId, search, next), { busy: (b) => setLoading(b) });
+    if (!page) return;
+    setRows((r) => [...r, ...page.customers]);
+    setNext(page.next);
+  }
+  const replace = (p: Person) => setRows((r) => r.map((x) => (x.userId === p.userId ? p : x)));
+
+  async function setProfiles(c: Person, profiles: string[]) {
+    if (await act(() => api.setMemberProfiles(tenantId, c.userId, profiles), { busy: busyFor(c.userId) })) replace({ ...c, profiles });
+  }
+  async function setStatus(c: Person, status: MemberStatus) {
+    const updated = await act(() => api.updateMember(tenantId, c.userId, { status }), { busy: busyFor(c.userId) });
+    if (!updated) return;
+    replace(updated);
+    toast.success(status === "suspended" ? `Suspended ${c.label ?? c.userId}` : `Resumed ${c.label ?? c.userId}`, {
+      description: status === "suspended" ? "Their next request is refused; their access and profiles are kept." : "They have their access back.",
+    });
+  }
+  async function setNote(c: Person, note: string) {
+    const updated = await act(() => api.updateMember(tenantId, c.userId, { note: note.trim() || null }), { busy: busyFor(c.userId) });
+    if (updated) replace(updated);
+  }
+  async function remove(c: Person) {
+    if (!(await act(() => api.removeMember(tenantId, c.userId), { busy: busyFor(c.userId) }))) return;
+    setRows((r) => r.filter((x) => x.userId !== c.userId));
+    setTotal((t) => t - 1);
+    onCount();
+    toast.success(`Removed ${c.label ?? c.userId}`);
+  }
+
+  return (
+    <Card className="gap-0 py-0">
+      <div className="flex flex-wrap items-center gap-2 border-b p-3">
+        <InputGroup className="min-w-48 flex-1">
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput placeholder="Search by name, email, account id, or note" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </InputGroup>
+        <span className="text-muted-foreground text-sm tabular-nums">
+          {search ? `${total} of ${view.customers}` : `${total}`} {total === 1 ? "customer" : "customers"}
+        </span>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Customer</TableHead>
+            <TableHead className="w-28">Status</TableHead>
+            <TableHead>Profiles</TableHead>
+            <TableHead className="hidden lg:table-cell">Note</TableHead>
+            <TableHead className="w-12" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((c) => (
+            <TableRow key={c.userId} className={c.status === "suspended" ? "bg-muted/40" : undefined}>
+              <TableCell className="max-w-0">
+                <PersonName person={c} />
+              </TableCell>
+              <TableCell>
+                {c.status === "suspended" ? <Badge variant="destructive">Suspended</Badge> : <Badge variant="secondary">Active</Badge>}
+              </TableCell>
+              <TableCell>
+                <ProfilePicker profiles={view.profiles} held={c.profiles} busy={busy === c.userId} readOnly={!canEdit} onChange={(p) => void setProfiles(c, p)} />
+              </TableCell>
+              <TableCell className="hidden max-w-0 truncate text-muted-foreground text-sm lg:table-cell" title={c.note ?? undefined}>
+                {c.note}
+              </TableCell>
+              <TableCell>
+                {canEdit && (
+                  <CustomerMenu
+                    customer={c}
+                    busy={busy === c.userId}
+                    onStatus={(s) => void setStatus(c, s)}
+                    onNote={(n) => void setNote(c, n)}
+                    onRemove={() => void remove(c)}
+                  />
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+          {!loading && rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                {search ? "No customer matches." : "No customers yet. Anyone you grant access to joins as a customer."}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      {(next || loading) && (
+        <div className="flex justify-center border-t p-3">
+          <Button variant="outline" size="sm" disabled={loading} onClick={() => void more()}>
+            {loading && <Spinner />} {loading ? "Loading" : `Show more (${rows.length} of ${total})`}
+          </Button>
+        </div>
+      )}
+      {canEdit && (
+        <AddCustomer
+          tenantId={tenantId}
+          view={view}
+          onAdded={() => {
+            setSearch("");
+            setQuery("");
+            setRows([]);
+            onCount();
+            // Reload the first page so the new customer shows at the top.
+            void api.customers(tenantId).then((page) => {
+              setRows(page.customers);
+              setTotal(page.total);
+              setNext(page.next);
+            });
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+function CustomerMenu(props: { customer: Person; busy: boolean; onStatus: (s: MemberStatus) => void; onNote: (note: string) => void; onRemove: () => void }) {
+  const { customer, busy } = props;
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [note, setNote] = useState(customer.note ?? "");
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="icon-sm" variant="ghost" disabled={busy} aria-label={`Actions for ${customer.label ?? customer.userId}`}>
+            {busy ? <Spinner /> : <EllipsisIcon />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {customer.status === "active" ? (
+            <DropdownMenuItem onSelect={() => props.onStatus("suspended")}>
+              <PauseIcon /> Suspend
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onSelect={() => props.onStatus("active")}>
+              <PlayIcon /> Resume
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            onSelect={() => {
+              setNote(customer.note ?? "");
+              setNoteOpen(true);
+            }}
+          >
+            <StickyNoteIcon /> {customer.note ? "Edit note" : "Add note"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
+            <Trash2Icon /> Remove
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={noteOpen} onOpenChange={setNoteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Note on {customer.label ?? customer.userId}</DialogTitle>
+            <DialogDescription>Only your team sees it.</DialogDescription>
+          </DialogHeader>
+          <Textarea rows={3} maxLength={2000} value={note} placeholder="Trial until March, support ticket link…" onChange={(e) => setNote(e.target.value)} />
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                props.onNote(note);
+                setNoteOpen(false);
+              }}
+            >
+              Save note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {customer.label ?? customer.userId}?</AlertDialogTitle>
+            <AlertDialogDescription>They lose their access and profiles here. Suspending keeps both, if they may come back.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={props.onRemove}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function AddCustomer({ tenantId, view, onAdded }: { tenantId: string; view: AccessView; onAdded: () => void }) {
+  const [userId, setUserId] = useState("");
+  const [profileId, setProfileId] = useState(view.profiles[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  if (view.profiles.length === 0) {
+    return <p className="border-t px-4 py-3 text-muted-foreground text-xs">Create a profile first to add customers with it, or grant access on a toolset's Access tab.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2 border-t p-4">
+      <div>
+        <h3 className="font-medium text-sm">Add a customer</h3>
         <p className="text-muted-foreground text-xs">They sign in once by connecting to an MCP URL; the No access page shows their account id.</p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -444,11 +825,17 @@ function AddMember({ tenantId, view, onChanged }: { tenantId: string; view: Acce
         <Button
           disabled={busy || !userId || !profileId}
           onClick={async () => {
-            const current = view.members.find((m) => m.userId === userId)?.profiles ?? [];
-            const next = await act(() => api.setMemberProfiles(tenantId, userId, [...new Set([...current, profileId])]), { busy: setBusy });
-            if (!next) return;
-            onChanged(next);
+            // Keep any profiles they already hold.
+            const added = await act(
+              async () => {
+                const existing = (await api.customers(tenantId, userId)).customers.find((c) => c.userId === userId)?.profiles ?? [];
+                return api.setMemberProfiles(tenantId, userId, [...new Set([...existing, profileId])]);
+              },
+              { busy: setBusy },
+            );
+            if (!added) return;
             setUserId("");
+            onAdded();
             toast.success("Added");
           }}
         >
