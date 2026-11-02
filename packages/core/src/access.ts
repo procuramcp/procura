@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { JsonValue } from "./ir/json-schema.ts";
 import { OperationId, ProfileId, ToolsetId, type UserId } from "./ir/ids.ts";
 import type { SideEffect } from "./ir/side-effect.ts";
+import { omitUndefined } from "./util.ts";
 
 /**
  * Who is making a call, after their token was validated (D-022, D-023).
@@ -64,7 +65,25 @@ export function canCall(level: ToolsetAccessLevel | undefined, sideEffect: SideE
  * One grant of access to a toolset (D-034): a level, optionally narrowed to
  * some of its operations. A direct grant is a rule with no operation list.
  */
-export type AccessRule = { level: ToolsetAccessLevel; operations?: readonly string[] | null };
+/**
+ * How much one customer may call under a plan (D-039). Each field left out
+ * means no limit on it. Allowances count calls across the whole tenant, per
+ * UTC day and calendar month.
+ */
+export const PlanLimits = z.object({
+  requestsPerMinute: z.number().int().min(1).max(100_000).optional(),
+  perDay: z.number().int().min(1).max(1_000_000_000).optional(),
+  perMonth: z.number().int().min(1).max(1_000_000_000).optional(),
+  /** Where a customer who hits a limit can get more; shown in the limit message. */
+  upgradeUrl: z
+    .url({ protocol: /^https$/ })
+    .max(2000)
+    .optional(),
+});
+export type PlanLimits = z.infer<typeof PlanLimits>;
+
+/** A level on one toolset, optionally narrowed to some operations, and the plan limits that come with it. */
+export type AccessRule = { level: ToolsetAccessLevel; operations?: readonly string[] | null; limits?: PlanLimits };
 
 /** Everything that gives a caller access to one toolset; none means no access. */
 export type ToolsetAccess = { rules: readonly AccessRule[] };
@@ -76,6 +95,21 @@ export type ToolsetAccess = { rules: readonly AccessRule[] };
  */
 export function allowsTool(access: ToolsetAccess, operationId: string, sideEffect: SideEffect): boolean {
   return access.rules.some((r) => canCall(r.level, sideEffect) && (!r.operations || r.operations.includes(operationId)));
+}
+
+/**
+ * The limits on one call (D-039): of the rules that allow it, the most
+ * generous on each count, where a rule without that limit (a direct grant, or
+ * a plan that leaves it unset) means no limit. The upgrade link comes from the
+ * first allowing rule that has one. Undefined when no rule allows the call.
+ */
+export function callLimits(access: ToolsetAccess, operationId: string, sideEffect: SideEffect): PlanLimits | undefined {
+  const allowing = access.rules.filter((r) => canCall(r.level, sideEffect) && (!r.operations || r.operations.includes(operationId)));
+  if (allowing.length === 0) return undefined;
+  const loosest = (key: "requestsPerMinute" | "perDay" | "perMonth") =>
+    allowing.every((r) => r.limits?.[key] !== undefined) ? Math.max(...allowing.map((r) => r.limits![key]!)) : undefined;
+  const upgradeUrl = allowing.find((r) => r.limits?.upgradeUrl)?.limits?.upgradeUrl;
+  return omitUndefined({ requestsPerMinute: loosest("requestsPerMinute"), perDay: loosest("perDay"), perMonth: loosest("perMonth"), upgradeUrl });
 }
 
 /** The highest level among the rules, for display (e.g. "can write" on the consent page). */
@@ -100,6 +134,8 @@ export const AccessProfile = z
     name: z.string().trim().min(1).max(200),
     description: z.string().max(2000).optional(),
     rules: z.array(ProfileRule).max(200),
+    /** What a plan allows each customer who holds it (D-039). */
+    limits: PlanLimits.default({}),
   })
   .superRefine((p, ctx) => {
     const seen = new Set<string>();

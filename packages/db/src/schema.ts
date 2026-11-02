@@ -1,7 +1,7 @@
 // Drizzle's view of the tables in migrations/*.sql, for typed queries only.
 // The SQL files are the source of truth (constraints, RLS, grants live there);
 // schema.test.ts checks that every column here exists in the migrated database.
-import { bigint, foreignKey, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, date, foreignKey, integer, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 import type { WrappedKey } from "@cairnmcp/vault";
 
 export const cairnmcp = pgSchema("cairnmcp");
@@ -191,6 +191,10 @@ export const accessProfiles = cairnmcp.table(
     id: text("id").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    requestsPerMinute: integer("requests_per_minute"),
+    perDay: integer("per_day"),
+    perMonth: integer("per_month"),
+    upgradeUrl: text("upgrade_url"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -246,6 +250,18 @@ export const consoleSessions = cairnmcp.table("console_sessions", {
   createdAt: createdAt(),
 });
 
+export const usageCounters = cairnmcp.table(
+  "usage_counters",
+  {
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    period: text("period", { enum: ["day", "month"] }).notNull(),
+    periodStart: date("period_start").notNull(),
+    calls: bigint("calls", { mode: "number" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.userId, t.period, t.periodStart] })],
+);
+
 export const allTables = {
   tenants,
   users,
@@ -265,4 +281,5 @@ export const allTables = {
   accessProfiles,
   profileRules,
   memberProfiles,
+  usageCounters,
 };

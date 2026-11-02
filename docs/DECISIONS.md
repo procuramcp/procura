@@ -767,3 +767,37 @@ planning handoff are not repeated here unless implementation added something.
   last-seen times (with usage, 3c step 4).
 - **Rejected:** a separate `customers` table (above); a `kind` column beside the role (two fields
   that must agree); letting viewers run test calls (they spend the tenant's upstream key).
+
+## D-039 Plan limits: per-minute rate and allowances on access profiles
+
+- **Context:** a provider sells plans (D-037). A plan already says which tools (an access profile,
+  D-034); it also has to say how much each customer may call, so one customer can't use up the
+  provider's own upstream quota and a free tier stays free.
+- **Decision:** an access profile carries optional limits: calls per minute, per UTC day, and per
+  calendar month (UTC), plus an https upgrade link. Each limit is per customer, across every
+  toolset in the tenant. Left empty, a limit doesn't apply.
+- **More than one plan:** of the rules that allow a call, the most generous wins, separately for
+  each limit (`callLimits` in core). A direct grant (D-034's per-person exception) has no limits,
+  so it lifts them for that toolset. Limits follow plans, not roles: a team member holding a
+  limited profile is limited too.
+- **Where they're counted:** allowances in Postgres (`usage_counters`, one row per person, period,
+  and period start). Taking one is a single upsert that only increments while the counter is under
+  the limit, so concurrent calls can't overshoot; the month is taken before the day and given back
+  if the day is full. Every admitted call counts, limited or not, which is also the usage the
+  console shows and billing will read (3c step 4). The per-minute rate uses an in-memory limiter
+  like the runtime's own throttling: per process, which is enough for bursts until there's more
+  than one instance (then a shared limiter, D-018).
+- **What counts:** calls that reach the API, plus ones it turns away for being busy. A call that
+  fails before it's sent (invalid input, a missing key, our own throttling) is refunded: an
+  agent's typo shouldn't cost a customer.
+- **Telling the agent:** a refusal is a tool result, `limit_reached`, never an exception (D-020):
+  which limit, when it starts over (`resetsAt`), and the upgrade link. Allowances are
+  `retryable: false`, since an agent shouldn't wait hours; it should tell the person. The
+  per-minute limit is retryable, with `retryAfterSeconds`.
+- **Counters are keyed to the tenant, not the membership,** so removing and re-adding someone
+  doesn't reset what they've used.
+- **Not yet:** a cost per tool (an expensive call counting as several), plan changes from sign-in
+  claims (3c step 3), the usage page and export (3c step 4), sweeping old counter rows.
+- **Rejected:** counting from the audit log (writes only, and too heavy, D-037); limits per rule
+  instead of per profile (a plan is one price, whatever toolsets it covers); retrying refused calls
+  automatically (D-020).

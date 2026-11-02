@@ -60,10 +60,10 @@ each step is usable on its own:
 1. **Customers separate from the team** (P-16, T-1), ✅ D-038: roles owner, admin, editor, viewer,
    and customer; customers searchable and paged, with suspend, notes, and per-customer grants and
    profiles; isolation tests cover them. Creating them on first sign-in comes with step 3.
-2. **Plans with limits** (P-11, P-13, P-14, C-3): an access profile gains per-customer requests per
-   minute and a daily or monthly allowance, optionally a cost per tool. Counters in Postgres, so
-   they hold across restarts and instances. Limit errors say which limit, when it resets, and the
-   provider's upgrade link.
+2. **Plans with limits** (P-11, P-13, P-14, C-3), ✅ D-039: an access profile has per-customer
+   calls per minute, per day, and per month, and an upgrade link; allowances counted in Postgres;
+   `limit_reached` says which limit, when it starts over, and where to upgrade. Left for later: a
+   cost per tool.
 3. **The provider's sign-in, plans from claims** (P-10, P-12, C-1, C-4): moved here from 3b. The
    tenant names its OIDC or OAuth provider; a claim picks the plan and is re-read on token refresh.
 4. **Usage** (P-30, P-31, P-32): a usage page by tool, customer, and plan; export and a webhook

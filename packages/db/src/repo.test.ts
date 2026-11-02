@@ -1,5 +1,5 @@
 // The lightweight repo queries: they must agree with what the full IR says.
-import { countBySideEffect, defaultToolset, type TenantId, type UserId } from "@cairnmcp/core";
+import { AccessProfile, countBySideEffect, defaultToolset, type TenantId, type UserId } from "@cairnmcp/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import { PG, pgErrorCode } from "./errors.ts";
@@ -19,6 +19,14 @@ import {
   tenantName,
   toolsetVersion,
   updateMember,
+  listProfiles,
+  putProfile,
+  refundAllowance,
+  setMemberProfiles,
+  takeAllowance,
+  toolsetAccessFor,
+  usageFor,
+  usagePeriods,
 } from "./repo.ts";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "./test-support.ts";
 
@@ -146,5 +154,81 @@ describe.skipIf(!adminUrl)("repo queries", () => {
     expect([suspended?.status, suspended?.note]).toEqual(["suspended", "Trial ends 100% in March"]);
     // A tampered cursor reads as the first page instead of failing.
     expect((await db.withTenant(tenantId, (tx) => listCustomers(tx, { after: "garbage" }))).customers.length).toBeGreaterThan(0);
+  });
+
+  describe("plan limits and allowances (D-039)", () => {
+    it("works out UTC days and months, across a year end", () => {
+      expect(usagePeriods(new Date("2026-12-31T23:59:59.999Z"))).toEqual({
+        day: "2026-12-31",
+        month: "2026-12-01",
+        dayEnds: "2027-01-01T00:00:00Z",
+        monthEnds: "2027-01-01T00:00:00Z",
+      });
+      expect(usagePeriods(new Date("2026-02-28T10:00:00Z")).dayEnds).toBe("2026-03-01T00:00:00Z");
+    });
+
+    it("stores a profile's limits and hands them to access checks", async () => {
+      const customer = await db.ensureUser("https://issuer.test", "plan-holder");
+      const free = AccessProfile.parse({
+        id: "free",
+        name: "Free",
+        rules: [{ toolsetId: "intervals", level: "use" }],
+        limits: { requestsPerMinute: 10, perDay: 100, upgradeUrl: "https://example.com/pricing" },
+      });
+      await db.withTenant(tenantId, async (tx) => {
+        await putProfile(tx, free);
+        await ensureMember(tx, customer);
+        await setMemberProfiles(tx, customer, ["free"]);
+        expect((await listProfiles(tx)).find((p) => p.id === "free")?.limits).toEqual(free.limits);
+        expect((await toolsetAccessFor(tx, "intervals", customer)).rules.map((r) => r.limits)).toEqual([free.limits]);
+        // Clearing a limit stores null, not the old value.
+        await putProfile(tx, { ...free, limits: { perDay: 100 } });
+        expect((await listProfiles(tx)).find((p) => p.id === "free")?.limits).toEqual({ perDay: 100 });
+      });
+    });
+
+    it("counts calls up to the daily allowance, then refuses until the next day", async () => {
+      const user = await db.ensureUser("https://issuer.test", "daily");
+      await db.withTenant(tenantId, (tx) => ensureMember(tx, user));
+      const now = new Date("2026-11-02T15:00:00Z");
+      const take = (at = now) => db.withTenant(tenantId, (tx) => takeAllowance(tx, user, { perDay: 3, perMonth: 10 }, at));
+      for (let i = 0; i < 3; i++) expect((await take()).ok).toBe(true);
+      expect(await take()).toEqual({ ok: false, period: "day", limit: 3, resetsAt: "2026-11-03T00:00:00Z" });
+      // The refused call took nothing from the month.
+      expect((await db.withTenant(tenantId, (tx) => usageFor(tx, [user], now))).get(user)).toEqual({ today: 3, month: 3 });
+      expect((await take(new Date("2026-11-03T00:00:01Z"))).ok).toBe(true);
+    });
+
+    it("refuses at the monthly allowance without counting the day, and refunds", async () => {
+      const user = await db.ensureUser("https://issuer.test", "monthly");
+      await db.withTenant(tenantId, (tx) => ensureMember(tx, user));
+      const now = new Date("2026-11-02T15:00:00Z");
+      const take = () => db.withTenant(tenantId, (tx) => takeAllowance(tx, user, { perMonth: 2 }, now));
+      const first = await take();
+      await take();
+      expect(await take()).toEqual({ ok: false, period: "month", limit: 2, resetsAt: "2026-12-01T00:00:00Z" });
+      if (!first.ok) throw new Error("first call should be allowed");
+      await db.withTenant(tenantId, (tx) => refundAllowance(tx, user, first.periods));
+      expect((await db.withTenant(tenantId, (tx) => usageFor(tx, [user], now))).get(user)).toEqual({ today: 1, month: 1 });
+      expect((await take()).ok).toBe(true);
+    });
+
+    it("never lets concurrent calls overshoot an allowance", async () => {
+      const user = await db.ensureUser("https://issuer.test", "burst");
+      await db.withTenant(tenantId, (tx) => ensureMember(tx, user));
+      const now = new Date("2026-11-02T15:00:00Z");
+      const results = await Promise.all(Array.from({ length: 20 }, () => db.withTenant(tenantId, (tx) => takeAllowance(tx, user, { perDay: 5 }, now))));
+      expect(results.filter((r) => r.ok)).toHaveLength(5);
+      expect((await db.withTenant(tenantId, (tx) => usageFor(tx, [user], now))).get(user)).toEqual({ today: 5, month: 5 });
+    });
+
+    it("keeps one tenant's usage out of another's", async () => {
+      const other = await newTenant(db, "repo-other");
+      const user = await db.ensureUser("https://issuer.test", "daily");
+      const now = new Date("2026-11-02T15:00:00Z");
+      expect((await db.withTenant(other.tenantId, (tx) => usageFor(tx, [user], now))).size).toBe(0);
+      // Their allowance there starts from zero.
+      expect((await db.withTenant(other.tenantId, (tx) => takeAllowance(tx, user, { perDay: 1 }, now))).ok).toBe(true);
+    });
   });
 });

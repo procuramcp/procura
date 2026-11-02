@@ -24,7 +24,7 @@ export function issuesText(error: z.ZodError): string {
 export const NewToolset = z.object({ id: ToolsetId, sourceId: SourceId, name: z.string().min(1).max(200) });
 export const ToolsetEdit = z.object({ name: z.string().min(1).max(200), description: z.string().max(4000).optional(), tools: z.array(z.unknown()).max(2000) });
 export const AccessEdit = z.object({ userId: UserId, level: z.union([ToolsetAccessLevel, z.literal("none")]) });
-export const ProfileEdit = z.object({ name: z.string(), description: z.string().optional(), rules: z.array(z.unknown()).max(200) });
+export const ProfileEdit = z.object({ name: z.string(), description: z.string().optional(), rules: z.array(z.unknown()).max(200), limits: z.unknown().optional() });
 export const MemberProfiles = z.object({ profiles: z.array(z.string().max(64)).max(100) });
 export const RoleEdit = z.object({ role: MemberRole });
 export const MemberEdit = z.object({ status: MemberStatus.optional(), note: z.string().trim().max(2000).nullable().optional() });

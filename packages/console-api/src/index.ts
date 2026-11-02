@@ -50,6 +50,8 @@ export type Person = {
   /** Profile ids they hold. */
   profiles: string[];
   you: boolean;
+  /** Calls today and this month (UTC), in the customer list (D-039). */
+  usage?: { today: number; month: number } | undefined;
 };
 
 // ---- Tenant ----
@@ -126,6 +128,9 @@ export type ToolError = {
   /** Upstream HTTP status, for `upstream_error`. */
   status?: number | undefined;
   details?: string[] | undefined;
+  /** For `limit_reached` (D-039). */
+  resetsAt?: string | undefined;
+  upgradeUrl?: string | undefined;
 };
 export type ToolResult = { ok: true; status: number; contentType?: string | undefined; data: JsonValue } | { ok: false; error: ToolError };
 
@@ -140,7 +145,15 @@ export type TestResult = {
 
 /** One rule of a profile; `operations` null means every tool the level allows. */
 export type ProfileRule = { toolsetId: string; level: Level; operations: string[] | null };
-export type AccessProfile = { id: string; name: string; description?: string | undefined; rules: ProfileRule[]; members: string[] };
+/** What a plan allows each customer who holds it (D-039); a missing field means no limit. */
+export type PlanLimits = {
+  requestsPerMinute?: number | undefined;
+  perDay?: number | undefined;
+  perMonth?: number | undefined;
+  /** https only: where a customer who hits a limit can get more. */
+  upgradeUrl?: string | undefined;
+};
+export type AccessProfile = { id: string; name: string; description?: string | undefined; rules: ProfileRule[]; limits: PlanLimits; members: string[] };
 
 /** `GET /tenants/:t/access`, and every profile or team change. */
 export type AccessView = {
@@ -152,7 +165,7 @@ export type AccessView = {
 };
 
 /** `PUT /tenants/:t/profiles/:id` body. */
-export type ProfileEdit = { name: string; description?: string | undefined; rules: ProfileRule[] };
+export type ProfileEdit = { name: string; description?: string | undefined; rules: ProfileRule[]; limits?: PlanLimits | undefined };
 /** `PUT /tenants/:t/members/:user/profiles` body. Adds them as a customer if they aren't in the tenant. */
 export type MemberProfilesEdit = { profiles: string[] };
 

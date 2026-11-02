@@ -306,6 +306,60 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
     });
   });
 
+  describe("plan limits (D-039)", () => {
+    type LimitError = { error: { kind: string; message: string; retryable: boolean; resetsAt?: string; upgradeUrl?: string; retryAfterSeconds?: number } };
+    const list = { name: "list_activities", arguments: { oldest: "2026-10-25" } };
+
+    async function onPlan(subject: string, limits: object) {
+      const user = await db.ensureUser(ISSUER, subject);
+      await db.withTenant(a.tenantId, async (tx) => {
+        await addMember(tx, user, "customer");
+        await putProfile(tx, AccessProfile.parse({ id: subject, name: subject, rules: [{ toolsetId: "mine", level: "use" }], limits }));
+        await setMemberProfiles(tx, user, [subject]);
+      });
+      return { user, client: await connect(subject, resource(a.tenantId)) };
+    }
+
+    it("stops a customer at their daily allowance, says when it starts over and where to get more", async () => {
+      const { client } = await onPlan("plan-daily", { perDay: 2, upgradeUrl: "https://example.com/pricing" });
+      for (let i = 0; i < 2; i++) expect((await client.callTool(list)).isError).toBeFalsy();
+      const refused = await client.callTool(list);
+      expect(refused.isError).toBe(true);
+      const { error } = refused.structuredContent as LimitError;
+      expect(error).toMatchObject({ kind: "limit_reached", retryable: false, upgradeUrl: "https://example.com/pricing" });
+      expect(error.resetsAt).toMatch(/T00:00:00Z$/);
+      expect(error.message).toMatch(/all 2 calls your plan allows today.*upgrade at https:\/\/example\.com\/pricing/);
+      expect(upstreamCalls).toHaveLength(2);
+      await client.close();
+    });
+
+    it("limits calls per minute", async () => {
+      const { client } = await onPlan("plan-rate", { requestsPerMinute: 1 });
+      expect((await client.callTool(list)).isError).toBeFalsy();
+      const refused = await client.callTool(list);
+      expect((refused.structuredContent as LimitError).error).toMatchObject({ kind: "limit_reached", retryable: true });
+      expect((refused.structuredContent as LimitError).error.retryAfterSeconds).toBeGreaterThan(0);
+      expect(upstreamCalls).toHaveLength(1);
+      await client.close();
+    });
+
+    it("doesn't charge for a call that never reached the API", async () => {
+      const { client } = await onPlan("plan-refund", { perDay: 1 });
+      const invalid = await client.callTool({ name: "list_activities", arguments: { oldest: 42 } });
+      expect((invalid.structuredContent as LimitError).error.kind).toBe("invalid_input");
+      expect((await client.callTool(list)).isError).toBeFalsy();
+      expect(((await client.callTool(list)).structuredContent as LimitError).error.kind).toBe("limit_reached");
+      await client.close();
+    });
+
+    it("leaves a direct grant unlimited, even next to a limited plan", async () => {
+      const { user, client } = await onPlan("plan-plus-grant", { perDay: 1 });
+      await db.withTenant(a.tenantId, (tx) => setToolsetAccess(tx, toolset.id, user, "use"));
+      for (let i = 0; i < 3; i++) expect((await client.callTool(list)).isError).toBeFalsy();
+      await client.close();
+    });
+  });
+
   describe("access profiles (D-034)", () => {
     it("a member with only a profile sees and calls exactly what it allows, and edits apply on the next request", async () => {
       const coach = await db.ensureUser(ISSUER, "alpha-coach");
