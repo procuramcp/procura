@@ -3,6 +3,7 @@ import { PgAuditSink, PgVaultStore, type Database } from "@cairnmcp/db";
 import { createMcpHandler, TokenVerifier, type TrustedIssuer } from "@cairnmcp/mcp";
 import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
 import { Vault, type KeyWrapper } from "@cairnmcp/vault";
+import { createConsoleHandler } from "./console.ts";
 
 export type AppOptions = {
   db: Database;
@@ -15,6 +16,8 @@ export type AppOptions = {
   /** Upstream API access. Injected for tests. */
   fetch: FetchLike;
   now?: () => number;
+  /** The built console (packages/web/dist), served at /app (D-033). */
+  consoleDir?: string;
 };
 
 /**
@@ -34,5 +37,13 @@ export async function createApp(options: AppOptions): Promise<(request: Request)
 
   const auth = createAuthHandler({ db: options.db, keys, providers: options.providers, publicUrl, ...(options.now ? { now: options.now } : {}) });
   const mcp = createMcpHandler({ db: options.db, verifier, runtime, publicUrl, ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {}) });
-  return async (request) => (await auth(request)) ?? mcp(request);
+  const console_ = createConsoleHandler({
+    db: options.db,
+    publicUrl,
+    providers: options.providers,
+    runtime,
+    ...(options.consoleDir ? { staticDir: options.consoleDir } : {}),
+    ...(options.now ? { now: options.now } : {}),
+  });
+  return async (request) => (await auth(request)) ?? (await console_(request)) ?? mcp(request);
 }

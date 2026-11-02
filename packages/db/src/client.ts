@@ -72,6 +72,15 @@ export class Database {
     return TenantId.parse(rows[0]!.id);
   }
 
+  /** The tenants `userId` is a member of, with their role there (for the console, D-033). */
+  async userTenants(userId: UserId): Promise<Array<{ tenantId: TenantId; name: string; role: "owner" | "admin" | "member" }>> {
+    const { rows } = await this.#pool.query<{ tenant_id: string; tenant_name: string; role: "owner" | "admin" | "member" }>(
+      "SELECT tenant_id, tenant_name, role FROM cairnmcp.user_tenants($1)",
+      [UserId.parse(userId)],
+    );
+    return rows.map((r) => ({ tenantId: TenantId.parse(r.tenant_id), name: r.tenant_name, role: r.role }));
+  }
+
   /** The user for a validated token's issuer and subject, if they have signed in before. */
   async findUser(issuer: string, subject: string): Promise<UserId | undefined> {
     const { rows } = await this.#pool.query<{ id: string | null }>("SELECT cairnmcp.find_user($1, $2) AS id", [issuer, subject]);

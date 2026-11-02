@@ -66,4 +66,22 @@ describe("serve (node:http)", () => {
       server.close();
     }
   });
+
+  it("sends every Set-Cookie, not just the last one", async () => {
+    const handler = async () => {
+      const headers = new Headers({ location: "/app/" });
+      headers.append("set-cookie", "a=1; Path=/");
+      headers.append("set-cookie", "b=; Path=/; Max-Age=0");
+      return new Response(null, { status: 302, headers });
+    };
+    const server = serve(handler, { port: 0, host: "127.0.0.1", publicUrl: "https://cairn.example.com" });
+    await new Promise((resolve) => server.once("listening", resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/`, { redirect: "manual" });
+      expect(response.headers.getSetCookie()).toEqual(["a=1; Path=/", "b=; Path=/; Max-Age=0"]);
+    } finally {
+      server.close();
+    }
+  });
 });

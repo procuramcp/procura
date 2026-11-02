@@ -31,3 +31,6 @@ deploy/oracle/*.env
 *.tfvars
 !*.tfvars.example
 crash.log
+
+# Built console (D-033): made by `pnpm --filter @cairnmcp/web build` and in the image.
+packages/web/dist/

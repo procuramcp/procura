@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# The cairnmcp image (D-018): the authorization server and the MCP endpoint.
-# No build step: Node runs the TypeScript sources directly (D-009).
+# The cairnmcp image (D-018): the authorization server, the MCP endpoint, and the
+# curation console. No build step for the server: Node runs the TypeScript
+# sources directly (D-009); only the console's browser bundle is built (D-033).
 #
 #   docker build -t cairnmcp .
 #   docker run --rm -e CAIRNMCP_DATABASE_OWNER_URL=… cairnmcp node packages/db/scripts/migrate.ts
@@ -23,10 +24,24 @@ COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --offline --frozen-lockfile --prod --filter "@cairnmcp/server..."
 
+# The curation console (D-033): a browser bundle, the only thing that is built.
+# Its dev dependencies (Vite, Tailwind) stay in this stage.
+FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS web
+WORKDIR /app
+ENV CI=true PNPM_HOME=/pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+RUN corepack enable && corepack install
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
+COPY . .
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --offline --frozen-lockfile --filter "@cairnmcp/web" && \
+    pnpm --filter @cairnmcp/web build
+
 FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080
 COPY --from=deps --chown=root:root /app /app
+COPY --from=web --chown=root:root /app/packages/web/dist /app/packages/web/dist
 # Read-only code, unprivileged process.
 USER node
 EXPOSE 8080
