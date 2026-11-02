@@ -39,7 +39,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
-import { api, type AccessProfile, type AccessView, type Level, type MemberStatus, type Person, type ProfileRule, type Role } from "@/lib/api";
+import { api, type AccessProfile, type AccessView, type Level, type MemberStatus, type Person, type PlanLimits, type ProfileRule, type Role } from "@/lib/api";
 import { useLoad, useRole } from "@/lib/hooks";
 import { PersonName, SideEffectBadge, slugify } from "@/pages/parts";
 import { Problem } from "@/pages/shell";
@@ -137,7 +137,13 @@ function ProfilesTab({ tenantId, view, onChanged }: { tenantId: string; view: Ac
 
 function summary(p: AccessProfile, view: AccessView): string {
   if (p.rules.length === 0) return "No access yet";
-  return p.rules.map((r) => `${view.toolsets.find((t) => t.id === r.toolsetId)?.name ?? r.toolsetId}: ${r.level}${r.operations ? ` (${r.operations.length} tools)` : ""}`).join(" · ");
+  const rules = p.rules.map((r) => `${view.toolsets.find((t) => t.id === r.toolsetId)?.name ?? r.toolsetId}: ${r.level}${r.operations ? ` (${r.operations.length} tools)` : ""}`);
+  const { perDay, perMonth } = p.limits;
+  const limits = [
+    perDay && `${perDay.toLocaleString()}/day`,
+    perMonth && `${perMonth.toLocaleString()}/month`,
+  ].filter(Boolean);
+  return [...rules, ...(limits.length > 0 ? [limits.join(", ")] : [])].join(" · ");
 }
 
 function NewProfile({ taken, onCreate }: { taken: string[]; onCreate: (id: string, name: string) => Promise<void> }) {
@@ -186,11 +192,29 @@ function NewProfile({ taken, onCreate }: { taken: string[]; onCreate: (id: strin
   );
 }
 
-type Draft = { name: string; description: string; rules: ProfileRule[] };
+/** Limits as typed: blank means no limit. */
+type LimitFields = { perDay: string; perMonth: string; upgradeUrl: string };
+type Draft = { name: string; description: string; rules: ProfileRule[]; limits: LimitFields };
+
+const limitFields = (l: PlanLimits): LimitFields => ({
+  perDay: l.perDay?.toString() ?? "",
+  perMonth: l.perMonth?.toString() ?? "",
+  upgradeUrl: l.upgradeUrl ?? "",
+});
+function planLimits(f: LimitFields): PlanLimits {
+  const count = (v: string) => (v.trim() ? Number(v) : undefined);
+  const limits: PlanLimits = {};
+  const day = count(f.perDay);
+  const month = count(f.perMonth);
+  if (day !== undefined) limits.perDay = day;
+  if (month !== undefined) limits.perMonth = month;
+  if (f.upgradeUrl.trim()) limits.upgradeUrl = f.upgradeUrl.trim();
+  return limits;
+}
 
 function ProfileEditor(props: { tenantId: string; view: AccessView; profile: AccessProfile; onChanged: (v: AccessView) => void; onDeleted: () => void; readOnly: boolean }) {
   const { view, profile } = props;
-  const initial: Draft = { name: profile.name, description: profile.description ?? "", rules: profile.rules };
+  const initial: Draft = { name: profile.name, description: profile.description ?? "", rules: profile.rules, limits: limitFields(profile.limits) };
   const [draft, setDraft] = useState<Draft>(initial);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -201,7 +225,7 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
   }
 
   async function save() {
-    const edit = { name: draft.name, ...(draft.description.trim() ? { description: draft.description } : {}), rules: draft.rules };
+    const edit = { name: draft.name, ...(draft.description.trim() ? { description: draft.description } : {}), rules: draft.rules, limits: planLimits(draft.limits) };
     const next = await act(() => api.saveProfile(props.tenantId, profile.id, edit), { busy: setBusy, failure: "Not saved" });
     if (!next) return;
     props.onChanged(next);
@@ -237,6 +261,8 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
             : `${profile.members.length} ${profile.members.length === 1 ? "person has" : "people have"} this profile.`}
         </div>
       </Card>
+
+      <LimitsCard limits={draft.limits} onChange={(limits) => setDraft({ ...draft, limits })} />
 
       {view.toolsets.map((toolset) => (
         <RuleCard key={toolset.id} toolset={toolset} rule={draft.rules.find((r) => r.toolsetId === toolset.id)} onChange={(r) => setRule(toolset.id, r)} />
@@ -279,6 +305,51 @@ function ProfileEditor(props: { tenantId: string; view: AccessView; profile: Acc
       </div>
       )}
     </fieldset>
+  );
+}
+
+/** What the plan allows each customer who holds it (D-039). */
+function LimitsCard({ limits, onChange }: { limits: LimitFields; onChange: (l: LimitFields) => void }) {
+  const field = (key: keyof LimitFields, label: string, hint: string) => (
+    <Field>
+      <FieldLabel htmlFor={`limit-${key}`}>{label}</FieldLabel>
+      <Input
+        id={`limit-${key}`}
+        type="number"
+        min={1}
+        step={1}
+        inputMode="numeric"
+        placeholder="No limit"
+        value={limits[key]}
+        onChange={(e) => onChange({ ...limits, [key]: e.target.value })}
+      />
+      <FieldDescription>{hint}</FieldDescription>
+    </Field>
+  );
+  return (
+    <Card className="gap-3 p-4">
+      <div>
+        <h3 className="font-medium">Limits</h3>
+        <p className="text-muted-foreground text-xs">
+          Per customer, across every toolset. Leave a box empty for no limit. Someone with more than one plan gets the most generous; a direct grant has none.
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {field("perDay", "Calls per day", "Starts over at midnight UTC")}
+        {field("perMonth", "Calls per month", "Starts over on the 1st, UTC")}
+      </div>
+      <Field>
+        <FieldLabel htmlFor="limit-upgradeUrl">Upgrade link</FieldLabel>
+        <Input
+          id="limit-upgradeUrl"
+          type="url"
+          placeholder="https://example.com/pricing"
+          value={limits.upgradeUrl}
+          onChange={(e) => onChange({ ...limits, upgradeUrl: e.target.value })}
+        />
+        <FieldDescription>Shown to the customer's agent when they hit a limit. https only.</FieldDescription>
+      </Field>
+    </Card>
   );
 }
 
@@ -651,6 +722,7 @@ function CustomersTab({ tenantId, view, onCount }: { tenantId: string; view: Acc
             <TableHead>Customer</TableHead>
             <TableHead className="w-28">Status</TableHead>
             <TableHead>Profiles</TableHead>
+            <TableHead className="w-36 text-right">Calls today / month</TableHead>
             <TableHead className="hidden lg:table-cell">Note</TableHead>
             <TableHead className="w-12" />
           </TableRow>
@@ -666,6 +738,9 @@ function CustomersTab({ tenantId, view, onCount }: { tenantId: string; view: Acc
               </TableCell>
               <TableCell>
                 <ProfilePicker profiles={view.profiles} held={c.profiles} busy={busy === c.userId} readOnly={!canEdit} onChange={(p) => void setProfiles(c, p)} />
+              </TableCell>
+              <TableCell className="text-right text-sm tabular-nums">
+                {c.usage ? `${c.usage.today.toLocaleString()} / ${c.usage.month.toLocaleString()}` : "–"}
               </TableCell>
               <TableCell className="hidden max-w-0 truncate text-muted-foreground text-sm lg:table-cell" title={c.note ?? undefined}>
                 {c.note}
@@ -685,7 +760,7 @@ function CustomersTab({ tenantId, view, onCount }: { tenantId: string; view: Acc
           ))}
           {!loading && rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+              <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                 {search ? "No customer matches." : "No customers yet. Anyone you grant access to joins as a customer."}
               </TableCell>
             </TableRow>

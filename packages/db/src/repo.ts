@@ -9,6 +9,7 @@ import {
   MemberRole,
   MemberStatus,
   omitUndefined,
+  type PlanLimits,
   SourceId,
   TenantId,
   Toolset,
@@ -23,7 +24,7 @@ import {
 import type { AuditEvent } from "@cairnmcp/runtime";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import type { TenantTx } from "./client.ts";
-import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
+import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets, usageCounters, users } from "./schema.ts";
 
 const currentTenant = sql<string>`cairnmcp.current_tenant_id()`;
 
@@ -324,7 +325,7 @@ export type GrantedRule = AccessRule & { via: AccessVia };
 export async function toolsetAccessFor(tx: TenantTx, toolsetId: string, userId: UserId): Promise<{ rules: GrantedRule[] }> {
   const direct = await toolsetAccessLevel(tx, toolsetId, userId);
   const fromProfiles = await tx
-    .select({ level: profileRules.level, operations: profileRules.operations, profileId: accessProfiles.id, profileName: accessProfiles.name })
+    .select({ level: profileRules.level, operations: profileRules.operations, profileId: accessProfiles.id, profileName: accessProfiles.name, ...limitColumns })
     .from(memberProfiles)
     .innerJoin(profileRules, and(eq(profileRules.profileId, memberProfiles.profileId), eq(profileRules.toolsetId, toolsetId)))
     .innerJoin(accessProfiles, eq(accessProfiles.id, memberProfiles.profileId))
@@ -333,7 +334,12 @@ export async function toolsetAccessFor(tx: TenantTx, toolsetId: string, userId: 
   return {
     rules: [
       ...(direct ? [{ level: direct, operations: null, via: { kind: "direct" as const } }] : []),
-      ...fromProfiles.map((r) => ({ level: r.level, operations: r.operations, via: { kind: "profile" as const, profileId: r.profileId, profileName: r.profileName } })),
+      ...fromProfiles.map((r) => ({
+        level: r.level,
+        operations: r.operations,
+        limits: limitsOf(r),
+        via: { kind: "profile" as const, profileId: r.profileId, profileName: r.profileName },
+      })),
     ],
   };
 }
@@ -347,6 +353,19 @@ export async function mayCallTool(tx: TenantTx, input: { toolsetId: string; user
 
 export type StoredProfile = AccessProfile & { members: UserId[] };
 
+const limitColumns = {
+  perDay: accessProfiles.perDay,
+  perMonth: accessProfiles.perMonth,
+  upgradeUrl: accessProfiles.upgradeUrl,
+};
+type LimitRow = { perDay: number | null; perMonth: number | null; upgradeUrl: string | null };
+const limitsOf = (r: LimitRow): PlanLimits =>
+  omitUndefined({
+    perDay: r.perDay ?? undefined,
+    perMonth: r.perMonth ?? undefined,
+    upgradeUrl: r.upgradeUrl ?? undefined,
+  });
+
 export async function listProfiles(tx: TenantTx): Promise<StoredProfile[]> {
   const profiles = await tx.select().from(accessProfiles).orderBy(asc(accessProfiles.name));
   const rules = await tx.select().from(profileRules);
@@ -357,6 +376,7 @@ export async function listProfiles(tx: TenantTx): Promise<StoredProfile[]> {
       name: p.name,
       ...(p.description ? { description: p.description } : {}),
       rules: rules.filter((r) => r.profileId === p.id).map((r) => ({ toolsetId: r.toolsetId, level: r.level, operations: r.operations })),
+      limits: limitsOf(p),
     }),
     members: members.filter((m) => m.profileId === p.id).map((m) => UserId.parse(m.userId)),
   }));
@@ -367,12 +387,19 @@ export async function putProfile(tx: TenantTx, profile: AccessProfile): Promise<
   const p = AccessProfile.parse(profile);
   await tx
     .insert(accessProfiles)
-    .values({ tenantId: currentTenant, id: p.id, name: p.name, description: p.description ?? null })
-    .onConflictDoUpdate({ target: [accessProfiles.tenantId, accessProfiles.id], set: { name: p.name, description: p.description ?? null, updatedAt: sql`now()` } });
+    .values({ tenantId: currentTenant, id: p.id, name: p.name, description: p.description ?? null, ...limitValues(p.limits) })
+    .onConflictDoUpdate({
+      target: [accessProfiles.tenantId, accessProfiles.id],
+      set: { name: p.name, description: p.description ?? null, ...limitValues(p.limits), updatedAt: sql`now()` },
+    });
   await tx.delete(profileRules).where(eq(profileRules.profileId, p.id));
   if (p.rules.length > 0) {
     await tx.insert(profileRules).values(p.rules.map((r) => ({ tenantId: currentTenant, profileId: p.id, toolsetId: r.toolsetId, level: r.level, operations: r.operations })));
   }
+}
+
+function limitValues(l: PlanLimits): LimitRow {
+  return { perDay: l.perDay ?? null, perMonth: l.perMonth ?? null, upgradeUrl: l.upgradeUrl ?? null };
 }
 
 export async function deleteProfile(tx: TenantTx, id: string): Promise<boolean> {
@@ -398,6 +425,95 @@ export async function memberProfileIds(tx: TenantTx, userIds?: readonly UserId[]
   for (const r of rows) {
     const user = UserId.parse(r.userId);
     out.set(user, [...(out.get(user) ?? []), r.profileId]);
+  }
+  return out;
+}
+
+// --- Usage and allowances (D-039) -------------------------------------------------------
+
+export type UsagePeriods = { day: string; month: string };
+
+/** The UTC day and calendar month `now` falls in (as `YYYY-MM-DD` starts), and when each ends. */
+export function usagePeriods(now: Date): UsagePeriods & { dayEnds: Instant; monthEnds: Instant } {
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const d = now.getUTCDate();
+  const iso = (date: Date) => date.toISOString().slice(0, 10);
+  return {
+    day: iso(new Date(Date.UTC(y, m, d))),
+    month: iso(new Date(Date.UTC(y, m, 1))),
+    dayEnds: instantOf(new Date(Date.UTC(y, m, d + 1))),
+    monthEnds: instantOf(new Date(Date.UTC(y, m + 1, 1))),
+  };
+}
+
+export type Allowance =
+  | { ok: true; periods: UsagePeriods }
+  | { ok: false; period: "day" | "month"; limit: number; resetsAt: Instant };
+
+/**
+ * Count one call for `userId`, unless that would go over a daily or monthly
+ * allowance. Each counter only goes up while it's under its limit, in one
+ * statement, so concurrent calls can't overshoot. Every call counts, limited
+ * or not. Pass `periods` from an `ok` answer to `refundAllowance` if the call
+ * never reached the API.
+ */
+export async function takeAllowance(tx: TenantTx, userId: UserId, limits: Pick<PlanLimits, "perDay" | "perMonth">, now: Date): Promise<Allowance> {
+  const p = usagePeriods(now);
+  if (!(await bump(tx, userId, "month", p.month, limits.perMonth))) return { ok: false, period: "month", limit: limits.perMonth!, resetsAt: p.monthEnds };
+  if (!(await bump(tx, userId, "day", p.day, limits.perDay))) {
+    await unbump(tx, userId, "month", p.month);
+    return { ok: false, period: "day", limit: limits.perDay!, resetsAt: p.dayEnds };
+  }
+  return { ok: true, periods: { day: p.day, month: p.month } };
+}
+
+/** Give back a call `takeAllowance` counted. */
+export async function refundAllowance(tx: TenantTx, userId: UserId, periods: UsagePeriods): Promise<void> {
+  await unbump(tx, userId, "month", periods.month);
+  await unbump(tx, userId, "day", periods.day);
+}
+
+async function bump(tx: TenantTx, userId: UserId, period: "day" | "month", start: string, limit: number | undefined): Promise<boolean> {
+  const rows = await tx
+    .insert(usageCounters)
+    .values({ tenantId: currentTenant, userId: UserId.parse(userId), period, periodStart: start, calls: 1 })
+    .onConflictDoUpdate({
+      target: [usageCounters.tenantId, usageCounters.userId, usageCounters.period, usageCounters.periodStart],
+      set: { calls: sql`${usageCounters.calls} + 1` },
+      ...(limit === undefined ? {} : { setWhere: sql`${usageCounters.calls} < ${limit}` }),
+    })
+    .returning({ calls: usageCounters.calls });
+  return rows.length > 0;
+}
+
+async function unbump(tx: TenantTx, userId: UserId, period: "day" | "month", start: string): Promise<void> {
+  await tx
+    .update(usageCounters)
+    .set({ calls: sql`${usageCounters.calls} - 1` })
+    .where(and(eq(usageCounters.userId, userId), eq(usageCounters.period, period), eq(usageCounters.periodStart, start), sql`${usageCounters.calls} > 0`));
+}
+
+/** Calls each user made today and this month (UTC). Users with none are left out. */
+export async function usageFor(tx: TenantTx, userIds: readonly UserId[], now: Date): Promise<Map<UserId, { today: number; month: number }>> {
+  const out = new Map<UserId, { today: number; month: number }>();
+  if (userIds.length === 0) return out;
+  const p = usagePeriods(now);
+  const rows = await tx
+    .select({ userId: usageCounters.userId, period: usageCounters.period, calls: usageCounters.calls })
+    .from(usageCounters)
+    .where(
+      and(
+        inArray(usageCounters.userId, [...userIds]),
+        or(and(eq(usageCounters.period, "day"), eq(usageCounters.periodStart, p.day)), and(eq(usageCounters.period, "month"), eq(usageCounters.periodStart, p.month))),
+      ),
+    );
+  for (const r of rows) {
+    const user = UserId.parse(r.userId);
+    const entry = out.get(user) ?? { today: 0, month: 0 };
+    if (r.period === "day") entry.today = r.calls;
+    else entry.month = r.calls;
+    out.set(user, entry);
   }
   return out;
 }

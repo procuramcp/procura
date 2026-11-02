@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { IdentityProvider } from "@cairnmcp/auth";
 import { AccessProfile, Toolset, type TenantId } from "@cairnmcp/core";
-import { addMember, Database, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess, updateMember } from "@cairnmcp/db";
+import { addMember, Database, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess, takeAllowance, updateMember } from "@cairnmcp/db";
 import { intervalsIr, scratchDatabase } from "@cairnmcp/db/test-support";
 import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
 import { createApp, serve } from "../src/index.ts";
@@ -58,7 +58,15 @@ await db.withTenant(tenant, async (tx) => {
   await putToolset(tx, Toolset.parse({ ...starter, id: "intervals", sourceId: "intervals-icu" }));
   await setToolsetAccess(tx, "intervals" as never, me, "use");
   await addMember(tx, friend, "viewer");
-  await putProfile(tx, AccessProfile.parse({ id: "athlete", name: "Athlete", rules: [{ toolsetId: "intervals", level: "use" }] }));
+  await putProfile(
+    tx,
+    AccessProfile.parse({
+      id: "athlete",
+      name: "Athlete",
+      rules: [{ toolsetId: "intervals", level: "use" }],
+      limits: { perDay: 200, perMonth: 3000, upgradeUrl: "https://example.com/pricing" },
+    }),
+  );
 });
 // Customers to search and page through (D-038). One transaction each, so they get distinct join times.
 for (let i = 1; i <= 60; i++) {
@@ -67,6 +75,8 @@ for (let i = 1; i <= 60; i++) {
     await addMember(tx, customer, "customer");
     if (i % 2 === 0) await setMemberProfiles(tx, customer, ["athlete"]);
     if (i % 10 === 0) await updateMember(tx, customer, { status: "suspended", note: "Card declined" });
+    // Some usage to show (D-039).
+    for (let n = 0; n < (i % 7) * 3; n++) await takeAllowance(tx, customer, {}, new Date());
   });
 }
 await new Vault({ store: new PgVaultStore(db), keyWrapper }).putCredential({

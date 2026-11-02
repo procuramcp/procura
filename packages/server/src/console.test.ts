@@ -300,6 +300,20 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       expect(found.customers).toEqual([expect.objectContaining({ userId: erin, label: "erin@example.com", role: "customer", status: "active", profiles: ["coach"] })]);
     });
 
+    it("saves a plan's limits, refuses a link that isn't https, and shows each customer's usage (D-039)", async () => {
+      const browser = await signIn();
+      const limits = { perDay: 500, perMonth: 10_000, upgradeUrl: "https://example.com/pricing" };
+      const saved = await browser.json("PUT", `${API}/tenants/alpha/profiles/free`, { name: "Free", rules: [{ toolsetId: "mine", level: "use" }], limits });
+      expect(((await saved.json()) as { profiles: Array<{ id: string; limits: unknown }> }).profiles.find((p) => p.id === "free")?.limits).toEqual(limits);
+      const insecure = await browser.json("PUT", `${API}/tenants/alpha/profiles/free`, { name: "Free", rules: [], limits: { upgradeUrl: "http://example.com" } });
+      expect(insecure.status).toBe(422);
+      const zero = await browser.json("PUT", `${API}/tenants/alpha/profiles/free`, { name: "Free", rules: [], limits: { perDay: 0 } });
+      expect(zero.status).toBe(422);
+
+      const page = (await (await browser.json("GET", `${API}/tenants/alpha/customers?q=${carol}`)).json()) as { customers: Array<{ usage: unknown }> };
+      expect(page.customers[0]?.usage).toEqual({ today: 0, month: 0 });
+    });
+
     it("deletes a profile", async () => {
       const browser = await signIn();
       await browser.json("PUT", `${API}/tenants/alpha/profiles/temp`, { name: "Temp", rules: [] });

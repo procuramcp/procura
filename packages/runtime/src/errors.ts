@@ -7,6 +7,8 @@ export type RuntimeErrorKind =
   | "invalid_input"
   | "missing_credentials"
   | "rate_limited"
+  /** The caller's plan is used up for now (D-039); not the upstream's limit. */
+  | "limit_reached"
   | "timeout"
   | "network_error"
   | "egress_blocked"
@@ -24,6 +26,9 @@ export type RuntimeError = {
   retryAfterSeconds?: number;
   /** Upstream HTTP status, for `upstream_error`. */
   status?: number;
+  /** For `limit_reached`: when the allowance starts over, and where to get more. */
+  resetsAt?: string;
+  upgradeUrl?: string;
   details?: string[];
 };
 

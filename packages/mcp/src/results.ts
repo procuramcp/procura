@@ -1,4 +1,4 @@
-import type { ResolvedTool } from "@cairnmcp/core";
+import { omitUndefined, type ResolvedTool } from "@cairnmcp/core";
 import type { ToolResult } from "@cairnmcp/runtime";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 
@@ -21,13 +21,11 @@ export function toMcpTool(tool: ResolvedTool): Tool {
  */
 export function toCallToolResult(result: ToolResult): CallToolResult {
   if (!result.ok) {
-    const { kind, message, retryable, retryAfterSeconds, status } = result.error;
+    const { kind, message, retryable, retryAfterSeconds, status, resetsAt, upgradeUrl } = result.error;
     return {
       isError: true,
       content: [{ type: "text", text: message }],
-      structuredContent: {
-        error: { kind, message, retryable, ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}), ...(status !== undefined ? { status } : {}) },
-      },
+      structuredContent: { error: omitUndefined({ kind, message, retryable, retryAfterSeconds, status, resetsAt, upgradeUrl }) },
     };
   }
   const { data } = result;

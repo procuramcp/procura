@@ -39,7 +39,7 @@ a superuser URL; each test file creates and drops its own database. A local Post
 | `vault` | Envelope-encrypted upstream credentials. | `src/vault.ts`, `src/credentials.ts`, `src/key-wrapper.ts`, `src/store.ts` |
 | `runtime` | Runs one tool call: validation, auth, egress rules, throttling, audit. | `src/runtime.ts` (`invoke`), `request.ts`, `egress.ts`, `auth.ts`, `limiter.ts` |
 | `db` | Postgres with RLS: tenants, sources, toolsets, access, vault and audit storage. | `migrations/*.sql` (source of truth), `src/schema.ts` (Drizzle view), `src/repo.ts` (all tenant queries), `src/client.ts` (`Database`), `src/stores.ts`, `src/errors.ts` |
-| `mcp` | The MCP endpoint `/mcp/{tenant}/{toolset}`: OAuth resource server. | `src/handler.ts`, `src/cache.ts` (`ToolsetCache`), `src/token.ts`, `src/results.ts` |
+| `mcp` | The MCP endpoint `/mcp/{tenant}/{toolset}`: OAuth resource server. | `src/handler.ts`, `src/cache.ts` (`ToolsetCache`), `src/limits.ts` (plan limits), `src/token.ts`, `src/results.ts` |
 | `auth` | Embedded OAuth 2.1 authorization server under `/oauth`. | `src/handler.ts` (all endpoints + route table), `identity.ts` (OIDC), `keys.ts`, `pages.ts`, `redirect.ts` |
 | `server` | The app: wires everything, the console API, the admin CLI. | `src/app.ts`, `src/console/*`, `src/admin.ts`, `src/fetch-document.ts`, `scripts/serve.ts`, `scripts/admin.ts` |
 | `web` | The console UI (React, shadcn/ui), built to static files served at `/app`. | `src/lib/api.ts` (every API call; types from `console-api`), `src/lib/act.ts`, `src/lib/hooks.ts`, `src/pages/*` |
@@ -74,6 +74,8 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | `Date` → `Instant` | `instantOf` (core); never format ISO strings by hand |
 | Count read/write/destructive | `countBySideEffect` (core) |
 | Can this level call this tool? | `canCall`, `allowsTool`, `highestLevel` (core `access.ts`) |
+| A call's plan limits (most generous rule) | `callLimits`, `PlanLimits` (core `access.ts`) |
+| Count a call against allowances, refund it, show usage | `takeAllowance`, `refundAllowance`, `usageFor`, `usagePeriods` (db); the MCP side is `withinLimits` (mcp `limits.ts`) |
 | Team role at least X? Roles, statuses | `hasTeamRole`, `MemberRole`, `TeamRole`, `MemberStatus` (core `access.ts`); `useRole` in web `lib/hooks.ts` |
 | Id schemas | `TenantId`, `UserId`, `SourceId`, `ToolsetId`, `ProfileId`, `OperationId`, `ToolName` (core `ir/ids.ts`) |
 | JSON / redirect response | `json`, `redirect`, `withHeaders` (http) |
@@ -154,5 +156,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-038, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-039, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{oracle,auth0}`.

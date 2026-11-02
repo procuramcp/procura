@@ -122,7 +122,7 @@ describe.skipIf(!adminUrl)("0006 team and customers (Postgres)", () => {
       await owner.query("INSERT INTO cairnmcp.memberships (tenant_id, user_id, role) VALUES ('old', 'u-owner', 'owner'), ('old', 'u-friend', 'member')");
       await owner.query("COMMIT");
 
-      expect((await migrate(scratch.ownerUrl)).applied).toEqual(["0006_team_and_customers"]);
+      expect((await migrate(scratch.ownerUrl)).applied[0]).toBe("0006_team_and_customers");
 
       await owner.query("BEGIN");
       await owner.query("SELECT set_config('app.tenant_id', 'old', true)");

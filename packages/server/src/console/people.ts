@@ -13,6 +13,7 @@ import {
   setMemberProfiles,
   setMemberRole,
   updateMember,
+  usageFor,
   type Member,
   type TenantTx,
 } from "@cairnmcp/db";
@@ -32,8 +33,13 @@ export const peopleRoutes: ApiRoute[] = [
       teamResponse(api, tenant!, "viewer", async (tx) => {
         const params = new URL(api.request.url).searchParams;
         const page = await listCustomers(tx, { query: params.get("q") ?? "", ...(params.get("after") ? { after: params.get("after")! } : {}), limit: 50 });
-        const held = await memberProfileIds(tx, page.customers.map((c) => c.userId));
-        return { ...page, customers: page.customers.map((c) => person(c, held.get(c.userId) ?? [], api.user.userId)) } satisfies CustomerPage;
+        const ids = page.customers.map((c) => c.userId);
+        const held = await memberProfileIds(tx, ids);
+        const usage = await usageFor(tx, ids, new Date());
+        return {
+          ...page,
+          customers: page.customers.map((c) => ({ ...person(c, held.get(c.userId) ?? [], api.user.userId), usage: usage.get(c.userId) ?? { today: 0, month: 0 } })),
+        } satisfies CustomerPage;
       }),
   },
   {
