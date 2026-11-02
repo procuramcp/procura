@@ -135,6 +135,28 @@ a real call before saving. Sign in with the same account as your MCP client. Its
 second Auth0 callback (`/app/callback/auth0`), added by `deploy/auth0` (run `terraform apply`
 there once after upgrading).
 
+## Deploy on push
+
+Once set up, every push to `main` deploys after CI passes (D-036). One-time setup, from the repo
+on your machine (needs SSH to the VM and `gh` signed in):
+
+```bash
+deploy/oracle/setup-ci-deploy.sh cairnmcp
+```
+
+It creates a deploy key that can only run the VM's deploy command (it gets no shell), pins the
+VM's host key, stores both in a GitHub `production` environment that only `main` can use, and
+switches the deploy job on. Run it again to rotate the key.
+
+- **Watch a deploy:** the Actions tab, or `gh run watch`. The job ends by checking `/healthz`.
+- **Approve each deploy:** GitHub → Settings → Environments → production → Required reviewers.
+- **Pause deploys:** `gh variable set DEPLOY_ENABLED --body false` (and `true` to resume).
+- **Changing `compose.yaml`, `Caddyfile`, or `deploy.sh`:** CI only ships images, so it stops and
+  asks you to run `deploy/oracle/ship.sh cairnmcp` once; later pushes deploy again.
+- **Roll back:** the previous image stays on the VM. On the VM:
+  `docker tag cairnmcp:<previous tag> cairnmcp:local && deploy/oracle/deploy.sh --no-pull --no-build`
+  (`docker image ls cairnmcp` lists the tags; each is a commit).
+
 ## Operating it
 
 - Logs: `docker compose -f deploy/oracle/compose.yaml logs -f app` (or `caddy`).

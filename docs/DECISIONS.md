@@ -674,3 +674,29 @@ planning handoff are not repeated here unless implementation added something.
 - **Benchmark:** the Intervals.icu Swagger UI page
   (`https://intervals.icu/api/v1/docs/swagger-ui/index.html`) leads to `/api/v1/docs` in three
   fetches; the preview shows 153 operations, two auth schemes, and `API_KEY` pre-filled.
+
+## D-036 Push to main deploys to the VM, with a key that can only deploy
+
+- **Decision:** after the tests and the image smoke test pass on `main`, a `deploy` job builds
+  the x86 image on GitHub's runner and streams it over SSH to the VM, where it is loaded and
+  `deploy.sh` runs (migrate, restart, health check). No registry: the image goes the same way
+  `ship.sh` sends it. Deploys never overlap, and runs on `main` are no longer cancelled by a
+  newer push, so a deploy is never cut off halfway.
+- **The key can only deploy.** Its `authorized_keys` entry has `restrict` and a forced command,
+  `~/cairnmcp-ci/receive.sh` (from `deploy/oracle/ci-receive.sh`). It accepts exactly
+  `deploy <12-hex tag> <sha256>`, loads a size-capped image stream, checks the stream carried that
+  tag, and runs the VM's own `deploy.sh`. No shell, no file copies, no port forwarding.
+- **CI never changes the deploy files.** The command lives outside the repo copy, and if a
+  commit's `compose.yaml`, `Caddyfile`, or `deploy.sh` differ from the VM's (compared by hash),
+  it stops and asks for `ship.sh`, which you run with your own key. Otherwise a commit could
+  rewrite the script the key is locked to.
+- **Secrets:** the private key, the VM's pinned host key (read over your trusted connection, so
+  no trust on first use), host, and user are secrets of a `production` environment that only
+  `main` can deploy from. Required reviewers on that environment turn every deploy into a
+  one-click approval. `DEPLOY_ENABLED=false` pauses deploys.
+- **Accepted risk:** anyone who can push to `main` can deploy code that runs with the app's
+  secrets. That's inherent in push-to-deploy; branch protection (required PR review) is the
+  control for it. Caddy is pinned by digest, so a loaded image can't stand in for it.
+- **Not blue-green:** a deploy restarts the one container (a few seconds of 502s), as with
+  `ship.sh`. Fine for now (D-029).
+- **Also:** `ship.sh` no longer copies `infra/` (Terraform state and variables) to the VM.
