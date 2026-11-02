@@ -620,3 +620,30 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** server-rendered HTML (chosen first, then replaced to use shadcn/ui and AI
   Elements, which are React); a separate frontend deployment (another origin means CORS and
   token handling for no gain on one VM).
+
+## D-034 Access profiles: named permission sets, assigned to members
+
+- **Context:** access is granted per person and per toolset (D-023). Ten people who should be able
+  to do the same thing need ten grants, and changing what that group may do means editing each one.
+- **Decision:** a tenant defines **access profiles** (e.g. "Athlete", "Coach") and assigns them to
+  members. A profile is a list of rules, at most one per toolset: an access level (`use` or
+  `use_writes`) and optionally the operations it is limited to. Edit a profile and everyone with it
+  changes on their next request: access is checked on every `tools/list` and `tools/call`, so no
+  token is reissued and nobody reconnects.
+- **Effective access** to a tool is the union of the caller's direct grant (today's per-person
+  access, kept as an exception) and every rule from their profiles: a rule allows a tool when its
+  level allows the tool's side effect (`canCall`) and, if it lists operations, the tool's operation
+  is listed. Never more than the toolset enables.
+- **Operation lists only narrow.** A list picks tools within what the level allows; it can't add a
+  write tool to a `use` rule. Simpler to reason about, and a write always needs `use_writes`
+  somewhere. Lists name operations, not tool names, so renaming a tool keeps its rules.
+- **Profiles govern calling tools, not editing the tenant.** Owner, admin, and member (who may use
+  the console) stay separate. Letting a profile edit a toolset is a later, bigger decision.
+- **Storage:** `access_profiles`, `profile_rules`, and `member_profiles`, tenant tables with forced
+  row-level security like the rest. Deleting a toolset removes its rules; a member leaving removes
+  their assignments.
+- **Later:** claim-based assignment (D-032: "`plan = premium` gets Athlete") assigns the same
+  profiles from the sign-in token instead of by hand.
+- **Rejected:** replacing direct grants with profiles (more churn for no gain; a one-person
+  exception is common); a policy language (D-023: Cedar or OPA if declarative rules stop being
+  enough).
