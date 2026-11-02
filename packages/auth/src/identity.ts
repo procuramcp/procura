@@ -171,8 +171,9 @@ export type OAuth2ProviderConfig = {
 /**
  * Plain OAuth 2 sign-in, for providers without OpenID Connect (D-040): the
  * authorization code flow with PKCE and state, then who signed in and their
- * claims from the provider's userinfo URL. Users from it are keyed by that URL
- * as their issuer, so two providers never share a subject.
+ * claims from the provider's userinfo URL. Users from it are keyed by the
+ * provider id, that URL, and the ID field (`issuer`), so no other provider,
+ * or tenant, ever shares a subject with it.
  */
 export class OAuth2IdentityProvider implements IdentityProvider {
   readonly id: string;
@@ -194,9 +195,15 @@ export class OAuth2IdentityProvider implements IdentityProvider {
     if (options.fetch) this.#client[oidc.customFetch] = options.fetch;
   }
 
-  /** The issuer users from this provider are stored under. */
+  /**
+   * The issuer users from this provider are stored under. Everything that
+   * decides who someone is goes in it, including the provider id (for a
+   * tenant's sign-in, `tenant:{id}`): a tenant admin picks the URL and the ID
+   * field, so another tenant entering the same URL with a different field
+   * must never land on someone else's user.
+   */
   get issuer(): string {
-    return `oauth2:${this.#config.userinfoUrl}`;
+    return `oauth2:${this.id}:${this.#config.userinfoUrl}#${this.#config.subjectField}`;
   }
 
   async authorizationUrl(input: { redirectUri: string; state: string; nonce: string; codeVerifier: string }): Promise<URL> {

@@ -842,8 +842,12 @@ planning handoff are not repeated here unless implementation added something.
 - **Untrusted URLs:** issuer, token, and profile URLs are typed in by a tenant admin, so the
   server reaches them only through `publicFetch`: https, public addresses only, pinned
   connection, capped size and time (the same checks as D-035's document fetch).
-- **Identity:** OIDC users are keyed by the provider's issuer and subject; OAuth 2 users by
-  `oauth2:{profile URL}` and the profile's id field, so two providers never share a subject.
+- **Identity:** OIDC users are keyed by the provider's issuer and subject; the issuer is verified
+  (discovery and ID token), so a tenant can't mint another provider's users. Plain OAuth 2 users
+  are keyed by `oauth2:tenant:{tenant}:{profile URL}#{ID field}` and the ID field's value: a
+  tenant admin picks the URL and the field, so these identities never cross tenants (from the
+  security review: another tenant entering the same URL with a field its users control could
+  otherwise land on someone else's user and rename them).
 - **Consequence:** once a tenant turns this on, its own team connects MCP clients through the
   provider's sign-in too (their console sign-in is unchanged).
 - **Not yet:** a "test sign-in" button in the console; per-user upstream API credentials from the

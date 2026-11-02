@@ -38,6 +38,7 @@ describe.skipIf(!adminUrl)("a tenant's own sign-in (D-040, Postgres)", () => {
   let staffOp: FakeOidcProvider; // the console's own sign-in
   const acme = "acme" as TenantId;
   const zeta = "zeta" as TenantId;
+  const mimic = "mimic" as TenantId; // another tenant on Zeta's profile URL, with a different ID field
   const resource = (tenantId: string) => `${BASE}/mcp/${tenantId}/mine`;
 
   beforeAll(async () => {
@@ -66,7 +67,8 @@ describe.skipIf(!adminUrl)("a tenant's own sign-in (D-040, Postgres)", () => {
         userinfoUrl: `${zetaOp.issuer}/api/me`,
       }),
     };
-    for (const [tenantId, op] of [[acme, acmeOp], [zeta, zetaOp]] as const) {
+    configs["mimic"] = SignInConfig.parse({ ...configs["zeta"], name: "Mimic", subjectField: "email", labelField: "email" });
+    for (const [tenantId, op] of [[acme, acmeOp], [zeta, zetaOp], [mimic, zetaOp]] as const) {
       const owner = await db.ensureUser(staffOp.issuer, `${tenantId}-owner`);
       await db.createTenant(tenantId, owner, { id: tenantId });
       const sealed = await vault.sealSecret(tenantId, SIGN_IN_SECRET_CONTEXT, op.clientSecret);
@@ -199,7 +201,7 @@ describe.skipIf(!adminUrl)("a tenant's own sign-in (D-040, Postgres)", () => {
   it("signs in with plain OAuth 2, identifying people by the userinfo URL's id", async () => {
     zetaOp.claims.set("u42", { plan: "pro" });
     const { clientId, tokens } = await connect("zeta", zetaOp, { sub: "u42", email: "eve@zeta.test" });
-    const eve = (await userOf(`oauth2:${zetaOp.issuer}/api/me`, "42"))!;
+    const eve = (await userOf(`oauth2:tenant:zeta:${zetaOp.issuer}/api/me#id`, "42"))!;
     expect(eve).toBeDefined();
     expect((await db.withTenant(zeta, (tx) => getMember(tx, eve)))?.label).toBe("eve@zeta.test");
     expect(await profilesOf(zeta, eve)).toEqual(["pro"]);
@@ -207,6 +209,17 @@ describe.skipIf(!adminUrl)("a tenant's own sign-in (D-040, Postgres)", () => {
     zetaOp.claims.set("u42", {});
     expect((await refresh(clientId, tokens.refresh_token)).status).toBe(200);
     expect(await profilesOf(zeta, eve)).toEqual([]);
+  });
+
+  it("keeps plain OAuth 2 users per tenant, so another tenant on the same URL can't land on them", async () => {
+    // Mimic reads the subject from `email`; an account whose email is "42" would match Eve's id at Zeta.
+    zetaOp.claims.set("u7", { plan: "pro" });
+    await connect("mimic", zetaOp, { sub: "u7", email: "42" });
+    const eve = (await userOf(`oauth2:tenant:zeta:${zetaOp.issuer}/api/me#id`, "42"))!;
+    const impostor = (await userOf(`oauth2:tenant:mimic:${zetaOp.issuer}/api/me#email`, "42"))!;
+    expect(impostor).toBeDefined();
+    expect(impostor).not.toBe(eve);
+    expect((await db.withTenant(zeta, (tx) => getMember(tx, eve)))?.label).toBe("eve@zeta.test");
   });
 
   it("won't use one tenant's sign-in for another tenant's endpoint", async () => {
