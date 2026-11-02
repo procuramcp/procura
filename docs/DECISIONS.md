@@ -808,3 +808,47 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** counting from the audit log (writes only, and too heavy, D-037); limits per rule
   instead of per profile (a plan is one price, whatever toolsets it covers); retrying refused calls
   automatically (D-020).
+
+## D-040 A tenant's own sign-in: customers from the provider's accounts, plans from claims
+
+- **Context:** D-032 and D-037 call for customers to sign in with the account they already have
+  at the provider, be created without anyone adding them, and get the plan they pay for. Until
+  now every tenant shared the server's sign-in providers (Auth0 on our deployment) and customers
+  were added by hand.
+- **Decision:** a tenant may set its own sign-in (admins, in the console): any OpenID Connect
+  provider by issuer, or plain OAuth 2 for APIs without OpenID Connect, where who signed in and
+  their claims come from a profile (userinfo) URL. Once set, `/oauth/authorize` for that tenant's
+  MCP URLs goes straight to `/oauth/login/tenant/{tenant}`. A tenant's login refuses requests
+  for any other tenant's endpoint.
+- **First sign-in makes a customer** (D-038). Someone already in the tenant keeps their role and
+  status, so signing in never lifts a suspension.
+- **Plans from claims:** a profile can list claim rules (`plan` = `pro`); whoever's claims match
+  holds it, plus an optional default profile for everyone (a free tier). Matching is exact text,
+  or membership when the claim is a list; claim names are used as-is, since Auth0 namespaces
+  custom claims as URLs. Profiles assigned this way are marked `sign_in` and replaced on every
+  sign-in and refresh; the team's own (`manual`) are never touched, so an exception survives a
+  plan change. Giving by hand a profile that sign-in also gives makes it the team's.
+- **Kept current at refresh (D-032):** the provider's refresh token is sealed per cairnmcp token
+  family (one MCP client connection), so two clients of the same person never race to rotate
+  it. Each cairnmcp refresh, about every 15 minutes, refreshes at the provider, re-reads the
+  claims (ID token plus userinfo for OIDC; the profile URL for OAuth 2), checks it's still the
+  same person, and re-syncs profiles. If the provider refuses, the sign-in was turned off, or the
+  answer names someone else, the family is revoked and the customer connects again. A provider
+  that gives no refresh token (OIDC without `offline_access`) still works, but its claims are
+  read only at sign-in.
+- **Secrets:** the client secret and upstream refresh tokens are sealed with the tenant's data key
+  (`Vault.sealSecret`, D-019), bound to where they're stored; the secret is never sent back to
+  the console.
+- **Untrusted URLs:** issuer, token, and profile URLs are typed in by a tenant admin, so the
+  server reaches them only through `publicFetch`: https, public addresses only, pinned
+  connection, capped size and time (the same checks as D-035's document fetch).
+- **Identity:** OIDC users are keyed by the provider's issuer and subject; OAuth 2 users by
+  `oauth2:{profile URL}` and the profile's id field, so two providers never share a subject.
+- **Consequence:** once a tenant turns this on, its own team connects MCP clients through the
+  provider's sign-in too (their console sign-in is unchanged).
+- **Not yet:** a "test sign-in" button in the console; per-user upstream API credentials from the
+  same sign-in (P-20, 3c step 5); claims from nested objects (`app_metadata.plan`).
+- **Rejected:** reading claims only at sign-in (a cancelled plan would keep working until the
+  customer signed in again, possibly weeks); the provider pushing plan changes through an API
+  (every provider would have to build it before plans stay in sync; may come later as an
+  addition); one tenant per customer (D-032).

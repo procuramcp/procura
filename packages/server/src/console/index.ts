@@ -14,6 +14,7 @@ import type { Runtime } from "@cairnmcp/runtime";
 import type { Vault } from "@cairnmcp/vault";
 import { safeGet, type DocumentGetter } from "../fetch-document.ts";
 import { accessRoutes } from "./access.ts";
+import { customerSignInRoutes } from "./customer-sign-in.ts";
 import { peopleRoutes } from "./people.ts";
 import type { ApiRoute, ConsoleContext } from "./context.ts";
 import { signIn } from "./sign-in.ts";
@@ -37,7 +38,7 @@ export type ConsoleOptions = {
   now?: () => number;
 };
 
-const API_ROUTES: readonly ApiRoute[] = [...tenantRoutes, ...toolsetRoutes, ...accessRoutes, ...peopleRoutes, ...sourceRoutes];
+const API_ROUTES: readonly ApiRoute[] = [...tenantRoutes, ...toolsetRoutes, ...accessRoutes, ...peopleRoutes, ...customerSignInRoutes, ...sourceRoutes];
 
 export function createConsoleHandler(options: ConsoleOptions): (request: Request) => Promise<Response | undefined> {
   const base = new URL(options.publicUrl).origin;

@@ -40,7 +40,7 @@ const devProvider: IdentityProvider = {
   async finish() {
     // DEV_USER=friend signs in as the viewer instead, to see the read-only console.
     const subject = process.env["DEV_USER"] ?? "dev-user";
-    return { issuer: ISSUER, subject, label: `${subject === "dev-user" ? "dev" : subject}@localhost` };
+    return { issuer: ISSUER, subject, label: `${subject === "dev-user" ? "dev" : subject}@localhost`, claims: {} };
   },
 };
 

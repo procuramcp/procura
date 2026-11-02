@@ -1,5 +1,20 @@
-import { highestLevel } from "@cairnmcp/core";
-import { getToolset, memberRole, schema, tenantName, toolsetAccessFor, type Database } from "@cairnmcp/db";
+import { highestLevel, profilesForClaims, SIGN_IN_SECRET_CONTEXT, TenantId, upstreamGrantContext, UserId, type SignInConfig } from "@cairnmcp/core";
+import {
+  deleteUpstreamGrant,
+  ensureMember,
+  getSignIn,
+  getToolset,
+  getUpstreamGrant,
+  getUserIdentity,
+  listProfiles,
+  memberRole,
+  putUpstreamGrant,
+  schema,
+  syncSignInProfiles,
+  tenantName,
+  toolsetAccessFor,
+  type Database,
+} from "@cairnmcp/db";
 import {
   dispatch,
   json,
@@ -18,7 +33,9 @@ import {
 import { parseMcpResource } from "@cairnmcp/mcp";
 import { and, eq, gt, isNull, lt, or, isNotNull } from "drizzle-orm";
 import { z } from "zod";
-import { finishSignIn, startSignIn, type IdentityProvider } from "./identity.ts";
+import type { Vault } from "@cairnmcp/vault";
+import type * as oidc from "openid-client";
+import { finishSignIn, startSignIn, tenantIdentityProvider, type IdentityProvider } from "./identity.ts";
 import type { SigningKeys } from "./keys.ts";
 import { chooserPage, consentPage, errorPage, htmlResponse, noAccessPage } from "./pages.ts";
 import { matchesRegistered, redirectUriProblem } from "./redirect.ts";
@@ -28,6 +45,13 @@ export type AuthServerOptions = {
   keys: SigningKeys;
   /** Where people sign in (at least one). */
   providers: IdentityProvider[];
+  /**
+   * For tenants with their own sign-in (D-040): the vault that holds their
+   * client secrets and customers' upstream refresh tokens, and the fetch used
+   * for their provider's URLs, which a tenant admin typed in and so must
+   * never reach a private address. Without both, only `providers` are used.
+   */
+  tenantSignIn?: { vault: Vault; fetch: oidc.CustomFetch };
   /** Public base URL; also the issuer (`iss`) of every token. */
   publicUrl: string;
   /** Clock in milliseconds. Injected for tests. */
@@ -99,6 +123,95 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
 
   const expired = () => htmlResponse(400, errorPage("This sign-in has expired", "Start connecting again from your app."));
 
+  // --- A tenant's own sign-in (D-040) --------------------------------------------
+
+  type TenantSignIn = { key: string; tenantId: TenantId; provider: IdentityProvider; config: SignInConfig; callback: string };
+  // Built providers, so OIDC discovery runs once per settings version, not per sign-in.
+  const built = new Map<string, { version: string; signIn: TenantSignIn }>();
+
+  /** The tenant's own sign-in, if it has one with a client secret set. */
+  async function tenantSignIn(tenantId: TenantId): Promise<TenantSignIn | undefined> {
+    const own = options.tenantSignIn;
+    if (!own) return undefined;
+    const stored = await db.withTenant(tenantId, (tx) => getSignIn(tx));
+    if (!stored?.secret) return undefined;
+    const cached = built.get(tenantId);
+    if (cached?.version === stored.updatedAt) return cached.signIn;
+    const secret = await own.vault.openSecret(tenantId, SIGN_IN_SECRET_CONTEXT, stored.secret);
+    const key = `tenant:${tenantId}`;
+    const signIn = {
+      key,
+      tenantId,
+      provider: tenantIdentityProvider(key, stored.config, secret.reveal(), own.fetch),
+      config: stored.config,
+      callback: tenantCallbackUrl(base, tenantId),
+    };
+    built.set(tenantId, { version: stored.updatedAt, signIn });
+    return signIn;
+  }
+
+  /** Who signs this request in: a configured provider, or the tenant's own for its own MCP URLs only. */
+  async function signInFor(ref: { provider: string } | { tenant: string }, row: RequestRow): Promise<{ key: string; provider: IdentityProvider; callback: string; tenant?: TenantSignIn } | undefined> {
+    if ("provider" in ref) {
+      const provider = providers.get(ref.provider);
+      return provider && { key: provider.id, provider, callback: callbackUri(provider.id) };
+    }
+    const tenantId = TenantId.safeParse(ref.tenant).data;
+    // A tenant's login can't be used to reach another tenant's endpoint.
+    if (!tenantId || parseMcpResource(base, row.resource)?.tenantId !== tenantId) return undefined;
+    const tenant = await tenantSignIn(tenantId);
+    return tenant && { key: tenant.key, provider: tenant.provider, callback: tenant.callback, tenant };
+  }
+
+  /**
+   * After a customer signs in with the tenant's provider: make them a customer
+   * if they're new, set their profiles from their claims, and keep the
+   * provider's refresh token for this token family so later refreshes can read
+   * their claims again.
+   */
+  async function welcome(tenant: TenantSignIn, userId: string, claims: Record<string, unknown>, refreshToken: string | undefined, familyId: string): Promise<void> {
+    const user = UserId.parse(userId);
+    const sealed = refreshToken ? await options.tenantSignIn!.vault.sealSecret(tenant.tenantId, upstreamGrantContext(familyId), refreshToken) : undefined;
+    await db.withTenant(tenant.tenantId, async (tx) => {
+      // Someone already here keeps their role and status: signing in never lifts a suspension.
+      await ensureMember(tx, user);
+      await syncSignInProfiles(tx, user, profilesForClaims(await listProfiles(tx), claims, tenant.config.defaultProfileId));
+      if (sealed) await putUpstreamGrant(tx, { familyId, userId: user, sealed, expiresAt: at(refreshSeconds + REQUEST_SECONDS) });
+    });
+  }
+
+  /**
+   * On refresh of a family that signed in with a tenant's provider: ask the
+   * provider again and re-sync the person's profiles, so a lapsed plan ends
+   * within one access token's life (D-032). "ended" if the provider refuses,
+   * the sign-in was removed, or the provider now names someone else.
+   */
+  async function recheck(familyId: string, userId: string, resource: string): Promise<"ok" | "ended"> {
+    const target = parseMcpResource(base, resource);
+    const own = options.tenantSignIn;
+    if (!target || !own) return "ok";
+    const grant = await db.withTenant(target.tenantId, (tx) => getUpstreamGrant(tx, familyId));
+    if (!grant) return "ok";
+    const user = grant.userId;
+    try {
+      const tenant = await tenantSignIn(target.tenantId);
+      if (!tenant?.provider.refresh || user !== userId) throw new Error("no sign-in to ask");
+      const token = await own.vault.openSecret(target.tenantId, upstreamGrantContext(familyId), grant.sealed);
+      const now = await tenant.provider.refresh(token.reveal());
+      const identity = await db.withTenant(target.tenantId, (tx) => getUserIdentity(tx, user));
+      if (identity?.subject !== now.subject) throw new Error("the provider named someone else");
+      const sealed = now.refreshToken ? await own.vault.sealSecret(target.tenantId, upstreamGrantContext(familyId), now.refreshToken) : grant.sealed;
+      await db.withTenant(target.tenantId, async (tx) => {
+        await syncSignInProfiles(tx, user, profilesForClaims(await listProfiles(tx), now.claims, tenant.config.defaultProfileId));
+        await putUpstreamGrant(tx, { familyId, userId: user, sealed, expiresAt: at(refreshSeconds) });
+      });
+      return "ok";
+    } catch {
+      await db.withTenant(target.tenantId, (tx) => deleteUpstreamGrant(tx, familyId));
+      return "ended";
+    }
+  }
+
   // --- Endpoints ---------------------------------------------------------------
 
   async function register(request: Request): Promise<Response> {
@@ -162,6 +275,8 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
         createdAt: at(),
       }),
     );
+    // A tenant with its own sign-in sends its customers straight there (D-040).
+    if (await tenantSignIn(target.tenantId)) return redirect(`${base}/oauth/login/tenant/${target.tenantId}?request=${id}`);
     const loginHref = (p: IdentityProvider) => `/oauth/login/${p.id}?request=${id}`;
     if (providers.size === 1) {
       const [only] = providers.values();
@@ -170,25 +285,27 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     return htmlResponse(200, chooserPage({ clientName: client.name, providers: [...providers.values()].map((p) => ({ name: p.name, href: loginHref(p) })) }));
   }
 
-  async function login(url: URL, providerId: string): Promise<Response> {
-    const provider = providers.get(providerId);
+  async function login(url: URL, ref: { provider: string } | { tenant: string }): Promise<Response> {
     const row = await loadRequest(eq(requests.id, url.searchParams.get("request") ?? ""));
-    if (!provider || !row || row.userId !== null || row.codeHash !== null) return expired();
-    const { location, secrets } = await startSignIn(provider, callbackUri(provider.id));
+    if (!row || row.userId !== null || row.codeHash !== null) return expired();
+    const signIn = await signInFor(ref, row);
+    if (!signIn) return expired();
+    const { location, secrets } = await startSignIn(signIn.provider, signIn.callback);
     await db.withoutTenant((tx) =>
       tx
         .update(requests)
-        .set({ browserHash: sha256(secrets.browser), provider: provider.id, upstreamStateHash: sha256(secrets.state), upstreamNonce: secrets.nonce, upstreamVerifier: secrets.verifier })
+        .set({ browserHash: sha256(secrets.browser), provider: signIn.key, upstreamStateHash: sha256(secrets.state), upstreamNonce: secrets.nonce, upstreamVerifier: secrets.verifier })
         .where(eq(requests.id, row.id)),
     );
     return redirect(location.toString(), { "set-cookie": cookie(secrets.browser, REQUEST_SECONDS) });
   }
 
-  async function callback(request: Request, url: URL, providerId: string): Promise<Response> {
-    const provider = providers.get(providerId);
+  async function callback(request: Request, url: URL, ref: { provider: string } | { tenant: string }): Promise<Response> {
     const state = url.searchParams.get("state") ?? "";
-    const row = provider && state ? await loadRequest(eq(requests.upstreamStateHash, sha256(state))) : undefined;
-    if (!provider || !row || row.provider !== provider.id || row.userId !== null) return expired();
+    const row = state ? await loadRequest(eq(requests.upstreamStateHash, sha256(state))) : undefined;
+    const signIn = row && (await signInFor(ref, row));
+    if (!row || !signIn || row.provider !== signIn.key || row.userId !== null) return expired();
+    const { provider } = signIn;
     if (!sameBrowser(request, row)) {
       return htmlResponse(400, errorPage("Can't continue", "Sign-in has to finish in the same browser it started in. Start again from your app."));
     }
@@ -196,9 +313,11 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     await db.withoutTenant((tx) => tx.update(requests).set({ upstreamStateHash: null }).where(eq(requests.id, row.id)));
     if (url.searchParams.has("error")) return redirectWith(row.redirectUri, { error: "access_denied", error_description: "sign-in was cancelled", state: row.state });
 
-    const identity = await finishSignIn(provider, { callbackUrl: url, redirectUri: callbackUri(provider.id), state, nonce: row.upstreamNonce ?? "", verifier: row.upstreamVerifier ?? "" });
+    const identity = await finishSignIn(provider, { callbackUrl: url, redirectUri: signIn.callback, state, nonce: row.upstreamNonce ?? "", verifier: row.upstreamVerifier ?? "" });
     if (!identity) return htmlResponse(502, errorPage("Sign-in failed", `${provider.name} didn't confirm the sign-in. Start again from your app.`));
     const userId = await db.ensureUser(identity.issuer, identity.subject, identity.label);
+    // The request's own id becomes the token family id (exchangeCode), so the grant is stored under it now.
+    if (signIn.tenant) await welcome(signIn.tenant, userId, identity.claims, identity.refreshToken, row.id);
     const target = parseMcpResource(base, row.resource)!;
     const access = await db.withTenant(target.tenantId, async (tx) => {
       if (!(await memberRole(tx, userId))) return undefined;
@@ -306,6 +425,10 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     if (row.clientId !== clientId || (resource !== null && resource !== row.resource)) {
       return oauthError(400, "invalid_grant", "the refresh token doesn't belong to this client or resource");
     }
+    if ((await recheck(row.familyId, row.userId, row.resource)) === "ended") {
+      await revokeFamily(row.familyId);
+      return oauthError(400, "invalid_grant", "your sign-in at the provider has ended; connect again");
+    }
     return issueTokens({ userId: row.userId, clientId, resource: row.resource, scope: row.scope, familyId: row.familyId });
   }
 
@@ -360,8 +483,10 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     { method: "POST", path: /^\/oauth\/token$/, handle: cors(({ request }) => token(request)) },
     { method: "GET", path: /^\/oauth\/authorize$/, handle: ({ url }) => authorize(url) },
     { method: "POST", path: /^\/oauth\/consent$/, handle: ({ request }) => consent(request) },
-    { method: "GET", path: /^\/oauth\/login\/([a-z0-9-]+)$/, handle: ({ url }, [provider]) => login(url, provider!) },
-    { method: "GET", path: /^\/oauth\/callback\/([a-z0-9-]+)$/, handle: ({ request, url }, [provider]) => callback(request, url, provider!) },
+    { method: "GET", path: /^\/oauth\/login\/tenant\/([A-Za-z0-9_-]+)$/, handle: ({ url }, [tenant]) => login(url, { tenant: tenant! }) },
+    { method: "GET", path: /^\/oauth\/callback\/tenant\/([A-Za-z0-9_-]+)$/, handle: ({ request, url }, [tenant]) => callback(request, url, { tenant: tenant! }) },
+    { method: "GET", path: /^\/oauth\/login\/([a-z0-9-]+)$/, handle: ({ url }, [provider]) => login(url, { provider: provider! }) },
+    { method: "GET", path: /^\/oauth\/callback\/([a-z0-9-]+)$/, handle: ({ request, url }, [provider]) => callback(request, url, { provider: provider! }) },
   ];
 
   return async (request) => {
@@ -374,13 +499,19 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
   };
 }
 
-/** Delete finished and expired sign-in flows and refresh tokens. Safe to run on any schedule. */
+/** Delete finished and expired sign-in flows, refresh tokens, and upstream grants. Safe to run on any schedule. */
 export async function purgeExpiredAuthState(db: Database, now = new Date()): Promise<void> {
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   await db.withoutTenant(async (tx) => {
     await tx.delete(requests).where(lt(requests.expiresAt, dayAgo));
     await tx.delete(refreshTokens).where(or(lt(refreshTokens.expiresAt, now), lt(refreshTokens.revokedAt, dayAgo), lt(refreshTokens.usedAt, dayAgo)));
   });
+  await db.purgeUpstreamGrants();
+}
+
+/** Where a tenant's provider sends customers back (D-040): register this redirect URI with the provider. */
+export function tenantCallbackUrl(publicUrl: string, tenantId: string): string {
+  return `${new URL(publicUrl).origin}/oauth/callback/tenant/${tenantId}`;
 }
 
 const RegistrationRequest = z.looseObject({

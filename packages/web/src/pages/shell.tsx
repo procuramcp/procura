@@ -74,7 +74,7 @@ export function Shell() {
                       {t.id === tenantId && (
                         <SidebarMenuSub>
                           <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild isActive={!pathname.endsWith("/access")}>
+                            <SidebarMenuSubButton asChild isActive={!pathname.endsWith("/access") && !pathname.endsWith("/sign-in")}>
                               <NavLink to={`/t/${t.id}`} end>
                                 Toolsets
                               </NavLink>
@@ -83,6 +83,11 @@ export function Shell() {
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={pathname.endsWith("/access")}>
                               <NavLink to={`/t/${t.id}/access`}>People and profiles</NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild isActive={pathname.endsWith("/sign-in")}>
+                              <NavLink to={`/t/${t.id}/sign-in`}>Customer sign-in</NavLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         </SidebarMenuSub>

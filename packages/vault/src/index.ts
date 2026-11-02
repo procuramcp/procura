@@ -1,4 +1,4 @@
-export { DecryptionError } from "./aead.ts";
+export { DecryptionError, type Sealed } from "./aead.ts";
 export { CredentialInput, credentialKindsFor, type Credential } from "./credentials.ts";
 export { LocalKeyWrapper, parseMasterKey, type KeyWrapper, type WrappedKey } from "./key-wrapper.ts";
 export { Secret } from "./secret.ts";

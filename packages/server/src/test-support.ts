@@ -2,25 +2,37 @@
 import { createHash, randomBytes } from "node:crypto";
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 
-type Pending = { nonce: string; challenge: string; redirectUri: string; sub: string; email: string };
+type Pending = { nonce: string | null; challenge: string; redirectUri: string; sub: string; email: string };
 
 /**
  * An in-memory OpenID Connect provider. `openid-client` reaches it through
  * its fetch hook, so the real discovery, token exchange, and ID token checks
- * run with no network.
+ * run with no network. With `plainOAuth2` it's an OAuth 2 provider without
+ * OpenID Connect: no discovery or ID tokens, and who signed in comes from
+ * `/api/me` (fields `id` and `email`). Refresh tokens rotate and can be revoked.
  */
 export class FakeOidcProvider {
-  readonly issuer = "https://idp.test";
+  readonly issuer: string;
+  readonly plainOAuth2: boolean;
   readonly clientId = "cairnmcp-test";
   readonly clientSecret = "idp-test-secret-not-real";
+  /** Extra claims per subject, sent in ID tokens and userinfo; change them to simulate a plan change. */
+  readonly claims = new Map<string, Record<string, unknown>>();
   readonly #codes = new Map<string, Pending>();
+  readonly #accessTokens = new Map<string, { sub: string; email: string }>();
+  readonly #refreshTokens = new Map<string, { sub: string; email: string }>();
   #privateKey!: CryptoKey;
   #jwk!: JWK;
   /** Set to make the next ID token claim a different nonce (replay test). */
   wrongNonce = false;
 
-  static async create(): Promise<FakeOidcProvider> {
-    const op = new FakeOidcProvider();
+  constructor(options: { issuer?: string; plainOAuth2?: boolean } = {}) {
+    this.issuer = options.issuer ?? "https://idp.test";
+    this.plainOAuth2 = options.plainOAuth2 ?? false;
+  }
+
+  static async create(options: { issuer?: string; plainOAuth2?: boolean } = {}): Promise<FakeOidcProvider> {
+    const op = new FakeOidcProvider(options);
     const { privateKey, publicKey } = await generateKeyPair("RS256");
     op.#privateKey = privateKey;
     op.#jwk = { ...(await exportJWK(publicKey)), kid: "idp-1", alg: "RS256", use: "sig" };
@@ -36,9 +48,9 @@ export class FakeOidcProvider {
     const url = new URL(authorizationUrl);
     if (url.origin !== this.issuer) throw new Error(`not this provider: ${url.origin}`);
     const q = url.searchParams;
-    if (q.get("code_challenge_method") !== "S256" || !q.get("nonce") || !q.get("state")) throw new Error("provider expects PKCE, nonce, and state");
+    if (q.get("code_challenge_method") !== "S256" || (!this.plainOAuth2 && !q.get("nonce")) || !q.get("state")) throw new Error("provider expects PKCE, nonce, and state");
     const code = randomBytes(16).toString("base64url");
-    this.#codes.set(code, { nonce: q.get("nonce")!, challenge: q.get("code_challenge")!, redirectUri: q.get("redirect_uri")!, ...user });
+    this.#codes.set(code, { nonce: q.get("nonce"), challenge: q.get("code_challenge")!, redirectUri: q.get("redirect_uri")!, ...user });
     const back = new URL(q.get("redirect_uri")!);
     back.searchParams.set("code", code);
     back.searchParams.set("state", q.get("state")!);
@@ -48,11 +60,12 @@ export class FakeOidcProvider {
   async #handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-    if (url.pathname === "/.well-known/openid-configuration") {
+    if (url.pathname === "/.well-known/openid-configuration" && !this.plainOAuth2) {
       return json({
         issuer: this.issuer,
         authorization_endpoint: `${this.issuer}/authorize`,
         token_endpoint: `${this.issuer}/token`,
+        userinfo_endpoint: `${this.issuer}/userinfo`,
         jwks_uri: `${this.issuer}/jwks`,
         response_types_supported: ["code"],
         subject_types_supported: ["public"],
@@ -69,13 +82,21 @@ export class FakeOidcProvider {
         ? Buffer.from(basic.slice(6), "base64").toString().split(":").map(decodeURIComponent)
         : [form.get("client_id"), form.get("client_secret")];
       if (id !== this.clientId || secret !== this.clientSecret) return json({ error: "invalid_client" }, 401);
+      if (form.get("grant_type") === "refresh_token") {
+        const who = this.#refreshTokens.get(form.get("refresh_token") ?? "");
+        if (!who) return json({ error: "invalid_grant" }, 400);
+        this.#refreshTokens.delete(form.get("refresh_token")!);
+        return json(this.#issue(who));
+      }
       const pending = this.#codes.get(form.get("code") ?? "");
       this.#codes.delete(form.get("code") ?? "");
       const verifier = form.get("code_verifier") ?? "";
       if (!pending || pending.redirectUri !== form.get("redirect_uri") || createHash("sha256").update(verifier).digest("base64url") !== pending.challenge) {
         return json({ error: "invalid_grant" }, 400);
       }
-      const idToken = await new SignJWT({ nonce: this.wrongNonce ? "replayed" : pending.nonce, email: pending.email })
+      const who = { sub: pending.sub, email: pending.email };
+      if (this.plainOAuth2) return json(this.#issue(who));
+      const idToken = await new SignJWT({ nonce: this.wrongNonce ? "replayed" : pending.nonce, email: pending.email, ...this.claims.get(pending.sub) })
         .setProtectedHeader({ alg: "RS256", kid: "idp-1" })
         .setIssuer(this.issuer)
         .setSubject(pending.sub)
@@ -83,9 +104,29 @@ export class FakeOidcProvider {
         .setIssuedAt()
         .setExpirationTime("5m")
         .sign(this.#privateKey);
-      return json({ access_token: "idp-access-token", token_type: "Bearer", expires_in: 300, id_token: idToken });
+      return json({ ...this.#issue(who), id_token: idToken });
+    }
+    const bearer = this.#accessTokens.get(request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "");
+    if (url.pathname === "/userinfo" && !this.plainOAuth2) {
+      return bearer ? json({ sub: bearer.sub, email: bearer.email, ...this.claims.get(bearer.sub) }) : json({ error: "invalid_token" }, 401);
+    }
+    if (url.pathname === "/api/me" && this.plainOAuth2) {
+      return bearer ? json({ id: Number(bearer.sub.replace(/\D/g, "")) || bearer.sub, email: bearer.email, ...this.claims.get(bearer.sub) }) : json({ error: "invalid_token" }, 401);
     }
     return json({ error: "not_found" }, 404);
+  }
+
+  /** End every refresh token issued to `sub`: their next refresh is refused. */
+  revoke(sub: string): void {
+    for (const [token, who] of this.#refreshTokens) if (who.sub === sub) this.#refreshTokens.delete(token);
+  }
+
+  #issue(who: { sub: string; email: string }): { access_token: string; token_type: string; expires_in: number; refresh_token: string } {
+    const access = `idp-at-${randomBytes(8).toString("hex")}`;
+    const refresh = `idp-rt-${randomBytes(8).toString("hex")}`;
+    this.#accessTokens.set(access, who);
+    this.#refreshTokens.set(refresh, who);
+    return { access_token: access, token_type: "Bearer", expires_in: 300, refresh_token: refresh };
   }
 }
 

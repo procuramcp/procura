@@ -9,6 +9,7 @@ import {
   MemberRole,
   MemberStatus,
   omitUndefined,
+  SignInConfig,
   type PlanLimits,
   SourceId,
   TenantId,
@@ -22,9 +23,25 @@ import {
   type SideEffectCounts,
 } from "@cairnmcp/core";
 import type { AuditEvent } from "@cairnmcp/runtime";
-import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import type { Sealed } from "@cairnmcp/vault";
+import { and, asc, desc, eq, ilike, inArray, ne, notInArray, or, sql } from "drizzle-orm";
 import type { TenantTx } from "./client.ts";
-import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets, usageCounters, users } from "./schema.ts";
+import {
+  accessProfiles,
+  auditEvents,
+  memberProfiles,
+  memberships,
+  profileClaims,
+  profileRules,
+  sources,
+  tenants,
+  tenantSignIn,
+  toolsetAccess,
+  toolsets,
+  upstreamGrants,
+  usageCounters,
+  users,
+} from "./schema.ts";
 
 const currentTenant = sql<string>`cairnmcp.current_tenant_id()`;
 
@@ -176,6 +193,12 @@ function decodeCursor(value: string): { at: string; userId: string } | undefined
   } catch {
     return undefined;
   }
+}
+
+/** The issuer and subject a member signed in with (members of the current tenant only, by RLS). */
+export async function getUserIdentity(tx: TenantTx, userId: UserId): Promise<{ issuer: string; subject: string } | undefined> {
+  const [row] = await tx.select({ issuer: users.issuer, subject: users.subject }).from(users).where(eq(users.id, userId));
+  return row;
 }
 
 /** The current tenant's display name. */
@@ -369,6 +392,7 @@ const limitsOf = (r: LimitRow): PlanLimits =>
 export async function listProfiles(tx: TenantTx): Promise<StoredProfile[]> {
   const profiles = await tx.select().from(accessProfiles).orderBy(asc(accessProfiles.name));
   const rules = await tx.select().from(profileRules);
+  const claims = await tx.select().from(profileClaims);
   const members = await tx.select().from(memberProfiles);
   return profiles.map((p) => ({
     ...AccessProfile.parse({
@@ -377,6 +401,7 @@ export async function listProfiles(tx: TenantTx): Promise<StoredProfile[]> {
       ...(p.description ? { description: p.description } : {}),
       rules: rules.filter((r) => r.profileId === p.id).map((r) => ({ toolsetId: r.toolsetId, level: r.level, operations: r.operations })),
       limits: limitsOf(p),
+      claims: claims.filter((c) => c.profileId === p.id).map((c) => ({ claim: c.claim, value: c.value })),
     }),
     members: members.filter((m) => m.profileId === p.id).map((m) => UserId.parse(m.userId)),
   }));
@@ -396,6 +421,9 @@ export async function putProfile(tx: TenantTx, profile: AccessProfile): Promise<
   if (p.rules.length > 0) {
     await tx.insert(profileRules).values(p.rules.map((r) => ({ tenantId: currentTenant, profileId: p.id, toolsetId: r.toolsetId, level: r.level, operations: r.operations })));
   }
+  await tx.delete(profileClaims).where(eq(profileClaims.profileId, p.id));
+  const claims = [...new Map(p.claims.map((c) => [`${c.claim}\0${c.value}`, c])).values()];
+  if (claims.length > 0) await tx.insert(profileClaims).values(claims.map((c) => ({ tenantId: currentTenant, profileId: p.id, claim: c.claim, value: c.value })));
 }
 
 function limitValues(l: PlanLimits): LimitRow {
@@ -407,12 +435,99 @@ export async function deleteProfile(tx: TenantTx, id: string): Promise<boolean> 
   return deleted.length > 0;
 }
 
-/** Replace the profiles a member holds. */
+/**
+ * Replace the profiles the team gave someone. Profiles from their sign-in
+ * claims (D-040) stay: sign-in manages those. Giving one by hand that sign-in
+ * also gives makes it the team's, so it outlasts a plan change.
+ */
 export async function setMemberProfiles(tx: TenantTx, userId: UserId, profileIds: readonly string[]): Promise<void> {
   const user = UserId.parse(userId);
-  await tx.delete(memberProfiles).where(eq(memberProfiles.userId, user));
+  await tx.delete(memberProfiles).where(and(eq(memberProfiles.userId, user), eq(memberProfiles.via, "manual")));
   const ids = [...new Set(profileIds)];
-  if (ids.length > 0) await tx.insert(memberProfiles).values(ids.map((profileId) => ({ tenantId: currentTenant, userId: user, profileId })));
+  if (ids.length > 0) {
+    await tx
+      .insert(memberProfiles)
+      .values(ids.map((profileId) => ({ tenantId: currentTenant, userId: user, profileId, via: "manual" as const })))
+      .onConflictDoUpdate({ target: [memberProfiles.tenantId, memberProfiles.userId, memberProfiles.profileId], set: { via: "manual" } });
+  }
+}
+
+/**
+ * Make someone's sign-in profiles exactly `profileIds` (D-040): from their
+ * claims, on every sign-in and token refresh. Profiles the team gave by hand
+ * are left alone.
+ */
+export async function syncSignInProfiles(tx: TenantTx, userId: UserId, profileIds: readonly string[]): Promise<void> {
+  const user = UserId.parse(userId);
+  const ids = [...new Set(profileIds)];
+  await tx
+    .delete(memberProfiles)
+    .where(and(eq(memberProfiles.userId, user), eq(memberProfiles.via, "sign_in"), ids.length > 0 ? notInArray(memberProfiles.profileId, ids) : undefined));
+  if (ids.length > 0) {
+    await tx
+      .insert(memberProfiles)
+      .values(ids.map((profileId) => ({ tenantId: currentTenant, userId: user, profileId, via: "sign_in" as const })))
+      .onConflictDoNothing();
+  }
+}
+
+/** For each user, the profiles they hold through sign-in rather than from the team. */
+export async function signInProfileIds(tx: TenantTx, userIds: readonly UserId[]): Promise<Map<UserId, string[]>> {
+  const out = new Map<UserId, string[]>();
+  if (userIds.length === 0) return out;
+  const rows = await tx
+    .select({ userId: memberProfiles.userId, profileId: memberProfiles.profileId })
+    .from(memberProfiles)
+    .where(and(inArray(memberProfiles.userId, [...userIds]), eq(memberProfiles.via, "sign_in")));
+  for (const r of rows) {
+    const user = UserId.parse(r.userId);
+    out.set(user, [...(out.get(user) ?? []), r.profileId]);
+  }
+  return out;
+}
+
+// --- A tenant's own sign-in (D-040) ------------------------------------------------------
+
+export type StoredSignIn = { config: SignInConfig; secret?: Sealed; updatedAt: Instant };
+
+export async function getSignIn(tx: TenantTx): Promise<StoredSignIn | undefined> {
+  const [row] = await tx.select().from(tenantSignIn);
+  if (!row) return undefined;
+  const secret = row.secretIv && row.secretCiphertext && row.secretTag ? { iv: row.secretIv, ciphertext: row.secretCiphertext, tag: row.secretTag } : undefined;
+  return { config: SignInConfig.parse(row.config), ...(secret ? { secret } : {}), updatedAt: instantOf(row.updatedAt) };
+}
+
+/** Set the tenant's sign-in. `secret` replaces the stored client secret; leave it out to keep it. */
+export async function putSignIn(tx: TenantTx, config: SignInConfig, secret?: Sealed): Promise<void> {
+  const parsed = SignInConfig.parse(config);
+  const sealed = secret ? { secretIv: secret.iv, secretCiphertext: secret.ciphertext, secretTag: secret.tag } : {};
+  await tx
+    .insert(tenantSignIn)
+    .values({ tenantId: currentTenant, config: parsed, ...sealed })
+    .onConflictDoUpdate({ target: tenantSignIn.tenantId, set: { config: parsed, ...sealed, updatedAt: sql`now()` } });
+}
+
+export async function deleteSignIn(tx: TenantTx): Promise<boolean> {
+  const rows = await tx.delete(tenantSignIn).returning({ tenantId: tenantSignIn.tenantId });
+  return rows.length > 0;
+}
+
+/** Keep the provider's refresh token for one token family, sealed (D-040). Replaces an older one. */
+export async function putUpstreamGrant(tx: TenantTx, grant: { familyId: string; userId: UserId; sealed: Sealed; expiresAt: Date }): Promise<void> {
+  const values = { iv: grant.sealed.iv, ciphertext: grant.sealed.ciphertext, tag: grant.sealed.tag, expiresAt: grant.expiresAt };
+  await tx
+    .insert(upstreamGrants)
+    .values({ tenantId: currentTenant, familyId: grant.familyId, userId: UserId.parse(grant.userId), ...values })
+    .onConflictDoUpdate({ target: [upstreamGrants.tenantId, upstreamGrants.familyId], set: { ...values, updatedAt: sql`now()` } });
+}
+
+export async function getUpstreamGrant(tx: TenantTx, familyId: string): Promise<{ userId: UserId; sealed: Sealed } | undefined> {
+  const [row] = await tx.select().from(upstreamGrants).where(eq(upstreamGrants.familyId, familyId));
+  return row && { userId: UserId.parse(row.userId), sealed: { iv: row.iv, ciphertext: row.ciphertext, tag: row.tag } };
+}
+
+export async function deleteUpstreamGrant(tx: TenantTx, familyId: string): Promise<void> {
+  await tx.delete(upstreamGrants).where(eq(upstreamGrants.familyId, familyId));
 }
 
 /** The profile ids each member holds. */

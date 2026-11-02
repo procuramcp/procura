@@ -1,10 +1,10 @@
-import { createAuthHandler, SigningKeys, type IdentityProvider } from "@cairnmcp/auth";
+import { createAuthHandler, SigningKeys, type IdentityProvider, type ProviderFetch } from "@cairnmcp/auth";
 import { PgAuditSink, PgVaultStore, type Database } from "@cairnmcp/db";
 import { createMcpHandler, TokenVerifier, type TrustedIssuer } from "@cairnmcp/mcp";
 import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
 import { Vault, type KeyWrapper } from "@cairnmcp/vault";
 import { createConsoleHandler } from "./console/index.ts";
-import type { DocumentGetter } from "./fetch-document.ts";
+import { publicFetch, type DocumentGetter } from "./fetch-document.ts";
 
 export type AppOptions = {
   db: Database;
@@ -21,6 +21,8 @@ export type AppOptions = {
   getDocument?: DocumentGetter;
   /** The built console (packages/web/dist), served at /app (D-033). */
   consoleDir?: string;
+  /** How tenants' own sign-in providers are reached (D-040). Public https only by default; injected for tests. */
+  signInFetch?: ProviderFetch;
 };
 
 /**
@@ -38,7 +40,14 @@ export async function createApp(options: AppOptions): Promise<(request: Request)
   const vault = new Vault({ store: new PgVaultStore(options.db), keyWrapper: options.keyWrapper });
   const runtime = new Runtime({ fetch: options.fetch, credentials: vault, limiter: new InMemoryRateLimiter(), audit: new PgAuditSink(options.db) });
 
-  const auth = createAuthHandler({ db: options.db, keys, providers: options.providers, publicUrl, ...(options.now ? { now: options.now } : {}) });
+  const auth = createAuthHandler({
+    db: options.db,
+    keys,
+    providers: options.providers,
+    publicUrl,
+    tenantSignIn: { vault, fetch: options.signInFetch ?? (publicFetch as ProviderFetch) },
+    ...(options.now ? { now: options.now } : {}),
+  });
   const mcp = createMcpHandler({ db: options.db, verifier, runtime, publicUrl, ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {}) });
   const console_ = createConsoleHandler({
     db: options.db,

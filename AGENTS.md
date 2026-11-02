@@ -40,7 +40,7 @@ a superuser URL; each test file creates and drops its own database. A local Post
 | `runtime` | Runs one tool call: validation, auth, egress rules, throttling, audit. | `src/runtime.ts` (`invoke`), `request.ts`, `egress.ts`, `auth.ts`, `limiter.ts` |
 | `db` | Postgres with RLS: tenants, sources, toolsets, access, vault and audit storage. | `migrations/*.sql` (source of truth), `src/schema.ts` (Drizzle view), `src/repo.ts` (all tenant queries), `src/client.ts` (`Database`), `src/stores.ts`, `src/errors.ts` |
 | `mcp` | The MCP endpoint `/mcp/{tenant}/{toolset}`: OAuth resource server. | `src/handler.ts`, `src/cache.ts` (`ToolsetCache`), `src/limits.ts` (plan limits), `src/token.ts`, `src/results.ts` |
-| `auth` | Embedded OAuth 2.1 authorization server under `/oauth`. | `src/handler.ts` (all endpoints + route table), `identity.ts` (OIDC), `keys.ts`, `pages.ts`, `redirect.ts` |
+| `auth` | Embedded OAuth 2.1 authorization server under `/oauth`. | `src/handler.ts` (all endpoints + route table, tenant sign-in and refresh re-checks), `identity.ts` (OIDC, plain OAuth 2), `keys.ts`, `pages.ts`, `redirect.ts` |
 | `server` | The app: wires everything, the console API, the admin CLI. | `src/app.ts`, `src/console/*`, `src/admin.ts`, `src/fetch-document.ts`, `scripts/serve.ts`, `scripts/admin.ts` |
 | `web` | The console UI (React, shadcn/ui), built to static files served at `/app`. | `src/lib/api.ts` (every API call; types from `console-api`), `src/lib/act.ts`, `src/lib/hooks.ts`, `src/pages/*` |
 | `eval` | Offline ingest eval over a corpus of public API descriptions. | `src/ingest-eval.ts`, `corpus/` |
@@ -57,6 +57,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | `tenants.ts` | `GET /tenants/:t`, `POST /tenants/:t/toolsets` |
 | `toolsets.ts` | `GET`/`PUT /tenants/:t/toolsets/:id`, `PUT …/access`, `POST …/test` |
 | `access.ts` | `GET /tenants/:t/access` (profiles, team, customer count), `PUT`/`DELETE …/profiles/:id` |
+| `customer-sign-in.ts` | `GET`/`PUT`/`DELETE /tenants/:t/sign-in`: a tenant's own sign-in for customers (D-040); the client secret is sealed, never returned |
 | `people.ts` | `GET …/customers` (search, paging), `PUT …/members/:user/role`, `PUT`/`DELETE …/members/:user` (suspend, note, remove), `PUT …/members/:user/profiles` |
 | `sources.ts` | `POST …/sources/preview`, `POST …/sources`, `GET …/sources/:id`, `PUT`/`DELETE …/credentials/:scheme` |
 | `sign-in.ts` | Browser sign-in through OIDC, session cookies, `purgeExpiredConsoleState` |
@@ -76,6 +77,9 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | Can this level call this tool? | `canCall`, `allowsTool`, `highestLevel` (core `access.ts`) |
 | A call's plan limits (most generous rule) | `callLimits`, `PlanLimits` (core `access.ts`) |
 | Count a call against allowances, refund it, show usage | `takeAllowance`, `refundAllowance`, `usageFor`, `usagePeriods` (db); the MCP side is `withinLimits` (mcp `limits.ts`) |
+| Profiles a person's sign-in claims give | `profilesForClaims`, `SignInConfig`, `ClaimRule` (core `sign-in.ts`); `syncSignInProfiles` (db) |
+| Encrypt a secret that isn't an API credential | `vault.sealSecret` / `vault.openSecret` with a context naming where it's stored (`SIGN_IN_SECRET_CONTEXT`, `upstreamGrantContext`) |
+| Fetch a URL a tenant admin typed in | `safeGet` (documents), `publicFetch` (sign-in providers), both in server `fetch-document.ts` |
 | Team role at least X? Roles, statuses | `hasTeamRole`, `MemberRole`, `TeamRole`, `MemberStatus` (core `access.ts`); `useRole` in web `lib/hooks.ts` |
 | Id schemas | `TenantId`, `UserId`, `SourceId`, `ToolsetId`, `ProfileId`, `OperationId`, `ToolName` (core `ir/ids.ts`) |
 | JSON / redirect response | `json`, `redirect`, `withHeaders` (http) |
@@ -156,5 +160,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-039, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-040, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{oracle,auth0}`.

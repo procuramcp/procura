@@ -1,5 +1,5 @@
 // The lightweight repo queries: they must agree with what the full IR says.
-import { AccessProfile, countBySideEffect, defaultToolset, type TenantId, type UserId } from "@cairnmcp/core";
+import { AccessProfile, countBySideEffect, defaultToolset, SignInConfig, type TenantId, type UserId } from "@cairnmcp/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import { PG, pgErrorCode } from "./errors.ts";
@@ -27,6 +27,15 @@ import {
   toolsetAccessFor,
   usageFor,
   usagePeriods,
+  deleteSignIn,
+  deleteUpstreamGrant,
+  getSignIn,
+  getUpstreamGrant,
+  memberProfileIds,
+  putSignIn,
+  putUpstreamGrant,
+  signInProfileIds,
+  syncSignInProfiles,
 } from "./repo.ts";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "./test-support.ts";
 
@@ -229,6 +238,82 @@ describe.skipIf(!adminUrl)("repo queries", () => {
       expect((await db.withTenant(other.tenantId, (tx) => usageFor(tx, [user], now))).size).toBe(0);
       // Their allowance there starts from zero.
       expect((await db.withTenant(other.tenantId, (tx) => takeAllowance(tx, user, { perDay: 1 }, now))).ok).toBe(true);
+    });
+  });
+
+  describe("a tenant's own sign-in (D-040)", () => {
+    const sealed = { iv: "aXY=", ciphertext: "Y3Q=", tag: "dGFn" };
+    const config = { kind: "oidc" as const, name: "Acme", issuer: "https://login.acme.test", clientId: "abc", scopes: "openid", defaultProfileId: "free" };
+
+    it("stores the sign-in, keeps the secret when it isn't replaced, and deletes it", async () => {
+      await db.withTenant(tenantId, async (tx) => {
+        await putSignIn(tx, SignInConfig.parse(config), sealed);
+        expect(await getSignIn(tx)).toMatchObject({ config, secret: sealed });
+        await putSignIn(tx, SignInConfig.parse({ ...config, name: "Acme Login" }));
+        expect(await getSignIn(tx)).toMatchObject({ config: { name: "Acme Login" }, secret: sealed });
+        expect(await deleteSignIn(tx)).toBe(true);
+        expect(await getSignIn(tx)).toBeUndefined();
+      });
+    });
+
+    it("keeps claim rules on profiles", async () => {
+      const claims = [{ claim: "plan", value: "pro" }, { claim: "https://acme.test/roles", value: "admin" }];
+      await db.withTenant(tenantId, async (tx) => {
+        await putProfile(tx, AccessProfile.parse({ id: "pro", name: "Pro", rules: [], claims: [...claims, claims[0]] }));
+        expect((await listProfiles(tx)).find((p) => p.id === "pro")?.claims).toEqual(expect.arrayContaining(claims));
+        expect((await listProfiles(tx)).find((p) => p.id === "pro")?.claims).toHaveLength(2);
+      });
+    });
+
+    it("lets sign-in manage its own profiles and never the team's", async () => {
+      const user = await db.ensureUser("https://issuer.test", "claims-sync");
+      await db.withTenant(tenantId, async (tx) => {
+        await ensureMember(tx, user);
+        for (const id of ["a", "b", "c"]) await putProfile(tx, AccessProfile.parse({ id, name: id.toUpperCase(), rules: [] }));
+        await setMemberProfiles(tx, user, ["a"]);
+        await syncSignInProfiles(tx, user, ["a", "b"]);
+        // "a" stays the team's; only "b" is from sign-in.
+        expect((await signInProfileIds(tx, [user])).get(user)).toEqual(["b"]);
+        await syncSignInProfiles(tx, user, ["c"]);
+        expect((await memberProfileIds(tx, [user])).get(user)?.sort()).toEqual(["a", "c"]);
+        // The team removing everything leaves sign-in's.
+        await setMemberProfiles(tx, user, []);
+        expect((await memberProfileIds(tx, [user])).get(user)).toEqual(["c"]);
+        // The team giving one sign-in also gives makes it theirs.
+        await setMemberProfiles(tx, user, ["c"]);
+        await syncSignInProfiles(tx, user, []);
+        expect((await memberProfileIds(tx, [user])).get(user)).toEqual(["c"]);
+      });
+    });
+
+    it("keeps one upstream grant per token family, and purges expired ones", async () => {
+      const user = await db.ensureUser("https://issuer.test", "grant-holder");
+      const later = new Date(Date.now() + 3_600_000);
+      await db.withTenant(tenantId, async (tx) => {
+        await putUpstreamGrant(tx, { familyId: "fam-1", userId: user, sealed, expiresAt: later });
+        await putUpstreamGrant(tx, { familyId: "fam-1", userId: user, sealed: { ...sealed, iv: "bmV3" }, expiresAt: later });
+        await putUpstreamGrant(tx, { familyId: "fam-old", userId: user, sealed, expiresAt: new Date(Date.now() - 1000) });
+        expect((await getUpstreamGrant(tx, "fam-1"))?.sealed.iv).toBe("bmV3");
+      });
+      expect(await db.purgeUpstreamGrants()).toBe(1);
+      await db.withTenant(tenantId, async (tx) => {
+        expect(await getUpstreamGrant(tx, "fam-old")).toBeUndefined();
+        await deleteUpstreamGrant(tx, "fam-1");
+        expect(await getUpstreamGrant(tx, "fam-1")).toBeUndefined();
+      });
+    });
+
+    it("keeps one tenant's sign-in and grants from another", async () => {
+      const other = await newTenant(db, "repo-sign-in-other");
+      const user = await db.ensureUser("https://issuer.test", "grant-holder");
+      await db.withTenant(tenantId, async (tx) => {
+        await putSignIn(tx, SignInConfig.parse(config), sealed);
+        await putUpstreamGrant(tx, { familyId: "fam-shared", userId: user, sealed, expiresAt: new Date(Date.now() + 3_600_000) });
+      });
+      await db.withTenant(other.tenantId, async (tx) => {
+        expect(await getSignIn(tx)).toBeUndefined();
+        expect(await getUpstreamGrant(tx, "fam-shared")).toBeUndefined();
+      });
     });
   });
 });

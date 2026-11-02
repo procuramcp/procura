@@ -52,6 +52,8 @@ export type Person = {
   you: boolean;
   /** Calls today and this month (UTC), in the customer list (D-039). */
   usage?: { today: number; month: number } | undefined;
+  /** Of `profiles`, the ones their sign-in claims give (D-040): sign-in manages these, not the team. */
+  signInProfiles: string[];
 };
 
 // ---- Tenant ----
@@ -152,7 +154,17 @@ export type PlanLimits = {
   /** https only: where a customer who hits a limit can get more. */
   upgradeUrl?: string | undefined;
 };
-export type AccessProfile = { id: string; name: string; description?: string | undefined; rules: ProfileRule[]; limits: PlanLimits; members: string[] };
+/** Whoever's sign-in claim `claim` equals `value` holds the profile (D-040). */
+export type ClaimRule = { claim: string; value: string };
+export type AccessProfile = {
+  id: string;
+  name: string;
+  description?: string | undefined;
+  rules: ProfileRule[];
+  limits: PlanLimits;
+  claims: ClaimRule[];
+  members: string[];
+};
 
 /** `GET /tenants/:t/access`, and every profile or team change. */
 export type AccessView = {
@@ -164,7 +176,13 @@ export type AccessView = {
 };
 
 /** `PUT /tenants/:t/profiles/:id` body. */
-export type ProfileEdit = { name: string; description?: string | undefined; rules: ProfileRule[]; limits?: PlanLimits | undefined };
+export type ProfileEdit = {
+  name: string;
+  description?: string | undefined;
+  rules: ProfileRule[];
+  limits?: PlanLimits | undefined;
+  claims?: ClaimRule[] | undefined;
+};
 /** `PUT /tenants/:t/members/:user/profiles` body. Adds them as a customer if they aren't in the tenant. */
 export type MemberProfilesEdit = { profiles: string[] };
 
@@ -176,6 +194,35 @@ export type RoleEdit = { role: Role };
 export type MemberEdit = { status?: MemberStatus | undefined; note?: string | null | undefined };
 /** `DELETE /tenants/:t/members/:user` */
 export type Removed = { ok: true };
+
+// ---- Customer sign-in (D-040) ----
+
+/** How a tenant's customers sign in: any OpenID Connect provider, or plain OAuth 2 with a userinfo URL. */
+export type SignInSettings =
+  | { kind: "oidc"; name: string; clientId: string; issuer: string; scopes?: string | undefined; defaultProfileId?: string | undefined }
+  | {
+      kind: "oauth2";
+      name: string;
+      clientId: string;
+      authorizationUrl: string;
+      tokenUrl: string;
+      userinfoUrl: string;
+      scopes?: string | undefined;
+      subjectField?: string | undefined;
+      labelField?: string | undefined;
+      defaultProfileId?: string | undefined;
+    };
+
+/** `GET /tenants/:t/sign-in`, and every change. The client secret is never sent back. */
+export type SignInView = {
+  settings: SignInSettings | null;
+  secretSet: boolean;
+  /** The redirect URI to register at the provider. */
+  callbackUrl: string;
+};
+
+/** `PUT /tenants/:t/sign-in` body. `clientSecret` is required the first time; leave it out to keep the saved one. */
+export type SignInEdit = SignInSettings & { clientSecret?: string | undefined };
 
 // ---- Sources (D-035) ----
 

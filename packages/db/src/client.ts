@@ -97,6 +97,12 @@ export class Database {
     return UserId.parse(rows[0]!.id);
   }
 
+  /** Delete expired upstream grants across tenants (D-040). Returns how many. Safe on any schedule. */
+  async purgeUpstreamGrants(): Promise<number> {
+    const { rows } = await this.#pool.query<{ removed: number }>("SELECT cairnmcp.purge_upstream_grants() AS removed");
+    return rows[0]?.removed ?? 0;
+  }
+
   async close(): Promise<void> {
     await this.#pool.end();
   }

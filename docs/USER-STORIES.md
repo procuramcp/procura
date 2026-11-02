@@ -38,9 +38,9 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 
 | Id | Story | Done when | Status |
 | --- | --- | --- | --- |
-| P-10 | My customers sign in with their existing account on my service; I don't create them one by one. | The tenant names its own OIDC or OAuth provider; a customer record is created on first sign-in (D-032). | — |
+| P-10 | My customers sign in with their existing account on my service; I don't create them one by one. | The tenant names its own OIDC or OAuth provider; a customer record is created on first sign-in (D-032). | built: OIDC or plain OAuth 2 per tenant, customers created on first sign-in (D-040) |
 | P-11 | I define plans (e.g. Free, Pro) that decide which tools a customer can use. | A plan is an access profile: tools, level, and optional operation list (D-034). | partial: profiles exist, assigned only by hand to members |
-| P-12 | A customer's plan follows what they pay for, without me syncing anything. | A claim in the sign-in token (`plan = pro`) picks the plan, re-read when the token refreshes, so a lapsed plan ends within minutes (D-032). | — |
+| P-12 | A customer's plan follows what they pay for, without me syncing anything. | A claim in the sign-in token (`plan = pro`) picks the plan, re-read when the token refreshes, so a lapsed plan ends within minutes (D-032). | built: claim rules on profiles, re-read at every token refresh (D-040) |
 | P-13 | Each plan has limits: requests per minute and a daily or monthly allowance per customer. | Limits enforced per customer across restarts and instances; a tool can count for more than one call. | partial: daily and monthly allowances on profiles, held across restarts and instances (D-039); no per-minute rate or cost per tool yet |
 | P-14 | One customer can't use up my API's own rate limit for everyone. | Per-customer limits sit under the tenant-wide limit and the upstream's `Retry-After` (D-020). | built: plan limits per customer (D-039) under the tenant and source limits |
 | P-15 | Plans can limit arguments, not just tools (e.g. Free may read at most 100 items). | Per-plan input pins and bounds, extending today's toolset pins (D-015, D-023). | — |
@@ -65,10 +65,10 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 
 | Id | Story | Done when | Status |
 | --- | --- | --- | --- |
-| C-1 | I add the provider's MCP URL to my client and sign in with my existing account. | Standard MCP OAuth: discovery, client registration, consent (D-025, D-026), through the provider's sign-in (P-10). | partial: works with the embedded sign-in |
+| C-1 | I add the provider's MCP URL to my client and sign in with my existing account. | Standard MCP OAuth: discovery, client registration, consent (D-025, D-026), through the provider's sign-in (P-10). | built: through the provider's own sign-in when the tenant sets one (D-040) |
 | C-2 | I see only the tools my plan includes. | `tools/list` filtered per caller; `tools/call` re-checked (D-023). | built |
 | C-3 | When I hit a limit, I'm told which one, when it resets, and how to get more. | Limit errors as tool results with reset time and the provider's upgrade link (D-020). | built: `limit_reached` with `resetsAt` and the upgrade link (D-039) |
-| C-4 | When I upgrade, the new tools appear without reconnecting. | Plan from refreshed claims (P-12); access checked per request (D-034). | — |
+| C-4 | When I upgrade, the new tools appear without reconnecting. | Plan from refreshed claims (P-12); access checked per request (D-034). | built: profiles from claims re-read at refresh, access checked per request (D-034, D-040) |
 | C-5 | My data stays mine: my calls use my account, not someone else's. | Per-user credentials (P-20); isolation tests cover customers. | partial: isolation tests cover customers (D-038); per-user credentials not yet |
 
 ## Team
