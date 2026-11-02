@@ -97,7 +97,7 @@ grep CAIRNMCP_MASTER_KEY deploy/oracle/app.env
 
 ## Set up your first tenant
 
-Until the curation UI exists, tenants are set up with `deploy/oracle/admin.sh`, run from the repo
+Creating a tenant and adding sources and API keys is done with `deploy/oracle/admin.sh`, run from the repo
 on your machine. It runs the admin CLI inside the app container on the VM (where the master key
 is), forwards files on stdin, and asks for secrets hidden. Example with Intervals.icu:
 
@@ -126,6 +126,14 @@ The starter toolset (`examples/intervals-icu/toolset.json`) is read-only: eight 
 athlete pinned to your own (`id = 0`). `toolset put` without `--definition` makes the default
 instead: every operation as a tool, reads enabled (D-016). `--level use_writes` also allows write
 tools a toolset enables.
+
+## The curation console
+
+`https://<domain>/app/` is where owners and admins edit toolsets (D-033): turn tools on or off,
+rename them, rewrite their descriptions for agents, pin inputs, grant access, and try a tool with
+a real call before saving. Sign in with the same account as your MCP client. Its sign-in uses a
+second Auth0 callback (`/app/callback/auth0`), added by `deploy/auth0` (run `terraform apply`
+there once after upgrading).
 
 ## Operating it
 

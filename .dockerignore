@@ -10,6 +10,8 @@
 **/test-support.ts
 **/__snapshots__
 **/coverage
+# The image builds the console itself.
+packages/web/dist
 docs
 examples/*/*
 !examples/*/package.json

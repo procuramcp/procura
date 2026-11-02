@@ -13,7 +13,7 @@ export function serve(handler: (request: Request) => Promise<Response>, options:
 async function handle(handler: (request: Request) => Promise<Response>, req: IncomingMessage, res: ServerResponse, publicUrl: string): Promise<void> {
   try {
     const response = await handler(toRequest(req, publicUrl));
-    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.writeHead(response.status, nodeHeaders(response.headers));
     if (response.body) for await (const chunk of response.body) res.write(chunk);
     res.end();
   } catch {
@@ -37,4 +37,13 @@ function toRequest(req: IncomingMessage, publicUrl: string): Request {
     headers,
     ...(hasBody ? { body: Readable.toWeb(req) as ReadableStream, duplex: "half" } : {}),
   });
+}
+
+/** Response headers for node:http, keeping every Set-Cookie (Object.fromEntries would keep only the last). */
+export function nodeHeaders(headers: Headers): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const [name, value] of headers) if (name !== "set-cookie") out[name] = value;
+  const cookies = headers.getSetCookie();
+  if (cookies.length > 0) out["set-cookie"] = cookies;
+  return out;
 }

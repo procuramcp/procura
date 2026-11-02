@@ -3,7 +3,8 @@
 import { OidcIdentityProvider, purgeExpiredAuthState } from "@cairnmcp/auth";
 import { Database } from "@cairnmcp/db";
 import { LocalKeyWrapper, parseMasterKey } from "@cairnmcp/vault";
-import { createApp, loadConfig, serve } from "../src/index.ts";
+import { fileURLToPath } from "node:url";
+import { createApp, loadConfig, purgeExpiredConsoleState, serve } from "../src/index.ts";
 
 let config;
 try {
@@ -22,13 +23,14 @@ const handler = await createApp({
   trustedIssuers: config.trustedIssuers,
   allowedOrigins: config.allowedOrigins,
   fetch: (url, init) => fetch(url, init),
+  consoleDir: fileURLToPath(new URL("../../web/dist", import.meta.url)),
 });
 
 const server = serve(handler, { port: config.port, publicUrl: config.publicUrl });
 console.log(`cairnmcp listening on :${config.port} as ${config.publicUrl}`);
 
-// Expired sign-in flows and refresh tokens are cleaned up hourly.
-const purge = setInterval(() => void purgeExpiredAuthState(db).catch((e: unknown) => console.error("purge failed:", (e as Error).message)), 60 * 60 * 1000);
+// Expired sign-in flows, refresh tokens, and console sessions are cleaned up hourly.
+const purge = setInterval(() => void Promise.all([purgeExpiredAuthState(db), purgeExpiredConsoleState(db)]).catch((e: unknown) => console.error("purge failed:", (e as Error).message)), 60 * 60 * 1000);
 purge.unref();
 
 const shutdown = () => {

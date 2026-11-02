@@ -49,6 +49,10 @@ client secret never appears in a command line or your terminal.
 Then connect from your MCP client: it now goes to Auth0's sign-in page, where you can create an
 account or continue with Google.
 
+The application allows two callbacks: `/oauth/callback/auth0` for MCP clients and
+`/app/callback/auth0` for the curation console (D-033). If you set up Auth0 before the console
+existed, run `terraform apply` again to add the second one (nothing needs pushing to the VM).
+
 ## Notes
 
 - **The client secret is in `terraform.tfstate`** (Terraform 1.5 can't keep it out). Keep the file

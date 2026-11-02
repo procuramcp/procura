@@ -90,6 +90,14 @@ headers=$(curl -s -o /dev/null -D - -X POST "$BASE/mcp/t1/mine")
 grep -q "^HTTP/1.1 401" <<<"$headers" || fail "expected 401"
 grep -qi "resource_metadata=\"$BASE/.well-known/oauth-protected-resource/mcp/t1/mine\"" <<<"$headers" || fail "missing resource_metadata"
 
+step "curation console"
+status=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/app/api/me")
+[ "$status" = "401" ] || fail "console API returned $status signed out"
+page=$(curl -fsS "$BASE/app/")
+grep -q '<div id="root">' <<<"$page" || fail "console page"
+asset=$(grep -o '/app/assets/index-[^"]*\.js' <<<"$page" | head -1)
+[ -n "$asset" ] && curl -fsS -o /dev/null "$BASE$asset" || fail "console bundle"
+
 step "runs as an unprivileged user"
 [ "$(docker exec "$NAME" id -u)" != "0" ] || fail "running as root"
 

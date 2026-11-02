@@ -106,6 +106,18 @@ export class TestBrowser {
     return this.#send(new Request(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", ...headers }, body: new URLSearchParams(form).toString() }));
   }
 
+  /** A JSON request as the console's own code sends it (same-origin Origin header). */
+  json(method: string, url: string | URL, body?: unknown, headers: Record<string, string> = {}): Promise<Response> {
+    const origin = new URL(url).origin;
+    return this.#send(
+      new Request(url, {
+        method,
+        headers: { ...(method === "GET" ? {} : { origin, "content-type": "application/json" }), ...headers },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    );
+  }
+
   forgetCookies(): void {
     this.#cookies.clear();
   }
@@ -113,8 +125,7 @@ export class TestBrowser {
   async #send(request: Request): Promise<Response> {
     if (this.#cookies.size > 0) request.headers.set("cookie", [...this.#cookies].map(([k, v]) => `${k}=${v}`).join("; "));
     const response = await this.#handler(request);
-    const setCookie = response.headers.get("set-cookie");
-    if (setCookie) {
+    for (const setCookie of response.headers.getSetCookie()) {
       const [pair, ...attrs] = setCookie.split(";").map((s) => s.trim());
       const [name, value] = pair!.split("=");
       if (attrs.some((a) => a.toLowerCase() === "max-age=0") || !value) this.#cookies.delete(name!);

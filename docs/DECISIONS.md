@@ -590,3 +590,33 @@ planning handoff are not repeated here unless implementation added something.
   themselves, which is the inefficiency this removes); asking each customer to paste their own API
   key (works, but worse to use and less safe than OAuth; may still be offered as a `per_user`
   fallback for APIs without OAuth).
+
+## D-033 Curation console: a React app with shadcn/ui, served by the app at /app
+
+- **Decision:** the curation UI (milestone 3) is a single-page app in `packages/web`: React,
+  Vite, Tailwind, shadcn/ui components, and Vercel's AI Elements for the tool test panel. Vite
+  builds it to static files in a Docker build stage; the app serves them at `/app` with a small
+  JSON API at `/app/api`. The first version edits toolsets (tools on or off, names, descriptions,
+  pins, with write tools marked) and access; sources, credentials, and tenants stay in the admin
+  CLI (D-030) for now.
+- **No build step still holds for the server** (D-009): Node runs the server's TypeScript as
+  before. The build is only for the browser bundle, which needs one anyway (JSX, Tailwind).
+- **Sign-in:** the same OIDC providers as the authorization server (D-026), with their own
+  callback (`/app/callback/<provider>`, added to the Auth0 application, D-031). A session is a
+  random token in a `__Host-` cookie (HttpOnly, Secure, SameSite=Lax), stored only as a hash,
+  for 8 hours. The console never sees access tokens for MCP endpoints.
+- **Who may edit:** tenant owners and admins. Members get 403. Every API call runs inside the
+  tenant (RLS), like the MCP endpoint; listing your tenants uses one more narrow cross-tenant
+  function, `cairnmcp.user_tenants(user_id)`.
+- **CSRF:** the API accepts unsafe methods only with `Origin` equal to the public URL and a JSON
+  body; together with SameSite=Lax, a form or fetch from another site can't act as the user.
+- **Tool test panel:** runs one tool from the editor (including unsaved changes) through the same
+  runtime as the MCP endpoint: same pins, credentials, and rate limits, and writes are audited
+  under the signed-in user. Write and destructive tools ask for confirmation first, since the call is
+  real. The panel shows the call and the response with AI Elements' tool view; no LLM is involved,
+  so it costs nothing.
+- **Content security policy:** scripts only from the app's own origin; inline styles are allowed
+  (Radix and the code view set them), nothing else inline.
+- **Rejected:** server-rendered HTML (chosen first, then replaced to use shadcn/ui and AI
+  Elements, which are React); a separate frontend deployment (another origin means CORS and
+  token handling for no gain on one VM).

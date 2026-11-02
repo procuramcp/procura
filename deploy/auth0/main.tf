@@ -52,7 +52,8 @@ resource "auth0_client" "cairnmcp" {
   is_first_party  = true
   oidc_conformant = true
   grant_types     = ["authorization_code"]
-  callbacks       = ["${var.public_url}/oauth/callback/auth0"]
+  # MCP clients' sign-in (D-026) and the curation console's (D-033).
+  callbacks = ["${var.public_url}/oauth/callback/auth0", "${var.public_url}/app/callback/auth0"]
 
   jwt_configuration {
     alg = "RS256"
@@ -98,8 +99,8 @@ resource "auth0_connection_clients" "google" {
   enabled_clients = [auth0_client.cairnmcp.id]
 }
 
-output "callback_url" {
-  value = "${var.public_url}/oauth/callback/auth0"
+output "callback_urls" {
+  value = auth0_client.cairnmcp.callbacks
 }
 
 output "issuer" {

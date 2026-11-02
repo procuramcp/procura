@@ -181,6 +181,24 @@ export const oauthSigningKeys = cairnmcp.table("oauth_signing_keys", {
   retiredAt: timestamp("retired_at", { withTimezone: true }),
 });
 
+export const consoleLogins = cairnmcp.table("console_logins", {
+  stateHash: text("state_hash").primaryKey(),
+  provider: text("provider").notNull(),
+  nonce: text("nonce").notNull(),
+  verifier: text("verifier").notNull(),
+  browserHash: text("browser_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
+export const consoleSessions = cairnmcp.table("console_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull(),
+  userLabel: text("user_label").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
 export const allTables = {
   tenants,
   users,
@@ -195,4 +213,6 @@ export const allTables = {
   oauthRequests,
   oauthRefreshTokens,
   oauthSigningKeys,
+  consoleLogins,
+  consoleSessions,
 };

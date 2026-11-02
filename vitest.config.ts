@@ -11,6 +11,7 @@ if (!process.env["CAIRNMCP_TEST_DATABASE_URL"] && !process.env["CI"]) {
 
 export default defineConfig({
   test: {
-    projects: ["packages/*"],
+    // packages/web is a browser app with its own Vite config and no unit tests (D-033).
+    projects: ["packages/*", "!packages/web"],
   },
 });
