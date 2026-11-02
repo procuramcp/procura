@@ -13,6 +13,7 @@
   "dependencies": {
     "@cairnmcp/core": "workspace:*",
     "@cairnmcp/db": "workspace:*",
+    "@cairnmcp/http": "workspace:*",
     "@cairnmcp/runtime": "workspace:*",
     "@cairnmcp/vault": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.1",

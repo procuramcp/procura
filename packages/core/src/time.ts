@@ -8,3 +8,12 @@ import { z } from "zod";
  */
 export const Instant = z.iso.datetime({ offset: false }).brand<"Instant">();
 export type Instant = z.infer<typeof Instant>;
+
+/**
+ * A `Date` as an `Instant`: whole seconds print without `.000`, other
+ * milliseconds are kept. The one conversion every package uses; callers own
+ * the clock and pass the `Date` in.
+ */
+export function instantOf(date: Date): Instant {
+  return date.toISOString().replace(/\.000Z$/, "Z") as Instant;
+}

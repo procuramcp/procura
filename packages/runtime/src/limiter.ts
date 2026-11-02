@@ -20,11 +20,15 @@ export interface RateLimiter {
   coolDown(key: string, seconds: number): void;
 }
 
-type Bucket = { tokens: number; updatedMs: number; inFlight: number; cooldownUntilMs: number };
+type Bucket = { tokens: number; updatedMs: number; inFlight: number; cooldownUntilMs: number; requestsPerMinute: number };
+
+/** How often idle buckets are swept, in acquires. */
+const SWEEP_EVERY = 1000;
 
 export class InMemoryRateLimiter implements RateLimiter {
   readonly #buckets = new Map<string, Bucket>();
   readonly #nowMs: () => number;
+  #acquires = 0;
 
   constructor(options: { nowMs?: () => number } = {}) {
     this.#nowMs = options.nowMs ?? Date.now;
@@ -32,6 +36,7 @@ export class InMemoryRateLimiter implements RateLimiter {
 
   acquire(keys: Array<{ key: string; limits: LimitSettings }>): Acquired {
     const now = this.#nowMs();
+    if (++this.#acquires % SWEEP_EVERY === 0) this.#sweep(now);
     // Check everything first so a refusal takes nothing.
     for (const { key, limits } of keys) {
       const b = this.#bucket(key, limits, now);
@@ -67,13 +72,31 @@ export class InMemoryRateLimiter implements RateLimiter {
   #bucket(key: string, limits: LimitSettings, now: number): Bucket {
     let b = this.#buckets.get(key);
     if (!b) {
-      b = { tokens: limits.requestsPerMinute, updatedMs: now, inFlight: 0, cooldownUntilMs: 0 };
+      b = { tokens: limits.requestsPerMinute, updatedMs: now, inFlight: 0, cooldownUntilMs: 0, requestsPerMinute: limits.requestsPerMinute };
       this.#buckets.set(key, b);
     }
+    b.requestsPerMinute = limits.requestsPerMinute;
     const refill = ((now - b.updatedMs) * limits.requestsPerMinute) / 60_000;
     b.tokens = Math.min(limits.requestsPerMinute, b.tokens + refill);
     b.updatedMs = now;
     return b;
+  }
+
+  /** Number of keys tracked. For tests and metrics. */
+  get size(): number {
+    return this.#buckets.size;
+  }
+
+  /**
+   * Forget buckets that are back to a fresh state (full, idle, no cooldown):
+   * recreating one later gives the same answer, so memory stays bounded by the
+   * keys in active use rather than every tenant and source ever seen.
+   */
+  #sweep(now: number): void {
+    for (const [key, b] of this.#buckets) {
+      const full = b.tokens + ((now - b.updatedMs) * b.requestsPerMinute) / 60_000 >= b.requestsPerMinute;
+      if (full && b.inFlight === 0 && b.cooldownUntilMs <= now) this.#buckets.delete(key);
+    }
   }
 }
 

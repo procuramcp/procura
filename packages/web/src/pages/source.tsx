@@ -20,6 +20,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { act } from "@/lib/act";
 import { api, type CredentialInput, type SourceView } from "@/lib/api";
 import { useLoad } from "@/lib/hooks";
 import { schemeLabel } from "@/pages/add-source";
@@ -115,28 +116,21 @@ function KeyCard({ tenantId, source, scheme, onChanged }: { tenantId: string; so
   async function save() {
     const c = credential();
     if (!c) return;
-    setBusy(true);
-    try {
-      onChanged(await api.setCredential(tenantId, source.id, scheme.id, c));
-      setSecret("");
-      setUsername("");
-      setEditing(false);
-      toast.success(`Saved the key for ${scheme.id}`, { description: "Encrypted; it won't be shown again." });
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    const next = await act(() => api.setCredential(tenantId, source.id, scheme.id, c), { busy: setBusy });
+    if (!next) return;
+    onChanged(next);
+    setSecret("");
+    setUsername("");
+    setEditing(false);
+    toast.success(`Saved the key for ${scheme.id}`, { description: "Encrypted; it won't be shown again." });
   }
 
   async function remove() {
-    try {
-      onChanged(await api.removeCredential(tenantId, source.id, scheme.id));
-      setEditing(true);
-      toast.success(`Removed the key for ${scheme.id}`);
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
+    const next = await act(() => api.removeCredential(tenantId, source.id, scheme.id));
+    if (!next) return;
+    onChanged(next);
+    setEditing(true);
+    toast.success(`Removed the key for ${scheme.id}`);
   }
 
   return (

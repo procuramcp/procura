@@ -10,6 +10,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { ToolsetCache } from "./cache.ts";
 import { createMcpHandler } from "./handler.ts";
 import { TokenVerifier } from "./token.ts";
 
@@ -27,6 +28,8 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
   let a: { tenantId: TenantId; ownerId: UserId };
   let b: { tenantId: TenantId; ownerId: UserId };
   let reader: UserId;
+  let toolset: Toolset;
+  const cache = new ToolsetCache();
 
   const resource = (tenantId: string, toolsetId = "mine") => `${BASE}/mcp/${tenantId}/${toolsetId}`;
 
@@ -72,7 +75,7 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       ...base,
       source: { ...base.source, authSchemes: base.source.authSchemes.map((s) => (s.type === "http_basic" ? { ...s, fixedUsername: "API_KEY" } : s)) },
     };
-    const toolset = Toolset.parse({
+    toolset = Toolset.parse({
       id: "mine",
       sourceId: "intervals-icu",
       name: "My training",
@@ -107,6 +110,7 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       db,
       runtime,
       publicUrl: BASE,
+      cache,
       verifier: new TokenVerifier([{ issuer: ISSUER, jwksUri: `${ISSUER}/jwks` }], new Map([[ISSUER, jwks]])),
     });
   });
@@ -249,6 +253,23 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
   });
 
   describe("changes take effect on the next request", () => {
+    it("serves a toolset edit on the next request, while reusing the resolved toolset in between", async () => {
+      const client = await connect("bravo-owner", resource(b.tenantId));
+      expect((await client.listTools()).tools).toHaveLength(2);
+      const cachedBefore = cache.size;
+      expect((await client.listTools()).tools).toHaveLength(2);
+      expect(cache.size).toBe(cachedBefore);
+
+      const edited = Toolset.parse({ ...toolset, tools: toolset.tools.map((t) => (t.name === "update_activity" ? { ...t, enabled: false } : { ...t, description: "Edited." })) });
+      await db.withTenant(b.tenantId, (tx) => putToolset(tx, edited));
+      const tools = (await client.listTools()).tools;
+      expect(tools.map((t) => [t.name, t.description])).toEqual([["list_activities", "Edited."]]);
+
+      await db.withTenant(b.tenantId, (tx) => putToolset(tx, toolset));
+      expect((await client.listTools()).tools).toHaveLength(2);
+      await client.close();
+    });
+
     it("downgrading access hides and blocks write tools immediately", async () => {
       const temp = await db.ensureUser(ISSUER, "alpha-temp");
       await db.withTenant(a.tenantId, async (tx) => {

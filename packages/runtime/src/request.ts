@@ -1,4 +1,4 @@
-import type { Operation, ParameterBinding } from "@cairnmcp/core";
+import { isRecord as isPlainObject, type Operation, type ParameterBinding } from "@cairnmcp/core";
 import { fail } from "./errors.ts";
 
 /** A request ready for auth and sending. Pure data; no secrets yet. */
@@ -152,8 +152,4 @@ function formScalar(v: unknown): string {
 
 function enc(s: string): string {
   return encodeURIComponent(s);
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
 }

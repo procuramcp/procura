@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { act } from "@/lib/act";
 import { api, type TenantView } from "@/lib/api";
 import { useLoad } from "@/lib/hooks";
 import { CopyText, slugify } from "@/pages/parts";
@@ -142,16 +143,10 @@ function NewToolset({ view }: { view: TenantView }) {
   const taken = view.toolsets.some((t) => t.id === id);
 
   async function create() {
-    setBusy(true);
-    try {
-      await api.createToolset(view.tenant.id, { id, name, sourceId });
-      toast.success(`Created ${name}`, { description: "Read tools are on; writes start off." });
-      navigate(`/t/${view.tenant.id}/toolsets/${id}`);
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    const created = await act(() => api.createToolset(view.tenant.id, { id, name, sourceId }), { busy: setBusy });
+    if (!created) return;
+    toast.success(`Created ${name}`, { description: "Read tools are on; writes start off." });
+    navigate(`/t/${view.tenant.id}/toolsets/${id}`);
   }
 
   return (

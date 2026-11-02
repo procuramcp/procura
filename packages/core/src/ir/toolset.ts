@@ -3,6 +3,7 @@ import type { IrDocument } from "./document.ts";
 import { OperationId, SourceId, ToolName, ToolsetId } from "./ids.ts";
 import { JsonValue, type JsonSchema } from "./json-schema.ts";
 import type { Operation } from "./operation.ts";
+import { isRecord, truncate } from "../util.ts";
 
 /** One operation exposed as one tool, renamed and re-described for agents. */
 export const ToolBinding = z.object({
@@ -82,7 +83,7 @@ export function defaultToolset(ir: IrDocument, options: { id: string; name: stri
       operationId: op.id,
       name: op.id,
       title: op.title,
-      description: op.description.length <= 4000 ? op.description : `${op.description.slice(0, 3999)}…`,
+      description: truncate(op.description, 4000),
       enabled: op.sideEffect.class === "read",
     })),
   });
@@ -157,7 +158,7 @@ export function toolAnnotations(op: Operation, title?: string): ToolAnnotations 
 
 function inputProperties(schema: JsonSchema): Record<string, unknown> {
   const props = schema["properties"];
-  return typeof props === "object" && props !== null && !Array.isArray(props) ? props : {};
+  return isRecord(props) ? props : {};
 }
 
 function withoutProperties(schema: JsonSchema, names: string[]): JsonSchema {

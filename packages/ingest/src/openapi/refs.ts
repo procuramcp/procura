@@ -1,3 +1,4 @@
+import { isRecord } from "@cairnmcp/core";
 import type { z } from "zod";
 
 /** Thrown when an operation cannot be mapped. The operation is skipped with an error diagnostic. */
@@ -61,8 +62,4 @@ export function deref<T>(doc: unknown, value: unknown, model: z.ZodType<T>, poin
     throw new MappingError("invalid_object", `invalid object at ${at}: ${first?.path.join(".") ?? ""} ${first?.message ?? ""}`, at);
   }
   return { value: parsed.data, pointer: at };
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

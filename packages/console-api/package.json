@@ -1,0 +1,13 @@
+{
+  "name": "@cairnmcp/console-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The console's JSON API contract: request and response types shared by the server's route handlers and the web console. Types only, with no imports, so the browser build and the server both typecheck against one copy.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

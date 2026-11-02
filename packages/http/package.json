@@ -1,0 +1,13 @@
+{
+  "name": "@cairnmcp/http",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Web-standard Request/Response helpers shared by the auth server, the MCP endpoint, and the console: responses, capped body reading, cookies, tokens, routing.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

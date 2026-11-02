@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { act } from "@/lib/act";
 import { api, ApiError, type Issue, type JsonValue, type Level, type OperationView, type ToolBinding, type ToolsetView } from "@/lib/api";
 import { useLoad, useMe } from "@/lib/hooks";
 import { display, parseValue } from "@/lib/values";
@@ -64,20 +65,19 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
   }, [dirty]);
 
   async function save() {
-    setSaving(true);
-    try {
-      const next = await api.saveToolset(tenantId, view.toolset.id, toEdit(draft));
-      onSaved(next);
-      setSaved(toDraft(next));
-      setDraft(toDraft(next));
-      setIssues(next.issues);
-      toast.success("Saved", { description: "MCP clients see the change on their next request." });
-    } catch (e) {
-      if (e instanceof ApiError && e.body.issues) setIssues(e.body.issues);
-      toast.error("Not saved", { description: (e as Error).message });
-    } finally {
-      setSaving(false);
-    }
+    const next = await act(() => api.saveToolset(tenantId, view.toolset.id, toEdit(draft)), {
+      busy: setSaving,
+      failure: "Not saved",
+      onError: (e) => {
+        if (e instanceof ApiError && e.body.issues) setIssues(e.body.issues);
+      },
+    });
+    if (!next) return;
+    onSaved(next);
+    setSaved(toDraft(next));
+    setDraft(toDraft(next));
+    setIssues(next.issues);
+    toast.success("Saved", { description: "MCP clients see the change on their next request." });
   }
 
   const enabled = draft.tools.filter((t) => t.enabled);
@@ -410,16 +410,11 @@ function AccessTab({ tenantId, view, onChanged }: { tenantId: string; view: Tool
       .join(", ");
 
   async function set(target: string, next: Level | "none") {
-    setBusy(true);
-    try {
-      onChanged(await api.setAccess(tenantId, view.toolset.id, target, next));
-      toast.success(next === "none" ? "Access removed" : `Access set to ${next}`);
-      setUserId("");
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    const updated = await act(() => api.setAccess(tenantId, view.toolset.id, target, next), { busy: setBusy });
+    if (!updated) return;
+    onChanged(updated);
+    toast.success(next === "none" ? "Access removed" : `Access set to ${next}`);
+    setUserId("");
   }
 
   return (

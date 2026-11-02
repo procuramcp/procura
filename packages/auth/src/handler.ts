@@ -1,6 +1,20 @@
-import { createHash, randomBytes } from "node:crypto";
 import { highestLevel } from "@cairnmcp/core";
-import { memberRole, schema, toolsetAccessFor, getToolset, type Database } from "@cairnmcp/db";
+import { getToolset, memberRole, schema, tenantName, toolsetAccessFor, type Database } from "@cairnmcp/db";
+import {
+  dispatch,
+  json,
+  randomToken as random,
+  readCookie,
+  readForm,
+  readJson,
+  redirect,
+  safeEqual,
+  setCookie,
+  sha256Base64url,
+  sha256Hex as sha256,
+  withHeaders,
+  type Route,
+} from "@cairnmcp/http";
 import { parseMcpResource } from "@cairnmcp/mcp";
 import { and, eq, gt, isNull, lt, or, isNotNull } from "drizzle-orm";
 import { z } from "zod";
@@ -29,7 +43,7 @@ const CODE_SECONDS = 60;
 const COOKIE = "cairnmcp_auth";
 const MAX_BODY_BYTES = 16 * 1024;
 
-const { oauthClients: clients, oauthRequests: requests, oauthRefreshTokens: refreshTokens, tenants } = schema;
+const { oauthClients: clients, oauthRequests: requests, oauthRefreshTokens: refreshTokens } = schema;
 type RequestRow = typeof requests.$inferSelect;
 
 /**
@@ -54,8 +68,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
 
   const at = (offsetSeconds = 0) => new Date(nowMs() + offsetSeconds * 1000);
   const callbackUri = (providerId: string) => `${base}/oauth/callback/${providerId}`;
-  const cookie = (value: string, maxAge: number) =>
-    `${COOKIE}=${value}; Path=/oauth; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secureCookie ? "; Secure" : ""}`;
+  const cookie = (value: string, maxAgeSeconds: number) => setCookie(COOKIE, value, { path: "/oauth", maxAgeSeconds, secure: secureCookie });
 
   const metadata = {
     issuer: base,
@@ -76,7 +89,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
   const redirectWith = (redirectUri: string, params: Record<string, string | null | undefined>, extraHeaders: Record<string, string> = {}) => {
     const url = new URL(redirectUri);
     for (const [k, v] of Object.entries({ ...params, iss: base })) if (v) url.searchParams.set(k, v);
-    return new Response(null, { status: 302, headers: { location: url.toString(), "cache-control": "no-store", ...extraHeaders } });
+    return redirect(url.toString(), extraHeaders);
   };
 
   async function loadRequest(where: ReturnType<typeof eq>): Promise<RequestRow | undefined> {
@@ -89,7 +102,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
   // --- Endpoints ---------------------------------------------------------------
 
   async function register(request: Request): Promise<Response> {
-    const body = await readJson(request);
+    const body = await readJson(request, MAX_BODY_BYTES).catch(() => undefined);
     const parsed = RegistrationRequest.safeParse(body);
     if (!parsed.success) return oauthError(400, "invalid_client_metadata", "expected JSON with redirect_uris (1 to 10 URLs)");
     for (const uri of parsed.data.redirect_uris) {
@@ -101,7 +114,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     const issuedAt = at();
     await db.withoutTenant((tx) => tx.insert(clients).values({ id, name, redirectUris: parsed.data.redirect_uris, createdAt: issuedAt }));
     // Whatever auth method was asked for, these are public clients: no secret is issued (RFC 7591 lets us replace it).
-    return jsonResponse(201, {
+    return json(201, {
       client_id: id,
       client_id_issued_at: Math.floor(issuedAt.getTime() / 1000),
       client_name: name,
@@ -152,7 +165,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     const loginHref = (p: IdentityProvider) => `/oauth/login/${p.id}?request=${id}`;
     if (providers.size === 1) {
       const [only] = providers.values();
-      return new Response(null, { status: 302, headers: { location: `${base}${loginHref(only!)}`, "cache-control": "no-store" } });
+      return redirect(`${base}${loginHref(only!)}`);
     }
     return htmlResponse(200, chooserPage({ clientName: client.name, providers: [...providers.values()].map((p) => ({ name: p.name, href: loginHref(p) })) }));
   }
@@ -172,7 +185,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
         .where(eq(requests.id, row.id)),
     );
     const location = await provider.authorizationUrl({ redirectUri: callbackUri(provider.id), state: upstreamState, nonce, codeVerifier: verifier });
-    return new Response(null, { status: 302, headers: { location: location.toString(), "cache-control": "no-store", "set-cookie": cookie(browserSecret, REQUEST_SECONDS) } });
+    return redirect(location.toString(), { "set-cookie": cookie(browserSecret, REQUEST_SECONDS) });
   }
 
   async function callback(request: Request, url: URL, providerId: string): Promise<Response> {
@@ -205,8 +218,8 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
       if (!(await memberRole(tx, userId))) return undefined;
       const level = highestLevel(await toolsetAccessFor(tx, target.toolsetId, userId));
       const toolset = level && (await getToolset(tx, target.toolsetId));
-      const [tenant] = await tx.select({ name: tenants.name }).from(tenants);
-      return level && toolset && tenant ? { level, toolsetName: toolset.name, tenantName: tenant.name } : undefined;
+      const tenant = await tenantName(tx);
+      return level && toolset && tenant ? { level, toolsetName: toolset.name, tenantName: tenant } : undefined;
     });
     if (!access) {
       return htmlResponse(403, noAccessPage({ userLabel: identity.label, userId }));
@@ -231,7 +244,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     // A cross-site form post is refused even before the cookie check.
     const origin = request.headers.get("origin");
     if (origin !== null && origin !== base) return htmlResponse(403, errorPage("Can't continue", "This form was sent from another site."));
-    const form = await readForm(request);
+    const form = await readForm(request, MAX_BODY_BYTES).catch(() => undefined);
     const row = form ? await loadRequest(eq(requests.id, form.get("request") ?? "")) : undefined;
     if (!form || !row || row.userId === null || row.codeHash !== null) return expired();
     if (!sameBrowser(request, row)) return htmlResponse(400, errorPage("Can't continue", "Sign-in has to finish in the same browser it started in."));
@@ -247,7 +260,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
   }
 
   async function token(request: Request): Promise<Response> {
-    const form = await readForm(request);
+    const form = await readForm(request, MAX_BODY_BYTES).catch(() => undefined);
     if (!form) return oauthError(400, "invalid_request", "send application/x-www-form-urlencoded parameters");
     const clientId = form.get("client_id") ?? "";
     const resource = form.get("resource");
@@ -281,7 +294,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
       row.codeExpiresAt > at() &&
       form.get("redirect_uri") === row.redirectUri &&
       /^[A-Za-z0-9._~-]{43,128}$/.test(verifier) &&
-      createHash("sha256").update(verifier).digest("base64url") === row.codeChallenge &&
+      sha256Base64url(verifier) === row.codeChallenge &&
       (resource === null || resource === row.resource);
     if (!ok) return oauthError(400, "invalid_grant", "the code doesn't match this client, redirect URI, code verifier, or resource, or it expired");
     return issueTokens({ userId: row.userId!, clientId, resource: row.resource, scope: row.scope, familyId: row.id });
@@ -334,7 +347,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
         createdAt: at(),
       }),
     );
-    return jsonResponse(200, { access_token: accessToken, token_type: "Bearer", expires_in: accessSeconds, refresh_token: refreshToken, scope: input.scope });
+    return json(200, { access_token: accessToken, token_type: "Bearer", expires_in: accessSeconds, refresh_token: refreshToken, scope: input.scope });
   }
 
   async function revokeFamily(familyId: string): Promise<void> {
@@ -342,29 +355,35 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
   }
 
   function sameBrowser(request: Request, row: RequestRow): boolean {
-    const secret = readCookie(request.headers.get("cookie"), COOKIE);
-    return secret !== undefined && row.browserHash !== null && sha256(secret) === row.browserHash;
+    const secret = readCookie(request, COOKIE);
+    return secret !== undefined && row.browserHash !== null && safeEqual(sha256(secret), row.browserHash);
   }
 
   // --- Routing -------------------------------------------------------------------
 
+  type Ctx = { request: Request; url: URL };
+  const cached = { "cache-control": "max-age=300" };
+  // Token, registration, and metadata endpoints use no cookies, so any origin may call them (browser-based MCP clients).
+  const cors = (handle: Route<Ctx>["handle"]): Route<Ctx>["handle"] => async (c, p) => withHeaders(await handle(c, p), CORS);
+  const preflight = async () => new Response(null, { status: 204 });
+  const routes: Route<Ctx>[] = [
+    { method: "OPTIONS", path: /^\/(?:\.well-known\/oauth-authorization-server|oauth\/(?:jwks|token|register))$/, handle: cors(preflight) },
+    { method: "GET", path: /^\/\.well-known\/oauth-authorization-server$/, handle: cors(async () => json(200, metadata, cached)) },
+    { method: "GET", path: /^\/oauth\/jwks$/, handle: cors(async () => json(200, keys.jwks(), cached)) },
+    { method: "POST", path: /^\/oauth\/register$/, handle: cors(({ request }) => register(request)) },
+    { method: "POST", path: /^\/oauth\/token$/, handle: cors(({ request }) => token(request)) },
+    { method: "GET", path: /^\/oauth\/authorize$/, handle: ({ url }) => authorize(url) },
+    { method: "POST", path: /^\/oauth\/consent$/, handle: ({ request }) => consent(request) },
+    { method: "GET", path: /^\/oauth\/login\/([a-z0-9-]+)$/, handle: ({ url }, [provider]) => login(url, provider!) },
+    { method: "GET", path: /^\/oauth\/callback\/([a-z0-9-]+)$/, handle: ({ request, url }, [provider]) => callback(request, url, provider!) },
+  ];
+
   return async (request) => {
     const url = new URL(request.url);
     const path = url.pathname;
-    const cors = path === "/.well-known/oauth-authorization-server" || path === "/oauth/jwks" || path === "/oauth/token" || path === "/oauth/register";
-    if (cors && request.method === "OPTIONS") return withCors(new Response(null, { status: 204 }));
-
-    if (path === "/.well-known/oauth-authorization-server" && request.method === "GET") return withCors(jsonResponse(200, metadata, { "cache-control": "max-age=300" }));
-    if (path === "/oauth/jwks" && request.method === "GET") return withCors(jsonResponse(200, keys.jwks(), { "cache-control": "max-age=300" }));
-    if (path === "/oauth/register" && request.method === "POST") return withCors(await register(request));
-    if (path === "/oauth/token" && request.method === "POST") return withCors(await token(request));
-    if (path === "/oauth/authorize" && request.method === "GET") return authorize(url);
-    if (path === "/oauth/consent" && request.method === "POST") return consent(request);
-    const login_ = /^\/oauth\/login\/([a-z0-9-]+)$/.exec(path);
-    if (login_ && request.method === "GET") return login(url, login_[1]!);
-    const callback_ = /^\/oauth\/callback\/([a-z0-9-]+)$/.exec(path);
-    if (callback_ && request.method === "GET") return callback(request, url, callback_[1]!);
-    if (path.startsWith("/oauth/") || path === "/.well-known/oauth-authorization-server") return jsonResponse(404, { error: "not_found" });
+    const handled = dispatch(routes, { request, url }, request.method, path);
+    if (handled) return handled;
+    if (path.startsWith("/oauth/") || path === "/.well-known/oauth-authorization-server") return json(404, { error: "not_found" });
     return undefined;
   };
 }
@@ -383,73 +402,17 @@ const RegistrationRequest = z.looseObject({
   client_name: z.string().max(200).optional(),
 });
 
-function random(bytes: number): string {
-  return randomBytes(bytes).toString("base64url");
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 function describeRedirect(uri: string): string {
   const url = new URL(uri);
   return url.protocol === "http:" || url.protocol === "https:" ? url.host : `${url.protocol}//${url.host}`;
 }
 
-function readCookie(header: string | null, name: string): string | undefined {
-  for (const part of (header ?? "").split(";")) {
-    const [k, ...v] = part.trim().split("=");
-    if (k === name && v.length > 0) return v.join("=") || undefined;
-  }
-  return undefined;
-}
-
-async function readBody(request: Request): Promise<string | undefined> {
-  const declared = Number(request.headers.get("content-length") ?? "0");
-  if (declared > MAX_BODY_BYTES || !request.body) return declared > MAX_BODY_BYTES ? undefined : "";
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_BODY_BYTES) {
-      await reader.cancel();
-      return undefined;
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
-
-async function readForm(request: Request): Promise<URLSearchParams | undefined> {
-  if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/x-www-form-urlencoded")) return undefined;
-  const text = await readBody(request);
-  return text === undefined ? undefined : new URLSearchParams(text);
-}
-
-async function readJson(request: Request): Promise<unknown> {
-  const text = await readBody(request);
-  try {
-    return text === undefined ? undefined : (JSON.parse(text) as unknown);
-  } catch {
-    return undefined;
-  }
-}
-
-function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
-}
-
 function oauthError(status: number, error: string, description: string): Response {
-  return jsonResponse(status, { error, error_description: description });
+  return json(status, { error, error_description: description });
 }
 
-// Token, registration, and metadata endpoints use no cookies, so any origin may call them (browser-based MCP clients).
-function withCors(response: Response): Response {
-  response.headers.set("access-control-allow-origin", "*");
-  response.headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
-  response.headers.set("access-control-allow-headers", "content-type, authorization, mcp-protocol-version");
-  return response;
-}
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type, authorization, mcp-protocol-version",
+};

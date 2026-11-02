@@ -13,6 +13,8 @@ Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted fi
 | Package | Purpose | Status |
 | --- | --- | --- |
 | `packages/core` | The IR (Zod), side-effect rules, toolset resolution. Pure: no I/O, no clock. | ✅ |
+| `packages/http` | Request/response helpers shared by the servers: bodies, cookies, tokens, routing. | ✅ |
+| `packages/console-api` | The console API contract: request and response types shared by the server and the web console. | ✅ |
 | `packages/ingest` | API description → IR. OpenAPI 3.0/3.1 now; GraphQL, Postman/HAR/curl, docs later. | OpenAPI ✅ |
 | `packages/eval` | Offline eval of the ingestor over a corpus of public API descriptions. | ✅ |
 | `packages/vault` | Envelope-encrypted credential storage (per-tenant data keys, master key or KMS). | ✅ |
@@ -21,9 +23,10 @@ Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted fi
 | `packages/mcp` | The MCP endpoint: an OAuth resource server serving each toolset with per-member access. | ✅ |
 | `packages/auth` | The embedded OAuth authorization server: client registration, sign-in through OIDC providers, consent, tokens. | ✅ |
 | `packages/server` | The app: authorization server and MCP endpoint in one process, configured from the environment. | ✅ |
-| `packages/api`, `web` | Added with their milestones | — |
+| `packages/web` | The curation console (React), served by the server at `/app`. | ✅ |
 
-Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
+Working in the code (or pointing an agent at it): [`AGENTS.md`](AGENTS.md) maps where things live
+and which helpers already exist. Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
 [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/sources/`](docs/sources/) (per-API findings).
 
 ## Develop

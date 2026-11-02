@@ -13,6 +13,7 @@
   "dependencies": {
     "@cairnmcp/core": "workspace:*",
     "@cairnmcp/db": "workspace:*",
+    "@cairnmcp/http": "workspace:*",
     "@cairnmcp/mcp": "workspace:*",
     "@cairnmcp/vault": "workspace:*",
     "drizzle-orm": "^0.45.4",

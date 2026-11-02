@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { act } from "@/lib/act";
 import { api, type DocumentInput, type SourcePreview } from "@/lib/api";
 import { slugify } from "@/pages/parts";
 
@@ -153,22 +154,12 @@ function Review({ tenantId, found, onAdded }: { tenantId: string; found: { input
   const basic = preview.authSchemes.filter((s) => s.type === "http_basic");
 
   async function add() {
-    setBusy(true);
-    try {
-      const fixed = Object.fromEntries(Object.entries(usernames).filter(([, v]) => v.trim()));
-      await api.createSource(tenantId, {
-        ...found.input,
-        id,
-        fixedUsernames: fixed,
-        ...(withToolset && toolsetName.trim() ? { toolset: { id: slugify(toolsetName) || id, name: toolsetName.trim() } } : {}),
-      });
-      toast.success(`Added ${preview.name}`, { description: "Next: add its API key so calls can be made." });
-      onAdded(id);
-    } catch (e) {
-      toast.error("Not added", { description: (e as Error).message });
-    } finally {
-      setBusy(false);
-    }
+    const fixed = Object.fromEntries(Object.entries(usernames).filter(([, v]) => v.trim()));
+    const toolset = withToolset && toolsetName.trim() ? { toolset: { id: slugify(toolsetName) || id, name: toolsetName.trim() } } : {};
+    const added = await act(() => api.createSource(tenantId, { ...found.input, id, fixedUsernames: fixed, ...toolset }), { busy: setBusy, failure: "Not added" });
+    if (!added) return;
+    toast.success(`Added ${preview.name}`, { description: "Next: add its API key so calls can be made." });
+    onAdded(id);
   }
 
   return (

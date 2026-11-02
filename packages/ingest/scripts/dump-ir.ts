@@ -3,13 +3,14 @@
 // Defaults to the Intervals.icu fixture.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
+import { instantOf } from "@cairnmcp/core";
 import { ingestOpenApiText } from "../src/index.ts";
 
 const input = resolve(process.argv[2] ?? new URL("../fixtures/intervals-icu/openapi.json", import.meta.url).pathname);
 const sourceId = process.argv[3] ?? (process.argv[2] ? undefined : "intervals-icu");
 const result = ingestOpenApiText(readFileSync(input, "utf8"), {
   ...(sourceId ? { sourceId } : {}),
-  derivedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+  derivedAt: instantOf(new Date()),
 });
 
 const outDir = resolve(import.meta.dirname, "../../../out");

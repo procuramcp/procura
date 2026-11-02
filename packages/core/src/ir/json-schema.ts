@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRecord } from "../util.ts";
 
 /** Every schema in the IR uses this dialect. OpenAPI 3.0 schemas are converted to it on ingest. */
 export const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema";
@@ -74,8 +75,4 @@ function walk(node: unknown, visit: (n: Record<string, unknown>) => void): void 
 
 function decodePointerToken(token: string): string {
   return token.replaceAll("~1", "/").replaceAll("~0", "~");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
