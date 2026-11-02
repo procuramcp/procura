@@ -16,7 +16,8 @@ step() { printf '\n• %s\n' "$*"; }
 
 step "copy deploy files to $host:$remote/deploy/oracle (settings on the VM are left alone)"
 ssh "$host" "mkdir -p '$remote/deploy/oracle'"
-rsync -az --exclude '.env' --exclude '*.env' "$here/" "$host:$remote/deploy/oracle/"
+# Settings stay on the VM, and infra/ (Terraform state and variables) stays on this machine.
+rsync -az --exclude '.env' --exclude '*.env' --exclude 'infra/' "$here/" "$host:$remote/deploy/oracle/"
 if ! ssh "$host" "test -f '$remote/deploy/oracle/app.env'"; then
   printf '\nNot set up yet. On the VM run:\n  cd %s && deploy/oracle/setup-vm.sh\nthen run this again.\n' "$remote"
   exit 1
