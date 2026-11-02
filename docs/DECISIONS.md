@@ -700,3 +700,36 @@ planning handoff are not repeated here unless implementation added something.
 - **Not blue-green:** a deploy restarts the one container (a few seconds of 502s), as with
   `ship.sh`. Fine for now (D-029).
 - **Also:** `ship.sh` no longer copies `infra/` (Terraform state and variables) to the VM.
+
+## D-037 API providers are the main customer; individuals are the on-ramp
+
+- **Context:** everything so far assumes one person or a small team hosting a server for their own
+  key: one shared credential, members added by hand. The business is API providers: a company
+  that wants one MCP server for all its customers, with different tools and limits per plan, and
+  usage it can charge for (D-032 designed this but filed it under milestone 3b).
+- **Decision:** design for the provider first; `docs/USER-STORIES.md` lists what each kind of
+  user needs. Personal hosting stays, as the free tier and the quickest way to try cairnmcp, on
+  the same code: a tenant can grow from one into the other without starting over (I-3).
+- **Team members and customers are separate.** "Member" today covers both the people who edit in
+  the console and the people who call tools. A provider has a few of the first and up to tens of
+  thousands of the second, created on first sign-in. Customers get their own records (search,
+  suspend, per-customer exceptions); team roles stay owner, admin, and editor. Cheap to split
+  now, expensive once real customers exist, so it comes first.
+- **A plan is an access profile with limits.** Profiles (D-034) already say which tools; plans
+  add per-customer requests per minute and a daily or monthly allowance, with an optional cost
+  per tool. Allowances need counters in Postgres; the in-memory limiter can't hold them across
+  restarts or instances. A sign-in claim picks the plan (D-032).
+- **cairnmcp meters and enforces; it doesn't take payments.** The provider's billing system
+  decides the plan and sets the claim; cairnmcp enforces it and reports usage per customer
+  (export and webhook). Taking payments would make us a party to every provider's pricing,
+  taxes, and refunds, for little gain over a usage feed.
+- **Usage is counted separately from the audit log.** The audit log keeps full inputs per call
+  (D-020); at provider scale that's too heavy to count from. Usage gets small per-call counters,
+  and audit retention becomes a provider setting.
+- **Roadmap:** provider work (milestone 3c) moves ahead of the GraphQL and docs-page ingestors.
+- **Open:** how the upstream learns the caller (per-user OAuth tokens, D-032, or a service key
+  plus a signed identity header; never the MCP token itself); a first real provider; whether
+  providers need self-hosting early, which would move milestone 2b up.
+- **Rejected:** one tenant per customer (D-032); building billing into cairnmcp (above); keeping
+  the individual case as the main design target (the provider case can't be added later without
+  reworking members, limits, and sign-in).
