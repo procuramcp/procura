@@ -1,7 +1,12 @@
 # Roadmap
 
 Milestones from the planning handoff, with status. Numbers are stable: other docs refer to
-them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
+them, so new work gets a letter suffix (e.g. 2b) instead of renumbering. What each kind of user
+needs to be able to do is in `docs/USER-STORIES.md` (story ids like P-13 below).
+
+**Order** (D-037: API providers are the main customer): finish 3 (source updates with a diff),
+then 3c, then the rest of 3b, then 2b. 4 and 5 wait. 2b moves up if a provider needs to run
+cairnmcp itself.
 
 | | Milestone | Status |
 | --- | --- | --- |
@@ -10,6 +15,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering.
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | Started: curation console at `/app` (D-033): sign-in, toolset editor (tools, names, descriptions, pins, write tools marked), access, and a tool test panel; access profiles, named permission sets assigned to members (D-034); adding APIs from OpenAPI (URL, Swagger UI page, paste, or file) and their keys (D-035). Next: updating a source with a diff of what changed |
 | 3b | Custom and on-behalf-of upstream auth; provider-hosted servers with per-user credentials (D-032); external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
+| 3c | Provider features: customers separate from the team, plans with per-customer limits and allowances, the provider's own sign-in with plans from claims, usage page and export, draft and published toolsets, branding. Details below | Next after 3 |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
 | 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
@@ -46,12 +52,35 @@ Done when someone can run their own cairnmcp with only Docker, a Postgres URL, a
   upgrades (including database migrations).
 - CI builds the image and runs the compose setup through a smoke test.
 
+## Milestone 3c: provider features
+
+For an API provider serving all its customers from one MCP server (D-032, D-037). In this order;
+each step is usable on its own:
+
+1. **Customers separate from the team** (P-16, T-1): customer records created on first sign-in,
+   searchable, with suspend and per-customer exceptions; team roles owner, admin, editor. Isolation
+   tests cover customers as they cover members today.
+2. **Plans with limits** (P-11, P-13, P-14, C-3): an access profile gains per-customer requests per
+   minute and a daily or monthly allowance, optionally a cost per tool. Counters in Postgres, so
+   they hold across restarts and instances. Limit errors say which limit, when it resets, and the
+   provider's upgrade link.
+3. **The provider's sign-in, plans from claims** (P-10, P-12, C-1, C-4): moved here from 3b. The
+   tenant names its OIDC or OAuth provider; a claim picks the plan and is re-read on token refresh.
+4. **Usage** (P-30, P-31, P-32): a usage page by tool, customer, and plan; export and a webhook
+   per period for the provider's billing. Small per-call counters, separate from the audit log;
+   audit retention as a setting.
+5. **How the upstream learns the caller** (P-20, C-5): per-user OAuth credentials (D-032) or a
+   service key plus a signed identity header; decided in D-037's open question before this step.
+6. **Drafts and branding** (P-5, P-6): draft and published toolset versions; custom domain,
+   branded sign-in and consent.
+
 ## Milestone 3b: custom and on-behalf-of auth
 
 For teams exposing internal APIs, often from an OpenAPI document they already generate a client from,
 and for API providers hosting one MCP server for all their customers (D-032).
 
-- **Provider-hosted, first step** (D-032): a tenant's own sign-in provider; a `per_user`
+- **Provider-hosted, first step** (D-032; the sign-in, claims, and per-user credentials now come
+  in 3c, D-037): a tenant's own sign-in provider; a `per_user`
   credential mode per source, filled by the sign-in itself when the provider is also the
   upstream's OAuth server (tokens stored and refreshed per user); claim-based access (e.g.
   `plan = premium` gets `use`) re-checked on refresh; rate limits per user.

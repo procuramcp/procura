@@ -4,9 +4,13 @@ A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs t
 ingests an API description, curates a safe set of operations, and serves them as a remote
 MCP server, on our hosting or yours.
 
-Status: milestone 1 done (IR, OpenAPI ingestor, vault, runtime, a live call to Intervals.icu as the
-first example API).
-Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted first; self-hosting with one container image follows (see the roadmap).
+It's built for API providers: one MCP server for all of a provider's customers, with different
+tools and limits per plan and usage it can bill for. Anyone can also host a server for their own
+key. See [`docs/USER-STORIES.md`](docs/USER-STORIES.md).
+
+Status: the pipeline, tenancy, the MCP endpoint with OAuth, and the curation console are built and
+deployed; provider features (plans, limits, customer sign-in, usage) are next. See the
+[roadmap](docs/ROADMAP.md).
 
 ## Layout
 
@@ -26,7 +30,7 @@ Milestone 2 (tenancy, MCP server with OAuth, container image) is next. Hosted fi
 | `packages/web` | The curation console (React), served by the server at `/app`. | ✅ |
 
 Working in the code (or pointing an agent at it): [`AGENTS.md`](AGENTS.md) maps where things live
-and which helpers already exist. Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/ROADMAP.md`](docs/ROADMAP.md),
+and which helpers already exist. Key docs: [`docs/IR.md`](docs/IR.md) (start here), [`docs/USER-STORIES.md`](docs/USER-STORIES.md), [`docs/ROADMAP.md`](docs/ROADMAP.md),
 [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/sources/`](docs/sources/) (per-API findings).
 
 ## Develop
