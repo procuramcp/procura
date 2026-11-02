@@ -354,15 +354,13 @@ export async function mayCallTool(tx: TenantTx, input: { toolsetId: string; user
 export type StoredProfile = AccessProfile & { members: UserId[] };
 
 const limitColumns = {
-  requestsPerMinute: accessProfiles.requestsPerMinute,
   perDay: accessProfiles.perDay,
   perMonth: accessProfiles.perMonth,
   upgradeUrl: accessProfiles.upgradeUrl,
 };
-type LimitRow = { requestsPerMinute: number | null; perDay: number | null; perMonth: number | null; upgradeUrl: string | null };
+type LimitRow = { perDay: number | null; perMonth: number | null; upgradeUrl: string | null };
 const limitsOf = (r: LimitRow): PlanLimits =>
   omitUndefined({
-    requestsPerMinute: r.requestsPerMinute ?? undefined,
     perDay: r.perDay ?? undefined,
     perMonth: r.perMonth ?? undefined,
     upgradeUrl: r.upgradeUrl ?? undefined,
@@ -401,7 +399,7 @@ export async function putProfile(tx: TenantTx, profile: AccessProfile): Promise<
 }
 
 function limitValues(l: PlanLimits): LimitRow {
-  return { requestsPerMinute: l.requestsPerMinute ?? null, perDay: l.perDay ?? null, perMonth: l.perMonth ?? null, upgradeUrl: l.upgradeUrl ?? null };
+  return { perDay: l.perDay ?? null, perMonth: l.perMonth ?? null, upgradeUrl: l.upgradeUrl ?? null };
 }
 
 export async function deleteProfile(tx: TenantTx, id: string): Promise<boolean> {

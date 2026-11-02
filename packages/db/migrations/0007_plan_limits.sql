@@ -2,10 +2,9 @@
 -- and the counters that enforce daily and monthly allowances.
 
 ALTER TABLE cairnmcp.access_profiles
-  ADD COLUMN requests_per_minute integer CHECK (requests_per_minute BETWEEN 1 AND 100000),
-  ADD COLUMN per_day             integer CHECK (per_day BETWEEN 1 AND 1000000000),
-  ADD COLUMN per_month           integer CHECK (per_month BETWEEN 1 AND 1000000000),
-  ADD COLUMN upgrade_url         text    CHECK (upgrade_url ~ '^https://' AND length(upgrade_url) <= 2000);
+  ADD COLUMN per_day     integer CHECK (per_day BETWEEN 1 AND 1000000000),
+  ADD COLUMN per_month   integer CHECK (per_month BETWEEN 1 AND 1000000000),
+  ADD COLUMN upgrade_url text    CHECK (upgrade_url ~ '^https://' AND length(upgrade_url) <= 2000);
 
 -- Calls per person per UTC day and calendar month, across the tenant. Every
 -- admitted call counts, limited or not, so usage is there to show (and bill)

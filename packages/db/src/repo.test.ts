@@ -173,7 +173,7 @@ describe.skipIf(!adminUrl)("repo queries", () => {
         id: "free",
         name: "Free",
         rules: [{ toolsetId: "intervals", level: "use" }],
-        limits: { requestsPerMinute: 10, perDay: 100, upgradeUrl: "https://example.com/pricing" },
+        limits: { perDay: 100, perMonth: 1000, upgradeUrl: "https://example.com/pricing" },
       });
       await db.withTenant(tenantId, async (tx) => {
         await putProfile(tx, free);

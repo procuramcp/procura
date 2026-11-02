@@ -147,7 +147,6 @@ export type TestResult = {
 export type ProfileRule = { toolsetId: string; level: Level; operations: string[] | null };
 /** What a plan allows each customer who holds it (D-039); a missing field means no limit. */
 export type PlanLimits = {
-  requestsPerMinute?: number | undefined;
   perDay?: number | undefined;
   perMonth?: number | undefined;
   /** https only: where a customer who hits a limit can get more. */

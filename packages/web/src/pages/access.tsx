@@ -138,9 +138,8 @@ function ProfilesTab({ tenantId, view, onChanged }: { tenantId: string; view: Ac
 function summary(p: AccessProfile, view: AccessView): string {
   if (p.rules.length === 0) return "No access yet";
   const rules = p.rules.map((r) => `${view.toolsets.find((t) => t.id === r.toolsetId)?.name ?? r.toolsetId}: ${r.level}${r.operations ? ` (${r.operations.length} tools)` : ""}`);
-  const { requestsPerMinute, perDay, perMonth } = p.limits;
+  const { perDay, perMonth } = p.limits;
   const limits = [
-    requestsPerMinute && `${requestsPerMinute.toLocaleString()}/min`,
     perDay && `${perDay.toLocaleString()}/day`,
     perMonth && `${perMonth.toLocaleString()}/month`,
   ].filter(Boolean);
@@ -194,11 +193,10 @@ function NewProfile({ taken, onCreate }: { taken: string[]; onCreate: (id: strin
 }
 
 /** Limits as typed: blank means no limit. */
-type LimitFields = { requestsPerMinute: string; perDay: string; perMonth: string; upgradeUrl: string };
+type LimitFields = { perDay: string; perMonth: string; upgradeUrl: string };
 type Draft = { name: string; description: string; rules: ProfileRule[]; limits: LimitFields };
 
 const limitFields = (l: PlanLimits): LimitFields => ({
-  requestsPerMinute: l.requestsPerMinute?.toString() ?? "",
   perDay: l.perDay?.toString() ?? "",
   perMonth: l.perMonth?.toString() ?? "",
   upgradeUrl: l.upgradeUrl ?? "",
@@ -206,10 +204,8 @@ const limitFields = (l: PlanLimits): LimitFields => ({
 function planLimits(f: LimitFields): PlanLimits {
   const count = (v: string) => (v.trim() ? Number(v) : undefined);
   const limits: PlanLimits = {};
-  const rpm = count(f.requestsPerMinute);
   const day = count(f.perDay);
   const month = count(f.perMonth);
-  if (rpm !== undefined) limits.requestsPerMinute = rpm;
   if (day !== undefined) limits.perDay = day;
   if (month !== undefined) limits.perMonth = month;
   if (f.upgradeUrl.trim()) limits.upgradeUrl = f.upgradeUrl.trim();
@@ -338,8 +334,7 @@ function LimitsCard({ limits, onChange }: { limits: LimitFields; onChange: (l: L
           Per customer, across every toolset. Leave a box empty for no limit. Someone with more than one plan gets the most generous; a direct grant has none.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {field("requestsPerMinute", "Calls per minute", "Short bursts")}
+      <div className="grid gap-4 sm:grid-cols-2">
         {field("perDay", "Calls per day", "Starts over at midnight UTC")}
         {field("perMonth", "Calls per month", "Starts over on the 1st, UTC")}
       </div>

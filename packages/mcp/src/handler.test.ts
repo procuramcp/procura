@@ -333,16 +333,6 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
       await client.close();
     });
 
-    it("limits calls per minute", async () => {
-      const { client } = await onPlan("plan-rate", { requestsPerMinute: 1 });
-      expect((await client.callTool(list)).isError).toBeFalsy();
-      const refused = await client.callTool(list);
-      expect((refused.structuredContent as LimitError).error).toMatchObject({ kind: "limit_reached", retryable: true });
-      expect((refused.structuredContent as LimitError).error.retryAfterSeconds).toBeGreaterThan(0);
-      expect(upstreamCalls).toHaveLength(1);
-      await client.close();
-    });
-
     it("doesn't charge for a call that never reached the API", async () => {
       const { client } = await onPlan("plan-refund", { perDay: 1 });
       const invalid = await client.callTool({ name: "list_activities", arguments: { oldest: 42 } });

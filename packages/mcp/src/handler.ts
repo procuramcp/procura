@@ -1,7 +1,7 @@
 import { allowsTool, callLimits, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccess } from "@cairnmcp/core";
 import { getToolsetWithSource, memberRole, toolsetAccessFor, toolsetVersion, type Database } from "@cairnmcp/db";
 import { json } from "@cairnmcp/http";
-import { InMemoryRateLimiter, type RateLimiter, type Runtime } from "@cairnmcp/runtime";
+import type { Runtime } from "@cairnmcp/runtime";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js";
@@ -21,8 +21,6 @@ export type McpHandlerOptions = {
   version?: string;
   /** Resolved toolsets reused across requests. Injected for tests; one per handler by default. */
   cache?: ToolsetCache;
-  /** Per-customer requests per minute from their plan (D-039). One per handler by default. */
-  planLimiter?: RateLimiter;
   /** The clock for allowances. Injected for tests. */
   now?: () => Date;
 };
@@ -45,7 +43,6 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
   const allowedOrigins = new Set(options.allowedOrigins ?? []);
   const issuers = options.verifier.issuers;
   const cache = options.cache ?? new ToolsetCache();
-  const planLimiter = options.planLimiter ?? new InMemoryRateLimiter();
   const now = options.now ?? (() => new Date());
 
   return async (request) => {
@@ -111,12 +108,11 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
     if (!resolved.ok) return json(500, { error: "toolset_invalid", error_description: "this toolset has problems and can't be served; fix it in the toolset settings" });
 
     const caller: Caller = { userId, claims: verified.claims };
-    return serveMcp(request, { ...options, planLimiter, now, tenantId: route.tenantId, caller, toolset, ir, access: loaded.access, tools: resolved.tools });
+    return serveMcp(request, { ...options, now, tenantId: route.tenantId, caller, toolset, ir, access: loaded.access, tools: resolved.tools });
   };
 }
 
 type Session = McpHandlerOptions & {
-  planLimiter: RateLimiter;
   now: () => Date;
   tenantId: TenantId;
   caller: Caller;
@@ -141,7 +137,7 @@ async function serveMcp(request: Request, s: Session): Promise<Response> {
     if (!tool) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${req.params.name}`);
     // The plan's limits for this tool: the most generous of the rules that allow it (D-039).
     const limits = callLimits(s.access, tool.operation.id, tool.operation.sideEffect.class) ?? {};
-    const result = await withinLimits({ db: s.db, limiter: s.planLimiter, tenantId: s.tenantId, userId: s.caller.userId, now: s.now }, limits, () =>
+    const result = await withinLimits({ db: s.db, tenantId: s.tenantId, userId: s.caller.userId, now: s.now }, limits, () =>
       s.runtime.invoke({ tenantId: s.tenantId, caller: s.caller, source: s.ir.source, tool, args: req.params.arguments ?? {} }),
     );
     return toCallToolResult(result);

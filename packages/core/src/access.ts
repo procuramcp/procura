@@ -71,7 +71,6 @@ export function canCall(level: ToolsetAccessLevel | undefined, sideEffect: SideE
  * UTC day and calendar month.
  */
 export const PlanLimits = z.object({
-  requestsPerMinute: z.number().int().min(1).max(100_000).optional(),
   perDay: z.number().int().min(1).max(1_000_000_000).optional(),
   perMonth: z.number().int().min(1).max(1_000_000_000).optional(),
   /** Where a customer who hits a limit can get more; shown in the limit message. */
@@ -106,10 +105,10 @@ export function allowsTool(access: ToolsetAccess, operationId: string, sideEffec
 export function callLimits(access: ToolsetAccess, operationId: string, sideEffect: SideEffect): PlanLimits | undefined {
   const allowing = access.rules.filter((r) => canCall(r.level, sideEffect) && (!r.operations || r.operations.includes(operationId)));
   if (allowing.length === 0) return undefined;
-  const loosest = (key: "requestsPerMinute" | "perDay" | "perMonth") =>
+  const loosest = (key: "perDay" | "perMonth") =>
     allowing.every((r) => r.limits?.[key] !== undefined) ? Math.max(...allowing.map((r) => r.limits![key]!)) : undefined;
   const upgradeUrl = allowing.find((r) => r.limits?.upgradeUrl)?.limits?.upgradeUrl;
-  return omitUndefined({ requestsPerMinute: loosest("requestsPerMinute"), perDay: loosest("perDay"), perMonth: loosest("perMonth"), upgradeUrl });
+  return omitUndefined({ perDay: loosest("perDay"), perMonth: loosest("perMonth"), upgradeUrl });
 }
 
 /** The highest level among the rules, for display (e.g. "can write" on the consent page). */

@@ -37,15 +37,15 @@ describe("hasTeamRole (D-038)", () => {
 });
 
 describe("callLimits (D-039)", () => {
-  const free = { level: "use" as const, limits: { requestsPerMinute: 10, perDay: 100, upgradeUrl: "https://example.com/pricing" } };
-  const pro = { level: "use_writes" as const, limits: { requestsPerMinute: 60, perDay: 5000, perMonth: 100_000 } };
+  const free = { level: "use" as const, limits: { perDay: 100, upgradeUrl: "https://example.com/pricing" } };
+  const pro = { level: "use_writes" as const, limits: { perDay: 5000, perMonth: 100_000 } };
 
   it("takes the most generous limit of the rules that allow the call", () => {
-    expect(callLimits({ rules: [free, pro] }, "list", "read")).toEqual({ requestsPerMinute: 60, perDay: 5000, upgradeUrl: "https://example.com/pricing" });
+    expect(callLimits({ rules: [free, pro] }, "list", "read")).toEqual({ perDay: 5000, upgradeUrl: "https://example.com/pricing" });
   });
 
   it("ignores rules that don't allow the call", () => {
-    expect(callLimits({ rules: [free, pro] }, "update", "write")).toEqual({ requestsPerMinute: 60, perDay: 5000, perMonth: 100_000 });
+    expect(callLimits({ rules: [free, pro] }, "update", "write")).toEqual({ perDay: 5000, perMonth: 100_000 });
     expect(callLimits({ rules: [{ ...free, operations: ["other"] }, pro] }, "list", "read")).toEqual(pro.limits);
     expect(callLimits({ rules: [free] }, "update", "write")).toBeUndefined();
   });

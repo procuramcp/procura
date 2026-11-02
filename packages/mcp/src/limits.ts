@@ -1,8 +1,8 @@
-// Plan limits on one tool call (D-039): requests per minute, then the daily
-// and monthly allowances, before the runtime runs the call.
+// Plan limits on one tool call (D-039): the daily and monthly allowances,
+// checked and taken before the runtime runs the call.
 import type { PlanLimits, TenantId, UserId } from "@cairnmcp/core";
 import { refundAllowance, takeAllowance, type Database, type UsagePeriods } from "@cairnmcp/db";
-import type { RateLimiter, RuntimeError, ToolResult } from "@cairnmcp/runtime";
+import type { RuntimeError, ToolResult } from "@cairnmcp/runtime";
 
 /**
  * Failures that don't use up an allowance: the call never reached the API
@@ -14,34 +14,16 @@ const NOT_SENT = new Set<RuntimeError["kind"]>(["invalid_input", "missing_creden
 
 export type LimitContext = {
   db: Database;
-  limiter: RateLimiter;
   tenantId: TenantId;
   userId: UserId;
   now: () => Date;
 };
 
 /**
- * Run `call` if `limits` allow it, counting it against the caller's
- * allowances. The per-minute rate lives in this process's limiter (like the
- * runtime's own throttling); allowances live in Postgres, so they hold across
- * restarts and instances.
+ * Run `call` if the caller's allowances have room, counting it against them.
+ * Allowances live in Postgres, so they hold across restarts and instances.
  */
 export async function withinLimits(c: LimitContext, limits: PlanLimits, call: () => Promise<ToolResult>): Promise<ToolResult> {
-  if (limits.requestsPerMinute !== undefined) {
-    const slot = c.limiter.acquire([
-      // Only the rate matters here: concurrency is the runtime's job.
-      { key: `plan:${c.tenantId}:${c.userId}`, limits: { requestsPerMinute: limits.requestsPerMinute, maxConcurrent: Number.MAX_SAFE_INTEGER } },
-    ]);
-    if (!slot.ok) {
-      return refused(
-        `Your plan allows ${limits.requestsPerMinute} calls a minute. Retry in ${slot.retryAfterSeconds}s.`,
-        { retryable: true, retryAfterSeconds: slot.retryAfterSeconds },
-        limits,
-      );
-    }
-    slot.release();
-  }
-
   const now = c.now();
   const allowance = await c.db.withTenant(c.tenantId, (tx) => takeAllowance(tx, c.userId, limits, now));
   if (!allowance.ok) {

@@ -191,7 +191,6 @@ export const accessProfiles = cairnmcp.table(
     id: text("id").notNull(),
     name: text("name").notNull(),
     description: text("description"),
-    requestsPerMinute: integer("requests_per_minute"),
     perDay: integer("per_day"),
     perMonth: integer("per_month"),
     upgradeUrl: text("upgrade_url"),

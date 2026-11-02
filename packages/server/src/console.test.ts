@@ -302,7 +302,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
 
     it("saves a plan's limits, refuses a link that isn't https, and shows each customer's usage (D-039)", async () => {
       const browser = await signIn();
-      const limits = { requestsPerMinute: 30, perDay: 500, upgradeUrl: "https://example.com/pricing" };
+      const limits = { perDay: 500, perMonth: 10_000, upgradeUrl: "https://example.com/pricing" };
       const saved = await browser.json("PUT", `${API}/tenants/alpha/profiles/free`, { name: "Free", rules: [{ toolsetId: "mine", level: "use" }], limits });
       expect(((await saved.json()) as { profiles: Array<{ id: string; limits: unknown }> }).profiles.find((p) => p.id === "free")?.limits).toEqual(limits);
       const insecure = await browser.json("PUT", `${API}/tenants/alpha/profiles/free`, { name: "Free", rules: [], limits: { upgradeUrl: "http://example.com" } });

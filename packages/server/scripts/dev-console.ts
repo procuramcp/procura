@@ -64,7 +64,7 @@ await db.withTenant(tenant, async (tx) => {
       id: "athlete",
       name: "Athlete",
       rules: [{ toolsetId: "intervals", level: "use" }],
-      limits: { requestsPerMinute: 30, perDay: 200, perMonth: 3000, upgradeUrl: "https://example.com/pricing" },
+      limits: { perDay: 200, perMonth: 3000, upgradeUrl: "https://example.com/pricing" },
     }),
   );
 });
