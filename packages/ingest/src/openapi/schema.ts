@@ -122,6 +122,59 @@ export class SchemaConverter {
     return (Object.keys(sorted).length > 0 ? { ...root, $defs: sorted } : root) as JsonSchema;
   }
 
+  /**
+   * Like `bundle`, but keeps the JSON under `maxChars` by leaving components beyond some
+   * number of hops from the root open: just their title, description, and type (D-042). That
+   * only loosens the schema, so it still accepts everything the full one does. `openAt` is the
+   * first open level (1 = the components the root names directly). Undefined when even that is
+   * too big.
+   */
+  bundleWithin(
+    root: Record<string, unknown>,
+    direction: Direction,
+    refs: Set<string>,
+    maxChars: number,
+  ): { schema: JsonSchema; openAt?: number } | undefined {
+    const full = this.bundle(root, direction, refs);
+    if (JSON.stringify(full).length <= maxChars) return { schema: full };
+
+    // levels[i]: components first reached i + 1 hops from the root. A component's refs are at
+    // its own level or the next, so keeping levels below `keep` whole and opening level `keep`
+    // leaves no dangling ref.
+    const levels: string[][] = [];
+    const seen = new Set(refs);
+    for (let frontier = [...refs]; frontier.length > 0; ) {
+      levels.push(frontier);
+      const next: string[] = [];
+      for (const name of frontier) {
+        for (const r of this.#component(name, direction).refs) {
+          if (!seen.has(r)) {
+            seen.add(r);
+            next.push(r);
+          }
+        }
+      }
+      frontier = next;
+    }
+
+    let best: { schema: JsonSchema; openAt: number } | undefined;
+    for (let keep = 0; keep < levels.length; keep++) {
+      const defs: Record<string, Schema> = {};
+      for (const [i, names] of levels.entries()) {
+        if (i > keep) break;
+        for (const name of names) {
+          const schema = this.#component(name, direction).schema;
+          defs[name] = i < keep ? schema : openSchema(schema);
+        }
+      }
+      const sorted = Object.fromEntries(Object.entries(defs).sort(([a], [b]) => a.localeCompare(b)));
+      const schema = { ...root, $defs: sorted } as JsonSchema;
+      if (JSON.stringify(schema).length > maxChars) break;
+      best = { schema, openAt: keep + 1 };
+    }
+    return best;
+  }
+
   #component(name: string, direction: Direction): { schema: Schema; refs: Set<string> } {
     const key = `${direction}:${name}`;
     const cached = this.#components.get(key);
@@ -156,12 +209,29 @@ export class SchemaConverter {
       const at = `${pointer}/${key}`;
       if (SCHEMA_KEYS.has(key) && (isRecord(value) || typeof value === "boolean")) {
         out[key] = this.#node(value, direction, at, refs, depth);
-      } else if (SCHEMA_MAP_KEYS.has(key) && isRecord(value)) {
+      } else if (SCHEMA_MAP_KEYS.has(key) && key !== "patternProperties" && isRecord(value)) {
         out[key] = Object.fromEntries(
           Object.entries(value).map(([k, v]) => [k, this.#node(v, direction, `${at}/${k}`, refs, depth)]),
         );
       } else if (SCHEMA_LIST_KEYS.has(key) && Array.isArray(value)) {
         out[key] = value.map((v, i) => this.#node(v, direction, `${at}/${i}`, refs, depth));
+      } else if (key === "pattern" && typeof value === "string") {
+        const fixed = unicodePattern(value);
+        if (fixed === undefined) this.#noteOnce("pattern_dropped", at, `pattern ${JSON.stringify(value)} is not a valid regular expression; dropped`, at);
+        else {
+          if (fixed !== value) this.#noteOnce("pattern_rewritten", at, `pattern ${JSON.stringify(value)} rewritten as ${JSON.stringify(fixed)} (needless escapes)`, at);
+          out[key] = fixed;
+        }
+      } else if (key === "patternProperties" && isRecord(value)) {
+        const props: Record<string, Schema> = {};
+        for (const [p, v] of Object.entries(value)) {
+          const fixed = unicodePattern(p);
+          // Skip an unusable property pattern. Rare; it only tightens a schema that also
+          // forbids additional properties.
+          if (fixed === undefined) this.#noteOnce("pattern_dropped", `${at}/${p}`, `property pattern ${JSON.stringify(p)} is not a valid regular expression; dropped`, at);
+          else props[fixed] = this.#node(v, direction, `${at}/${p}`, refs, depth);
+        }
+        out[key] = props;
       } else if (key === "enum" && Array.isArray(value) && value.length === 0) {
         // Matches nothing, so it is always a spec bug; usually another keyword carries the values.
         this.#noteOnce("empty_enum", at, "empty enum would accept no value; dropped", at);
@@ -204,6 +274,46 @@ export class SchemaConverter {
     if (target === undefined) throw new MappingError("unresolved_ref", `$ref target not found: ${ref}`, pointer);
     return this.#node(target, direction, ref, refs, depth + 1);
   }
+}
+
+// Characters a regex may escape in Unicode mode (ECMA-262 SyntaxCharacter, plus "/" and "-").
+const ESCAPABLE = new Set([..."^$\\.*+?()[]{}|/-"]);
+
+/**
+ * A pattern that compiles in Unicode mode, as JSON Schema validators run them. Specs often
+ * escape characters needlessly (DigitalOcean: `^[a-zA-Z0-9_\-\:]+$`), which plain JavaScript
+ * allows and Unicode mode refuses; those escapes are removed, which doesn't change the match.
+ * Undefined if it still doesn't compile.
+ */
+export function unicodePattern(pattern: string): string | undefined {
+  if (compiles(pattern)) return pattern;
+  let out = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    const next = pattern[i + 1];
+    if (c === "\\" && next !== undefined) {
+      out += /[A-Za-z0-9]/.test(next) || ESCAPABLE.has(next) ? c + next : next;
+      i++;
+    } else out += c;
+  }
+  return compiles(out) ? out : undefined;
+}
+
+function compiles(pattern: string): boolean {
+  try {
+    new RegExp(pattern, "u");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A component reduced to what describes it, without constraints on its contents or refs. */
+function openSchema(schema: Schema): Schema {
+  if (typeof schema === "boolean") return schema;
+  const out: Record<string, unknown> = {};
+  for (const key of ["title", "description", "type"]) if (schema[key] !== undefined) out[key] = schema[key];
+  return out;
 }
 
 /** OpenAPI 3.0 `nullable: true` → JSON Schema `null` type. */

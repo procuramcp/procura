@@ -22,6 +22,7 @@ If `node -v` is older, use `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` (
 | Both | `pnpm check` |
 | Build the console | `pnpm --filter @cairnmcp/web build` |
 | Run the console locally with fake data | `CAIRNMCP_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres pnpm --filter @cairnmcp/server dev:console` (http://localhost:8787/app/) |
+| Ingest eval report (`docs/eval/`) | `pnpm eval:ingest` (downloads large corpus documents on first run; `--offline` skips them) |
 | Migrate a database | `pnpm --filter @cairnmcp/db migrate` (owner role) |
 
 The Postgres tests (`db`, `mcp`, `auth`, `server`) skip unless `CAIRNMCP_TEST_DATABASE_URL` is
@@ -43,7 +44,7 @@ a superuser URL; each test file creates and drops its own database. A local Post
 | `auth` | Embedded OAuth 2.1 authorization server under `/oauth`. | `src/handler.ts` (all endpoints + route table), `identity.ts` (OIDC), `keys.ts`, `pages.ts`, `redirect.ts` |
 | `server` | The app: wires everything, the console API, the admin CLI. | `src/app.ts`, `src/console/*`, `src/admin.ts`, `src/fetch-document.ts`, `scripts/serve.ts`, `scripts/admin.ts` |
 | `web` | The console UI (React, shadcn/ui), built to static files served at `/app`. | `src/lib/api.ts` (every API call; types from `console-api`), `src/lib/act.ts`, `src/lib/hooks.ts`, `src/pages/*` |
-| `eval` | Offline ingest eval over a corpus of public API descriptions. | `src/ingest-eval.ts`, `corpus/` |
+| `eval` | Ingest eval over a corpus of public API descriptions; large ones are downloaded on demand, pinned by hash (D-017). | `src/ingest-eval.ts`, `src/fetch.ts`, `corpus/manifest.json` |
 
 `examples/intervals-icu` calls a real API through the whole pipeline. `deploy/` holds the Oracle
 VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
@@ -58,7 +59,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | `toolsets.ts` | `GET`/`PUT /tenants/:t/toolsets/:id`, `PUT …/access`, `POST …/test` |
 | `access.ts` | `GET /tenants/:t/access` (profiles, team, customer count), `PUT`/`DELETE …/profiles/:id` |
 | `people.ts` | `GET …/customers` (search, paging), `PUT …/members/:user/role`, `PUT`/`DELETE …/members/:user` (suspend, note, remove), `PUT …/members/:user/profiles` |
-| `sources.ts` | `POST …/sources/preview`, `POST …/sources`, `GET …/sources/:id`, `PUT`/`DELETE …/credentials/:scheme` |
+| `sources.ts` | `POST …/sources/preview`, `POST …/sources`, `GET …/sources/:id`, `PUT …/side-effects` (a person's classifications), `PUT`/`DELETE …/credentials/:scheme` |
 | `sign-in.ts` | Browser sign-in through OIDC, session cookies, `purgeExpiredConsoleState` |
 | `bodies.ts` | Zod schemas for request bodies, `readBody`, `issuesText`, size limits; `BodiesMatchContract` checks them against the contract |
 | `views.ts` | Operations and auth schemes as contract types (`OperationView`, `AuthSchemeView`) |
@@ -73,6 +74,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | Slug from text, cut text | `slugify`, `truncate` (core) |
 | `Date` → `Instant` | `instantOf` (core); never format ISO strings by hand |
 | Count read/write/destructive | `countBySideEffect` (core) |
+| A person's classification; POSTs that look like reads | `curateSideEffect`, `suggestRead` (core `side-effect.ts`) |
 | Can this level call this tool? | `canCall`, `allowsTool`, `highestLevel` (core `access.ts`) |
 | A call's plan limits (most generous rule) | `callLimits`, `PlanLimits` (core `access.ts`) |
 | Count a call against allowances, refund it, show usage | `takeAllowance`, `refundAllowance`, `usageFor`, `usagePeriods` (db); the MCP side is `withinLimits` (mcp `limits.ts`) |
@@ -156,5 +158,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-039, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-045, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{oracle,auth0}`.

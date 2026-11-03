@@ -13,11 +13,19 @@ export type HttpMethod = z.infer<typeof HttpMethod>;
 export const ClassificationBasis = z.enum(["http_method", "graphql_operation", "name_heuristic", "curated"]);
 export type ClassificationBasis = z.infer<typeof ClassificationBasis>;
 
+const AutomaticClassification = z.object({
+  class: SideEffect,
+  basis: ClassificationBasis.exclude(["curated"]),
+  reason: z.string().min(1).max(300),
+});
+
 export const SideEffectClassification = z.object({
   class: SideEffect,
   basis: ClassificationBasis,
   /** One short sentence a reviewer can check, e.g. `name contains "delete"`. */
   reason: z.string().min(1).max(300),
+  /** On a `curated` classification: what ingest said, so it can be shown and restored (D-043). */
+  automatic: AutomaticClassification.optional(),
 });
 export type SideEffectClassification = z.infer<typeof SideEffectClassification>;
 
@@ -125,4 +133,41 @@ export function splitWords(text: string): string[] {
 
 function stripPathParams(pathTemplate: string): string {
   return pathTemplate.replace(/\{[^}]*\}/g, " ");
+}
+
+/**
+ * A person's classification of an operation (D-005: only people may rate one below its method
+ * default). `"automatic"` restores what ingest said. Setting the automatic class again also
+ * restores it, so a curated label always means a person disagreed with ingest.
+ */
+export function curateSideEffect(current: SideEffectClassification, effect: SideEffect | "automatic", reason?: string): SideEffectClassification {
+  const automatic = current.basis === "curated" ? current.automatic : current;
+  if (effect === "automatic") return automatic ?? current;
+  if (automatic && automatic.class === effect) return automatic;
+  return {
+    class: effect,
+    basis: "curated",
+    reason: reason?.trim() || `marked ${effect} in the console`,
+    ...(automatic ? { automatic: { class: automatic.class, basis: automatic.basis as Exclude<ClassificationBasis, "curated">, reason: automatic.reason } } : {}),
+  };
+}
+
+// Verbs that name a lookup when an RPC-style API (Plaid: POST /accounts/get) uses POST for reads.
+const READ_WORDS = new Set(["get", "list", "search", "query", "find", "lookup", "fetch", "retrieve", "read", "describe"]);
+
+/**
+ * Whether a POST looks like a read, for a person to confirm (D-043). Never applied on its own:
+ * heuristics only escalate (D-005). Suggests only when the method default is the whole story
+ * (no escalation) and the path ends in, or the name starts with, a lookup verb, with no
+ * word that suggests a change anywhere.
+ */
+export function suggestRead(input: { method: HttpMethod; name: string; pathTemplate: string; sideEffect: SideEffectClassification }): string | undefined {
+  if (input.method !== "POST" || input.sideEffect.basis !== "http_method" || input.sideEffect.class !== "write") return undefined;
+  const pathWords = splitWords(stripPathParams(input.pathTemplate));
+  const nameWords = splitWords(input.name);
+  const all = [...pathWords, ...nameWords];
+  if (all.some((w) => WRITE_WORDS.has(w) || DESTRUCTIVE_WORDS.has(w))) return undefined;
+  // The name's last word is often a noun (Stripe's PostRadarValueListsValueList updates a list).
+  const hit = [pathWords.at(-1), nameWords[0]].find((w) => w !== undefined && READ_WORDS.has(w));
+  return hit ? `POST, but ${pathWords.at(-1) === hit ? "the path ends in" : "the name has"} "${hit}"` : undefined;
 }

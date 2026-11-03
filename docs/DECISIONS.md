@@ -21,7 +21,8 @@ planning handoff are not repeated here unless implementation added something.
 - **Why:** The runtime and MCP layers can use an operation without the source document. Recursive
   types work without inlining.
 - **Cost:** Shared components are repeated per operation. The Intervals.icu IR is ~0.9 MB as
-  compact JSON (148 operations). Fine in Postgres `jsonb`.
+  compact JSON (148 operations). Fine in Postgres `jsonb`. Not fine for Stripe, whose responses
+  reference most of the API: output schemas are now bounded (D-042).
 - **Rejected:** A shared schema registry on `Source` (smaller, but every consumer must resolve
   refs across objects); full inlining (breaks on recursion, much larger).
 
@@ -150,7 +151,7 @@ planning handoff are not repeated here unless implementation added something.
 - **Decision:** `packages/eval/corpus/manifest.json` pins a vendored corpus by URL, license,
   SHA-256, and retrieval date. `pnpm eval:ingest` runs offline and writes a deterministic report
   to `docs/eval/`; `pnpm --filter @cairnmcp/eval corpus:fetch` refreshes it.
-- **Corpus choice:** 13 documents, chosen for variety over volume: OpenAPI 3.0 and 3.1, JSON and
+- **Corpus choice:** 13 documents (14 since Stripe, D-042), chosen for variety over volume: OpenAPI 3.0 and 3.1, JSON and
   YAML, hand-written and generated (no single generator for more than two entries), small
   reference examples to large real APIs (OpenAI, Box, Discord, Twilio), a 3.1 document with only
   webhooks, and one tiny Swagger 2.0 document to check rejection. Only redistributable licenses
@@ -158,8 +159,17 @@ planning handoff are not repeated here unless implementation added something.
   reused by path and marked `refetch: false` so refreshing never overwrites it.
 - **Validity check:** schemas must compile under Ajv 2020 with unknown keywords rejected. Ajv's
   style lints (`strictTypes`, `strictRequired`) are off because they reject valid schemas.
+- **Large documents are fetched, not committed (revised 2026-11-03).** With Stripe the corpus
+  reached 19 MB, which every clone carries forever once it's in history. Documents over 1 MB are
+  marked `vendored: false`: `pnpm eval:ingest` downloads them into the gitignored
+  `corpus/fetched/` and refuses any whose SHA-256 doesn't match the pin. Their URLs name a commit,
+  not a branch, so the pinned bytes stay downloadable (OpenAI's file had already changed on `main`
+  three days after it was pinned). `--offline` skips missing ones and lists them in the report. CI
+  needs none of them: its eval test uses the small vendored files, and the regressions they
+  found have unit tests. 444 KB stays committed.
 - **Rejected:** Pulling a large share of APIs.guru (skews toward one conversion pipeline, and
-  repository bloat); fetching at eval time (non-deterministic, needs network in CI).
+  repository bloat); fetching from branch URLs (they move, so a pin can't be met); Git LFS
+  (another tool for contributors and CI, for files only the eval reads).
 
 ## D-018 Hosting: one container image, hosted first, self-host next
 
@@ -808,3 +818,157 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** counting from the audit log (writes only, and too heavy, D-037); limits per rule
   instead of per profile (a plan is one price, whatever toolsets it covers); retrying refused calls
   automatically (D-020).
+
+## D-040 Our pricing unit: requests that reach the provider's API
+
+- **Parked by D-041:** no pricing work for now. This stays the unit if we ever charge.
+
+- **Context:** cairnmcp needs a unit to charge providers by (D-037), and composite tools (3d)
+  raised whether one tool call that makes several API requests counts once or several times.
+- **Decision:** we charge a provider per upstream request: each request cairnmcp sends to their
+  API. A composite tool with three steps is three requests. What counts is what D-039 already
+  counts: requests that reach the API, plus ones it turns away for being busy; requests that fail
+  before they're sent are not charged. Billing reads the same counters as allowances and usage.
+- **Why requests, not bytes:** our cost per request is roughly flat (one fetch and two counter
+  updates, plus audit rows for writes) and barely moves with response size, which the runtime already caps at 2 MB. A
+  provider can't predict bytes (agents choose page sizes), and "GB a month" means nothing to
+  someone buying an MCP server; requests are how providers already price their own APIs. Bytes
+  may become a fair-use limit if a tenant's traffic is unusual, not a price.
+- **Separate from the provider's own plans:** this is what we charge the provider. What a
+  provider charges its customers stays theirs to set with allowances (D-039); a cost per tool (an
+  expensive tool counting as several calls) remains an option for those plans, not something our
+  pricing needs.
+- **Not decided here:** the prices, the free tier, and tiers or overage.
+- **Rejected:** per MCP tool call (a composite would hide its real cost); per byte (above).
+
+## D-041 Product first: no pricing or billing work; open source stays open
+
+- **Context:** the MCP gateway market is crowded. Gateways (Azure API Management, Kong, Apigee,
+  Google Cloud API Gateway) now turn REST APIs into MCP tools, and Speakeasy's Gram and Zuplo
+  already sell hosting, plans, and metering. cairnmcp has no revenue and no paying users.
+- **Decision:** build the best product we can and find where it breaks, rather than designing
+  pricing or billing. Our own prices, tiers, and a billing export are parked; D-040 stays as the
+  unit if we ever charge. Open sourcing cairnmcp stays possible, decided later along with a
+  licence.
+- **What stays:** plan allowances (D-039) and the usage page. They're product, not billing: they
+  protect a provider's upstream quota and show how the server is used. Usage export and the
+  billing webhook (3c step 4) are parked with pricing.
+- **Where the effort goes:** the quality of what agents get (not a claimed edge, D-045). Real APIs through ingest and the
+  eval corpus to find edge cases, tool curation, safe writes, and whether agents actually succeed
+  with a toolset. Edges come from what that work turns up, not from undercutting on price.
+- **Keeping open source possible:** self-host (2b) is what an open-source release needs, so it
+  moves up if we decide to release. No dependency or design that only works on our deployment.
+- **Rejected:** setting tiers and prices now (no users to ask, D-040's open questions); dropping
+  allowances with billing (they protect upstream quotas whether or not anyone pays).
+
+## D-042 Real-world edge cases: bounded output schemas, form field encodings
+
+Found by running large public descriptions (Stripe, GitHub, Plaid, DigitalOcean, Adyen,
+Kubernetes) through ingest (D-041).
+
+- **Output schemas are bounded at 64 KB.** Stripe's responses are expandable objects that
+  reference most of the API, so a self-contained output schema (D-002) was about 1 MB per
+  operation: 363 MB of IR, 48 s and 2.1 GB of memory to ingest. That is over Postgres's 255 MB
+  limit for one `jsonb` value and would crash our 512 MB app (D-029) when an editor adds Stripe.
+  Now, above the limit, `bundleWithin` keeps the components nearest the root whole and leaves
+  those from some depth on open (title, description, and type only), picking the deepest level
+  that fits; `output_schema_trimmed` (info) says so. Stripe: 17 MB, 4 s, under 300 MB. Elsewhere
+  it touches a handful of operations (Box 14, OpenAI 15, Plaid 10, GitHub 1).
+- **Why loosen, not cut:** output schemas only describe; nothing validates responses against
+  them yet. A looser schema still accepts every real response, so it stays safe to use later
+  (e.g. as an MCP `outputSchema`). If even the shallowest version is too big, the output is left
+  untyped with `output_schema_too_large`. Input schemas are never trimmed: the runtime validates
+  them, and none in the corpus comes close (largest: Adyen, 184 KB).
+- **Form bodies keep their field encodings.** Stripe sends every write as
+  `application/x-www-form-urlencoded`, with nested fields declared `deepObject`
+  (1,346 of them). We ignored `encoding` and sent nested objects as JSON text
+  (`metadata={"a":"1"}`), which Stripe rejects. The body binding now carries non-default field
+  encodings, and the runtime nests `deepObject` fields with brackets, arrays by index
+  (`metadata[a]=1`, `line_items[0][price]=p`): Stripe's convention, since OpenAPI leaves
+  deeper nesting undefined. Unexploded arrays are joined (`,` `|` or space). Optional field, so
+  stored IR stays valid; the ingestor version is now 0.2.0.
+- **Found, not fixed yet:**
+  - **RPC-style APIs look like all writes.** Plaid has 345 POST operations, about 154 of them reads
+    (`/accounts/get`, `…/list`). Classification by method only escalates (D-005), so a default
+    toolset offers 5 tools out of 351. Fixed by D-043.
+  - **Multi-file descriptions.** DigitalOcean's description splits into 873 files; every
+    operation fails with `external_ref`. Bundling relative refs when the document comes from a
+    URL would cover it, with the same fetch limits as the document itself. Not urgent: see D-044.
+  - **Relative server URLs with no host.** Kubernetes declares `/`, since every cluster has its own
+    address; ingest refuses it without a base URL. The console should ask for one.
+- **Corpus:** Stripe is added (MIT, about 8 MB). The others stay out to limit repository size;
+  each goes in with its fix.
+
+## D-043 People classify operations; POST lookups are suggested as reads
+
+- **Context:** RPC-style APIs use POST to look things up. Plaid has 345 POSTs out of 351
+  operations, about 157 of them reads (`/accounts/get`, `/transactions/list`). Ingest
+  classifies by method and only escalates (D-005), so all of them were writes: off in a new
+  toolset, and callable only with `use_writes`. The IR already allowed a `curated` class below
+  the method default; nothing set one.
+- **Decision:** a person sets an operation's class in the toolset editor (read, write,
+  destructive, or back to automatic). It's stored on the source's operation, with
+  `basis: "curated"` and ingest's classification kept as `automatic`, so it applies to every
+  toolset from the source, to access checks, MCP hints, counts, and new default toolsets alike,
+  and can be undone. Setting the automatic class again restores it, so `curated` always means a
+  person disagreed with ingest. `PUT /tenants/:t/sources/:id/side-effects` takes up to 2,000
+  changes at once; editors may use it, since they already decide who may call writes (D-038).
+- **Suggestions, never automatic:** `suggestRead` flags a POST whose class is just the method
+  default, whose path ends in (or name starts with) a lookup verb (get, list, search, query,
+  find, lookup, fetch, retrieve, read, describe), and with no change word anywhere in it. The
+  editor shows them as one banner; the person reviews the list, unticks any that change data,
+  and confirms, optionally turning them on in the toolset. Heuristics still only escalate on
+  their own (D-005).
+- **How well it guesses:** Plaid 157 of 345 POSTs; GitHub 2 (`…/attestations/bulk-list`), OpenAI 1
+  (vector store search), Box 1 (`/metadata_queries/execute_read`), all reads; none in Stripe,
+  Discord, Twilio, Adyen, or Intervals.icu. A name's last word is often a noun, so only its first
+  word counts (Stripe's `PostRadarValueListsValueList` updates a list).
+- **Source updates must keep these.** Re-ingesting replaces operations, so the source-update work
+  (milestone 3) carries curated classifications over to operations that still exist, and shows
+  any whose automatic class changed.
+- **Rejected:** lowering by heuristic at ingest (D-005); a per-toolset override (the class is a
+  fact about the API, and access rules across toolsets would disagree); an LLM classifier
+  (non-deterministic, and still needs a person to confirm).
+
+## D-044 Long introductions are cut, unusable regex patterns are fixed or dropped
+
+Found running DigitalOcean's bundled description (APIs.guru) after its multi-file source failed.
+
+- **Multi-file descriptions stay unsupported for now.** Splitting a description across files is
+  common where it's written (DigitalOcean's repository, Redocly-style projects), but what
+  providers publish for docs tools and Swagger UI is almost always one bundled file, and that's
+  what the console's URL discovery finds. The `external_ref` message says to bundle first.
+  Revisit if people bring split descriptions.
+- **A long API description no longer rejects the whole API.** DigitalOcean's introduction is over
+  10,000 characters (the IR's limit), so ingest refused all 290 operations. The description and
+  title are now cut to fit, with `description_truncated` (info).
+- **Patterns must compile in Unicode mode.** JSON Schema validators (Ajv, so our runtime)
+  compile `pattern` with the `u` flag, which refuses needless escapes that plain JavaScript
+  allows (DigitalOcean's tags: `^[a-zA-Z0-9_\-\:]+$`). The runtime threw on every call to those
+  tools and reported it as an unexpected network error. Ingest now removes needless escapes,
+  which doesn't change what matches (`pattern_rewritten`), or drops a pattern that still won't
+  compile (`pattern_dropped`; looser, and the API checks its own input). The runtime also fails
+  closed with a clear `unsupported` error if a schema can't be compiled.
+- **Inlined bundles can't be trimmed.** APIs.guru's bundle inlines every type, so D-042's
+  trimming (which opens referenced components) has nothing to open; 4 huge response schemas
+  are left untyped with `output_schema_too_large`. Harmless while outputs only describe.
+- **Corpus:** the bundled DigitalOcean description is added (Apache-2.0, 1.5 MB).
+
+## D-045 Self-host first; the licence is undecided
+
+- **Context:** cairnmcp is a personal project with no users besides its author. D-037 aimed at API
+  providers, and D-041 parked pricing. The first real step outward is letting someone run it.
+- **Decision:** milestone 2b (self-host) comes next: a published image, a `docker compose` setup
+  that works on a laptop, documented and validated config, and upgrade docs. The hosted
+  deployment stays as the author's own instance.
+- **Self-hosting is not open sourcing.** The repository is private with no licence, so all rights
+  are reserved. An image can be published without the source, or with source under any licence,
+  chosen later. Options, from most to least open: permissive (MIT, Apache-2.0: anyone may copy
+  and sell it, including as a hosted service), copyleft (AGPL-3.0: anyone may, but a hosted copy
+  must publish its changes; Gram uses it), source-available (BSL, FSL, Elastic License: free to
+  self-host, no competing hosted service, some become open after a few years), open core (an open
+  base with paid features), or closed (a free or paid image). A version once released under an
+  open licence stays open; later versions can change.
+- **Not claimed:** that cairnmcp's tools make agents succeed more often than others'. It's
+  tested by one person; D-041's quality work is about finding where it breaks, not a market edge.
+- **Rejected for now:** choosing a licence before anyone outside has run it.

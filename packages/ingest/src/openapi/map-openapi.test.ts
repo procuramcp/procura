@@ -52,6 +52,13 @@ describe("mapOpenApi: document level", () => {
     expect(r.ok && r.ir.source.baseUrl).toBe("https://sandbox.example.com");
   });
 
+  it("cuts a long title and description instead of refusing the API (DigitalOcean)", () => {
+    const r = mapOk(minimal({}, { info: { title: "T".repeat(300), version: "1", description: "d".repeat(12_000) } }));
+    expect(r.ir.source.name).toHaveLength(200);
+    expect(r.ir.source.description).toHaveLength(10_000);
+    expect(r.diagnostics.map((d) => d.code)).toContain("description_truncated");
+  });
+
   it("slugs the source id from the title unless given", () => {
     expect(mapOk(minimal({})).ir.source.id).toBe("mini-api");
     const r = mapOpenApi(minimal({}), { sourceId: "custom" });
@@ -123,6 +130,70 @@ describe("mapOpenApi: operations", () => {
     expect(opById(r.ir.operations, "both").mapping.body?.mediaType).toBe("application/json");
     expect(opById(r.ir.operations, "upload").mapping.body?.mediaType).toBe("multipart/form-data");
     expect(r.diagnostics.filter((d) => d.code === "binary_request_body").map((d) => d.operationId)).toEqual(["upload"]);
+  });
+
+  it("keeps a form body's non-default field encodings (Stripe)", () => {
+    const r = mapOk(
+      minimal({
+        "/customers": {
+          post: {
+            operationId: "createCustomer",
+            requestBody: {
+              content: {
+                "application/x-www-form-urlencoded": {
+                  schema: { type: "object", properties: { email: { type: "string" }, metadata: { type: "object" } } },
+                  encoding: {
+                    email: { style: "form", explode: true },
+                    metadata: { style: "deepObject", explode: true },
+                    ids: { style: "form", explode: false },
+                    weird: { style: "matrix" },
+                  },
+                },
+              },
+            },
+            responses: { "200": { description: "ok" } },
+          },
+        },
+      }),
+    );
+    expect(opById(r.ir.operations, "create_customer").mapping.body).toEqual({
+      property: "body",
+      mediaType: "application/x-www-form-urlencoded",
+      encoding: { metadata: { style: "deepObject", explode: true }, ids: { style: "form", explode: false } },
+    });
+    expect(r.diagnostics.map((d) => d.code)).toContain("unsupported_body_encoding");
+  });
+
+  it("leaves deep types open in a huge response schema instead of repeating them (Stripe)", () => {
+    // A chain of components, each with a large description, so the full schema is too big.
+    const big = "x".repeat(20_000);
+    const schemas: Record<string, unknown> = {};
+    for (let i = 0; i < 8; i++) {
+      schemas[`T${i}`] = { type: "object", description: `T${i} ${big}`, properties: { next: { $ref: `#/components/schemas/T${i + 1}` } } };
+    }
+    schemas["T8"] = { type: "string" };
+    const r = mapOk(
+      minimal(
+        { "/t": { get: { operationId: "getT", responses: { "200": { description: "ok", content: { "application/json": { schema: { $ref: "#/components/schemas/T0" } } } } } } } },
+        { components: { schemas } },
+      ),
+    );
+    const output = opById(r.ir.operations, "get_t").output as { $defs: Record<string, Record<string, unknown>> };
+    expect(JSON.stringify(output).length).toBeLessThanOrEqual(64 * 1024);
+    expect(output.$defs["T0"]?.["properties"]).toBeDefined();
+    const open = Object.entries(output.$defs).filter(([, s]) => s["properties"] === undefined).map(([k]) => k);
+    expect(open).toHaveLength(1);
+    expect(output.$defs[open[0]!]).toEqual({ type: "object", description: expect.stringMatching(/^T\d /) });
+    expect(r.diagnostics.find((d) => d.code === "output_schema_trimmed")).toMatchObject({ severity: "info" });
+    expect(strictAjv().validateSchema(output)).toBe(true);
+    expect(strictAjv().compile(output)({ next: { next: { next: { next: "anything" } } } })).toBe(true);
+  });
+
+  it("leaves the output untyped when even the outer level is too big", () => {
+    const schema = { type: "object", description: "y".repeat(70_000) };
+    const r = mapOk(minimal({ "/u": { get: { operationId: "getU", responses: { "200": { description: "ok", content: { "application/json": { schema } } } } } } }));
+    expect(opById(r.ir.operations, "get_u").output).toBeUndefined();
+    expect(r.diagnostics.map((d) => d.code)).toContain("output_schema_too_large");
   });
 
   it("assumes JSON for a wildcard media type with a schema, and warns", () => {

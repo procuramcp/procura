@@ -1,14 +1,94 @@
 {
   "summary": {
-    "corpusEntries": 13,
-    "mapped": 12,
+    "corpusEntries": 15,
+    "mapped": 14,
     "rejected": 1,
-    "operationsInDocuments": 1342,
-    "operationsInIr": 1341,
+    "operationsInDocuments": 2244,
+    "operationsInIr": 2243,
     "operationsSkipped": 0,
-    "operationsInRejectedDocuments": 1
+    "operationsInRejectedDocuments": 1,
+    "notFetched": []
   },
   "documents": [
+    {
+      "id": "apisguru-digitalocean-v2",
+      "file": "apisguru/digitalocean_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/f04b8d0bcd39c52e1cf3ad7a5fe744709832ae49/APIs/digitalocean.com/2.0/openapi.yaml",
+      "license": "Apache-2.0",
+      "sha256": "5bd3a4800c4396372cb80d99cc82b49463e4a3f136b63d1794c19f13da37cf63",
+      "retrievedOn": "2026-11-03",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 290,
+        "ir": 290,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "output_schema_too_large": 4,
+          "pattern_rewritten": 3,
+          "response_media_type_unspecified": 9
+        },
+        "errorsByCode": {},
+        "infosByCode": {
+          "description_truncated": 1,
+          "reserved_header_ignored": 2
+        }
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 141,
+          "write": 95,
+          "destructive": 54
+        },
+        "nameHeuristicEscalations": 6
+      },
+      "confidence": {
+        "mean": 0.895,
+        "min": 0.8
+      },
+      "schemas": {
+        "input": {
+          "total": 290,
+          "strictAjvCompiles": 290
+        },
+        "output": {
+          "total": 215,
+          "strictAjvCompiles": 215
+        }
+      },
+      "compactIrBytes": 1885378,
+      "topDiagnostics": [
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 9
+        },
+        {
+          "code": "output_schema_too_large",
+          "severity": "warning",
+          "count": 4
+        },
+        {
+          "code": "pattern_rewritten",
+          "severity": "warning",
+          "count": 3
+        },
+        {
+          "code": "reserved_header_ignored",
+          "severity": "info",
+          "count": 2
+        },
+        {
+          "code": "description_truncated",
+          "severity": "info",
+          "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
     {
       "id": "apisguru-listennotes-v2",
       "file": "apisguru/listennotes_v2.yaml",
@@ -104,7 +184,7 @@
     {
       "id": "box-v2",
       "file": "box/openapi.json",
-      "sourceUrl": "https://raw.githubusercontent.com/box/box-openapi/main/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/box/box-openapi/8464b2265fb8bf6d14feae0f7614e7d5c0084cc5/openapi.json",
       "license": "Apache-2.0",
       "sha256": "47cdf4bcbc7cdebcb042f155f13a8413bf913678489bd15b263b65f49e841ba1",
       "retrievedOn": "2026-10-30",
@@ -123,6 +203,7 @@
         },
         "errorsByCode": {},
         "infosByCode": {
+          "output_schema_trimmed": 14,
           "path_key_fragment": 19
         }
       },
@@ -148,12 +229,17 @@
           "strictAjvCompiles": 247
         }
       },
-      "compactIrBytes": 3716280,
+      "compactIrBytes": 3442430,
       "topDiagnostics": [
         {
           "code": "path_key_fragment",
           "severity": "info",
           "count": 19
+        },
+        {
+          "code": "output_schema_trimmed",
+          "severity": "info",
+          "count": 14
         },
         {
           "code": "response_media_type_unspecified",
@@ -171,7 +257,7 @@
     {
       "id": "discord-v10",
       "file": "discord/openapi.json",
-      "sourceUrl": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/discord/discord-api-spec/4e75626a4cedfbc397d66f5491c79a9a62a71fd5/specs/openapi.json",
       "license": "MIT",
       "sha256": "281a2bff563d77a19e51fc3bf8bbe3ebcef28e3dc86684ae395b06ac51ba7484",
       "retrievedOn": "2026-10-30",
@@ -214,7 +300,7 @@
           "strictAjvCompiles": 189
         }
       },
-      "compactIrBytes": 3246395,
+      "compactIrBytes": 3246431,
       "topDiagnostics": [
         {
           "code": "binary_request_body",
@@ -495,7 +581,7 @@
     {
       "id": "openai-openapi",
       "file": "openai/openapi.yaml",
-      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/main/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/8c668caa924f24baa77679fc6635ed56659fae06/openapi.yaml",
       "license": "MIT",
       "sha256": "aea81bdac8b83352defafcacf548fe859b5005716e64d3e25e6c79489fddd756",
       "retrievedOn": "2026-10-30",
@@ -516,7 +602,9 @@
           "wildcard_media_type": 1
         },
         "errorsByCode": {},
-        "infosByCode": {}
+        "infosByCode": {
+          "output_schema_trimmed": 15
+        }
       },
       "sideEffects": {
         "classCounts": {
@@ -540,8 +628,13 @@
           "strictAjvCompiles": 367
         }
       },
-      "compactIrBytes": 6317643,
+      "compactIrBytes": 5058625,
       "topDiagnostics": [
+        {
+          "code": "output_schema_trimmed",
+          "severity": "info",
+          "count": 15
+        },
         {
           "code": "binary_request_body",
           "severity": "warning",
@@ -561,9 +654,65 @@
           "code": "unknown_schema_keyword",
           "severity": "warning",
           "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
+    {
+      "id": "stripe-v1",
+      "file": "stripe/spec3.json",
+      "sourceUrl": "https://raw.githubusercontent.com/stripe/openapi/bcfd59f49dcac84a84d63d304c62793dff6e5916/openapi/spec3.json",
+      "license": "MIT",
+      "sha256": "7cff4cc46d0654101a36a3302f7544640f5f73e4f3cad6f264f0e23c19fa1776",
+      "retrievedOn": "2026-11-03",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 612,
+        "ir": 612,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 1
+        },
+        "errorsByCode": {},
+        "infosByCode": {
+          "output_schema_trimmed": 364
+        }
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 273,
+          "write": 305,
+          "destructive": 34
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 612,
+          "strictAjvCompiles": 612
+        },
+        "output": {
+          "total": 612,
+          "strictAjvCompiles": 612
+        }
+      },
+      "compactIrBytes": 17501549,
+      "topDiagnostics": [
+        {
+          "code": "output_schema_trimmed",
+          "severity": "info",
+          "count": 364
         },
         {
-          "code": "wildcard_media_type",
+          "code": "binary_request_body",
           "severity": "warning",
           "count": 1
         }
@@ -651,7 +800,7 @@
     {
       "id": "twilio-api-v2010-json",
       "file": "twilio/twilio_api_v2010.json",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/157fb094bd08957183278242d7622c8560b7a4c4/spec/json/twilio_api_v2010.json",
       "license": "MIT",
       "sha256": "bfdf249a129819af274d6bdc7672156ea3416ad48670a6f0544def6ef386ba87",
       "retrievedOn": "2026-10-30",
@@ -692,7 +841,7 @@
           "strictAjvCompiles": 164
         }
       },
-      "compactIrBytes": 1037120,
+      "compactIrBytes": 1037156,
       "topDiagnostics": [
         {
           "code": "no_success_response",

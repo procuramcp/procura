@@ -91,7 +91,15 @@ export type OperationView = {
   path: string;
   tags: string[];
   deprecated: boolean;
-  sideEffect: { class: SideEffect; basis: ClassificationBasis; reason: string };
+  sideEffect: {
+    class: SideEffect;
+    basis: ClassificationBasis;
+    reason: string;
+    /** When a person set the class: what ingest said (D-043). */
+    automatic?: { class: SideEffect; basis: ClassificationBasis; reason: string };
+  };
+  /** A POST that looks like a read, for a person to confirm; never applied on its own (D-043). */
+  suggestedRead?: string;
   inputs: OperationInput[];
   /** The operation's whole input JSON Schema. */
   inputSchema: JsonObject;
@@ -234,6 +242,14 @@ export type CredentialInput =
   | { kind: "oauth2"; accessToken: string; refreshToken?: string };
 /** `PUT /tenants/:t/sources/:id/credentials/:scheme` body. */
 export type CredentialBody = { credential: CredentialInput };
+
+/**
+ * `PUT /tenants/:t/sources/:id/side-effects` body: a person's classification of operations, for
+ * every toolset from the source (D-043). `automatic` restores what ingest said.
+ */
+export type SideEffectEdit = { changes: Array<{ operationId: string; class: SideEffect | "automatic"; reason?: string | undefined }> };
+/** `PUT /tenants/:t/sources/:id/side-effects`. */
+export type SideEffectsUpdated = { changed: number; operations: OperationCounts };
 
 /** `GET /tenants/:t/sources/:id`, and every credential change. Never a credential's value. */
 export type SourceView = {

@@ -5,7 +5,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { isRecord, type Diagnostic, type Operation, type SideEffect } from "@cairnmcp/core";
 import { ingestOpenApiText } from "@cairnmcp/ingest";
 import { parse as parseYaml } from "yaml";
-import { DEFAULT_MANIFEST_PATH, loadCorpusManifest, resolveCorpusFile, type CorpusEntry } from "./manifest.ts";
+import { DEFAULT_MANIFEST_PATH, isPresent, loadCorpusManifest, resolveCorpusFile, type CorpusEntry } from "./manifest.ts";
 
 type CodeCounts = Record<string, number>;
 
@@ -49,6 +49,8 @@ export type IngestEvalReport = {
     operationsSkipped: number;
     /** Operations in documents the mapper rejected outright (e.g. Swagger 2.0). */
     operationsInRejectedDocuments: number;
+    /** Fetched documents that weren't on disk (an `--offline` run); not evaluated. */
+    notFetched: string[];
   };
   documents: IngestEvalDocumentResult[];
 };
@@ -61,7 +63,9 @@ export function runIngestEval(options?: { manifestPath?: string; ids?: string[] 
     .filter((entry) => wanted === undefined || wanted.has(entry.id))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  const documents = entries.map((entry) => evaluateEntry(entry, manifestPath));
+  // Vendored documents are always there; a missing one is a broken checkout, so let it throw.
+  const notFetched = entries.filter((e) => e.vendored === false && !isPresent(manifestPath, e)).map((e) => e.id);
+  const documents = entries.filter((e) => !notFetched.includes(e.id)).map((entry) => evaluateEntry(entry, manifestPath));
   const summary = {
     corpusEntries: documents.length,
     mapped: documents.filter((d) => d.outcome.kind === "mapped").length,
@@ -72,6 +76,7 @@ export function runIngestEval(options?: { manifestPath?: string; ids?: string[] 
     operationsInRejectedDocuments: documents
       .filter((d) => d.outcome.kind === "rejected")
       .reduce((sum, d) => sum + d.operations.document, 0),
+    notFetched,
   };
   return { summary, documents };
 }
@@ -86,7 +91,7 @@ export function writeIngestEvalReport(report: IngestEvalReport, outputPaths?: { 
 }
 
 function evaluateEntry(entry: CorpusEntry, manifestPath: string): IngestEvalDocumentResult {
-  const absolutePath = resolveCorpusFile(manifestPath, entry.file);
+  const absolutePath = resolveCorpusFile(manifestPath, entry);
   const text = readFileSync(absolutePath, "utf8");
   const actualSha = createHash("sha256").update(text, "utf8").digest("hex");
   const raw = parseOpenApiText(text);
@@ -284,6 +289,7 @@ export function renderMarkdownReport(report: IngestEvalReport): string {
   lines.push(`Corpus entries: ${report.summary.corpusEntries}`);
   lines.push(`Mapped: ${report.summary.mapped}`);
   lines.push(`Rejected: ${report.summary.rejected}`);
+  if (report.summary.notFetched.length > 0) lines.push(`Not fetched (offline run): ${report.summary.notFetched.join(", ")}`);
   lines.push("");
   lines.push("| id | outcome | doc ops | IR ops | skipped | warnings | errors | mean confidence | input Ajv | output Ajv | IR bytes |\n| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const doc of report.documents) {

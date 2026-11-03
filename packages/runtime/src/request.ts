@@ -1,4 +1,4 @@
-import { isRecord as isPlainObject, type Operation, type ParameterBinding } from "@cairnmcp/core";
+import { isRecord as isPlainObject, type BodyBinding, type Operation, type ParameterBinding } from "@cairnmcp/core";
 import { fail } from "./errors.ts";
 
 /** A request ready for auth and sending. Pure data; no secrets yet. */
@@ -57,7 +57,7 @@ export function buildRequest(op: Operation, input: Record<string, unknown>): Req
   if (mapping.body) {
     const value = input[mapping.body.property];
     if (value !== undefined) {
-      const { body, contentType } = encodeBody(mapping.body.mediaType, value);
+      const { body, contentType } = encodeBody(mapping.body, value);
       plan.body = body;
       plan.headers["content-type"] = contentType;
     }
@@ -126,15 +126,21 @@ function scalar(value: unknown, binding: ParameterBinding): string {
   return fail("invalid_input", `"${binding.property}" has a nested value that cannot be sent as ${binding.in} parameter`);
 }
 
-function encodeBody(mediaType: string, value: unknown): { body: string; contentType: string } {
+function encodeBody(binding: BodyBinding, value: unknown): { body: string; contentType: string } {
+  const mediaType = binding.mediaType;
   const base = mediaType.split(";")[0]!.trim().toLowerCase();
   if (base === "application/json" || base.endsWith("+json")) return { body: JSON.stringify(value), contentType: mediaType };
   if (base === "application/x-www-form-urlencoded") {
     if (!isPlainObject(value)) fail("invalid_input", "form body must be an object");
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(value)) {
-      if (Array.isArray(v)) v.forEach((item) => params.append(k, formScalar(item)));
-      else if (v !== undefined) params.append(k, formScalar(v));
+      if (v === undefined) continue;
+      const encoding = binding.encoding?.[k];
+      if (encoding?.style === "deepObject") appendNested(params, k, v);
+      else if (Array.isArray(v) && encoding && !encoding.explode) {
+        params.append(k, v.map(formScalar).join(DELIMITERS[encoding.style]));
+      } else if (Array.isArray(v)) v.forEach((item) => params.append(k, formScalar(item)));
+      else params.append(k, formScalar(v));
     }
     return { body: params.toString(), contentType: mediaType };
   }
@@ -143,6 +149,15 @@ function encodeBody(mediaType: string, value: unknown): { body: string; contentT
     return { body: value, contentType: mediaType };
   }
   return fail("unsupported", `request bodies of type ${base} are not supported yet`, { retryable: false });
+}
+
+const DELIMITERS = { form: ",", spaceDelimited: " ", pipeDelimited: "|", deepObject: "," } as const;
+
+/** Bracket nesting for deepObject form fields: `a[b]=1`, `a[0][c]=2`. */
+function appendNested(params: URLSearchParams, key: string, value: unknown): void {
+  if (Array.isArray(value)) value.forEach((item, i) => appendNested(params, `${key}[${i}]`, item));
+  else if (isPlainObject(value)) for (const [k, v] of Object.entries(value)) appendNested(params, `${key}[${k}]`, v);
+  else if (value !== undefined) params.append(key, formScalar(value));
 }
 
 function formScalar(v: unknown): string {

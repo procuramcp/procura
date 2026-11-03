@@ -174,7 +174,12 @@ export class Runtime {
   #validate(schema: JsonSchema, value: unknown, what: string): void {
     let validate = this.#validators.get(schema);
     if (!validate) {
-      validate = this.#ajv.compile(schema);
+      try {
+        validate = this.#ajv.compile(schema);
+      } catch (e) {
+        // A schema ingest let through that the validator can't compile: fail closed, and say so.
+        fail("unsupported", `this tool's ${what} schema can't be checked (${e instanceof Error ? e.message : String(e)}); the toolset owner needs to fix it`, { retryable: false });
+      }
       this.#validators.set(schema, validate);
     }
     if (validate(value)) return;

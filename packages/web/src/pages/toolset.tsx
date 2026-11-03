@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, CircleAlertIcon, EyeIcon, PinIcon, SearchIcon, UndoIcon } from "lucide-react";
+import { ArrowLeftIcon, CircleAlertIcon, EyeIcon, LightbulbIcon, PinIcon, SearchIcon, UndoIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useBlocker, useParams } from "react-router";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -27,7 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
-import { api, ApiError, type Issue, type JsonValue, type Level, type OperationView, type ToolBinding, type ToolsetView } from "@/lib/api";
+import { api, ApiError, type Issue, type JsonValue, type Level, type OperationView, type SideEffect, type SideEffectEdit, type ToolBinding, type ToolsetView } from "@/lib/api";
 import { useLoad, useMe, useRole } from "@/lib/hooks";
 import { display, parseValue } from "@/lib/values";
 import { CopyText, Endpoint, PersonName, SideEffectBadge } from "@/pages/parts";
@@ -81,6 +83,15 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
     toast.success("Saved", { description: "MCP clients see the change on their next request." });
   }
 
+  /** Set classifications on the source (every toolset from it, D-043), then reload the operations. */
+  async function classify(changes: SideEffectEdit["changes"]): Promise<boolean> {
+    const done = await act(() => api.setSideEffects(tenantId, view.source.id, changes), { failure: "Not changed" });
+    if (!done) return false;
+    const next = await act(() => api.toolset(tenantId, view.toolset.id), { failure: "Changed, but the page didn't reload" });
+    if (next) onSaved(next);
+    return true;
+  }
+
   const enabled = draft.tools.filter((t) => t.enabled);
   const writes = enabled.filter((t) => ops.get(t.operationId)?.sideEffect.class !== "read").length;
 
@@ -130,7 +141,7 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="tools">
-          <ToolsTab tenantId={tenantId} view={view} draft={draft} setDraft={setDraft} ops={ops} readOnly={readOnly} />
+          <ToolsTab tenantId={tenantId} view={view} draft={draft} setDraft={setDraft} ops={ops} readOnly={readOnly} classify={classify} />
         </TabsContent>
         <TabsContent value="access">
           <AccessTab tenantId={tenantId} view={view} onChanged={onSaved} readOnly={readOnly} />
@@ -172,7 +183,17 @@ function Editor({ tenantId, view, onSaved }: { tenantId: string; view: ToolsetVi
 
 type Filter = "all" | "enabled" | "read" | "write";
 
-function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; setDraft: (d: Draft) => void; ops: Map<string, OperationView>; readOnly: boolean }) {
+type Classify = (changes: SideEffectEdit["changes"]) => Promise<boolean>;
+
+function ToolsTab(props: {
+  tenantId: string;
+  view: ToolsetView;
+  draft: Draft;
+  setDraft: (d: Draft) => void;
+  ops: Map<string, OperationView>;
+  readOnly: boolean;
+  classify: Classify;
+}) {
   const { view, draft, setDraft, ops, readOnly } = props;
   const [query, setQuery] = useState("");
   // Open on the tools already in use; "All" shows the rest of the source.
@@ -199,8 +220,22 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
   }
 
   const current = selected ? ops.get(selected) : undefined;
+  const suggested = view.operations.filter((op) => op.suggestedRead);
+
+  /** Turn tools on in the draft, adding bindings for operations that have none yet. */
+  function enableAll(ids: string[]) {
+    const want = new Set(ids);
+    const tools = draft.tools.map((t) => (want.has(t.operationId) ? { ...t, enabled: true } : t));
+    for (const id of want) {
+      const op = ops.get(id);
+      if (op && !bindings.has(id)) tools.push(newBinding(op));
+    }
+    setDraft({ ...draft, tools });
+  }
 
   return (
+    <div className="flex flex-col gap-4">
+    {!readOnly && suggested.length > 0 && <SuggestedReads ops={suggested} classify={props.classify} enableAll={enableAll} />}
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Card className="gap-0 py-0">
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
@@ -278,12 +313,161 @@ function ToolsTab(props: { tenantId: string; view: ToolsetView; draft: Draft; se
           names={draft.tools.filter((t) => t.operationId !== current.id).map((t) => t.name)}
           onChange={(change) => update(current, change)}
           readOnly={readOnly}
+          classify={props.classify}
         />
       ) : (
         <Card className="items-center justify-center p-8 text-muted-foreground">Pick an operation to {readOnly ? "see" : "edit"} it.</Card>
       )}
       </div>
     </div>
+    </div>
+  );
+}
+
+/** POSTs that look like reads (RPC-style APIs such as Plaid), for a person to confirm (D-043). */
+function SuggestedReads({ ops, classify, enableAll }: { ops: OperationView[]; classify: Classify; enableAll: (ids: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(ops.map((o) => o.id)));
+  const [enable, setEnable] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const sample = ops.slice(0, 2).map((o) => o.path).join(", ");
+
+  async function confirm() {
+    setBusy(true);
+    const ids = [...picked];
+    const ok = await classify(ids.map((operationId) => ({ operationId, class: "read" })));
+    setBusy(false);
+    if (!ok) return;
+    if (enable) enableAll(ids);
+    setOpen(false);
+    toast.success(`Marked ${ids.length} as read`, { description: enable ? "Save the toolset to turn them on." : "For every toolset from this source." });
+  }
+
+  return (
+    <Alert>
+      <LightbulbIcon />
+      <AlertTitle>
+        {ops.length} POST {ops.length === 1 ? "operation looks" : "operations look"} like {ops.length === 1 ? "a read" : "reads"}
+      </AlertTitle>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+        <span>Some APIs use POST to look things up ({sample}). They count as writes until you say otherwise.</span>
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          Review
+        </Button>
+      </AlertDescription>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Mark these as reads?</DialogTitle>
+            <DialogDescription>
+              People with use access will be able to call them, and clients will treat them as read-only. This applies to every toolset from
+              this source. Untick any that change data.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={picked.size === ops.length ? true : picked.size === 0 ? false : "indeterminate"}
+              onCheckedChange={(on) => setPicked(new Set(on === true ? ops.map((o) => o.id) : []))}
+            />
+            All {ops.length}
+          </label>
+          <div className="max-h-80 overflow-y-auto rounded-md border">
+            {ops.map((op) => (
+              <label key={op.id} className="flex items-start gap-2 border-b px-3 py-2 last:border-b-0">
+                <Checkbox
+                  className="mt-0.5"
+                  checked={picked.has(op.id)}
+                  onCheckedChange={(on) => {
+                    const next = new Set(picked);
+                    if (on === true) next.add(op.id);
+                    else next.delete(op.id);
+                    setPicked(next);
+                  }}
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate font-medium text-sm">{op.title}</span>
+                  <span className="truncate">
+                    <Endpoint method={op.method} path={op.path} />
+                  </span>
+                  <span className="text-muted-foreground text-xs">{op.suggestedRead}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={enable} onCheckedChange={(on) => setEnable(on === true)} />
+            Also turn them on in this toolset
+          </label>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={confirm} disabled={busy || picked.size === 0}>
+              {busy && <Spinner />} Mark {picked.size} as read
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Alert>
+  );
+}
+
+const RANK: Record<SideEffect, number> = { read: 0, write: 1, destructive: 2 };
+
+/** A person's classification of one operation, for every toolset from its source (D-043). */
+function ClassificationSelect({ op, classify, readOnly }: { op: OperationView; classify: Classify; readOnly: boolean }) {
+  const [pending, setPending] = useState<SideEffect | undefined>();
+  const [busy, setBusy] = useState(false);
+  const { automatic } = op.sideEffect;
+
+  async function apply(value: SideEffect | "automatic") {
+    setBusy(true);
+    await classify([{ operationId: op.id, class: value }]);
+    setBusy(false);
+    setPending(undefined);
+  }
+
+  function choose(value: string) {
+    if (value === "automatic") return void apply("automatic");
+    const next = value as SideEffect;
+    // Lowering lets more people call it, so say so first.
+    if (RANK[next] < RANK[op.sideEffect.class]) setPending(next);
+    else void apply(next);
+  }
+
+  return (
+    <>
+      <Select value={op.sideEffect.class} onValueChange={choose} disabled={readOnly || busy}>
+        <SelectTrigger size="sm" className="w-36" aria-label="Classification">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="read">read</SelectItem>
+          <SelectItem value="write">write</SelectItem>
+          <SelectItem value="destructive">destructive</SelectItem>
+          {automatic && <SelectItem value="automatic">Back to automatic ({automatic.class})</SelectItem>}
+        </SelectContent>
+      </Select>
+      <AlertDialog open={pending !== undefined} onOpenChange={(o) => !o && setPending(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as {pending}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pending === "read"
+                ? "People with use access will be able to call it, and clients will treat it as read-only."
+                : "Clients will no longer warn that it deletes or overwrites data."}{" "}
+              This applies to every toolset from this source.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={() => pending && void apply(pending)}>
+              Mark as {pending}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -299,6 +483,7 @@ function ToolEditor(props: {
   names: string[];
   onChange: (change: Partial<ToolBinding>) => void;
   readOnly: boolean;
+  classify: Classify;
 }) {
   const { op, binding, onChange, readOnly } = props;
   const nameProblem = !/^[a-z][a-z0-9_]{0,63}$/.test(binding.name)
@@ -326,6 +511,13 @@ function ToolEditor(props: {
               {binding.enabled ? "Enabled" : "Off"}
             </label>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            {op.sideEffect.basis === "curated" ? `Set by a person${op.sideEffect.automatic ? `; ingest said ${op.sideEffect.automatic.class}` : ""}.` : `Automatic: ${op.sideEffect.reason}.`}
+            {op.suggestedRead && ` Looks like a read: ${op.suggestedRead}.`}
+          </span>
+          <ClassificationSelect op={op} classify={props.classify} readOnly={readOnly} />
         </div>
         {op.sideEffect.class !== "read" && binding.enabled && (
           <Alert>

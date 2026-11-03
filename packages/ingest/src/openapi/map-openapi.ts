@@ -9,6 +9,8 @@ import {
   slugify,
   truncate,
   type AuthRequirement,
+  type BodyBinding,
+  type BodyFieldEncoding,
   type Diagnostic,
   type HttpMethod,
   type JsonSchema,
@@ -28,7 +30,7 @@ import { deref, escapePointerToken, MappingError } from "./refs.ts";
 import { SchemaConverter, type OasDialect } from "./schema.ts";
 import { mapSecurityRequirement, mapSecuritySchemes } from "./security.ts";
 
-export const OPENAPI_INGESTOR_VERSION = "0.1.0";
+export const OPENAPI_INGESTOR_VERSION = "0.2.0";
 
 /**
  * Confidence rubric for spec-derived operations. A spec can be wrong, so it
@@ -66,6 +68,12 @@ export type MapOpenApiOptions = {
 export type MapOpenApiResult =
   | { ok: true; ir: IrDocument; diagnostics: Diagnostic[] }
   | { ok: false; diagnostics: Diagnostic[] };
+
+/**
+ * Output schemas larger than this keep their outer levels and leave deeper types open (D-042).
+ * Stripe's responses reference most of its API (about 1 MB per operation in full).
+ */
+export const MAX_OUTPUT_SCHEMA_CHARS = 64 * 1024;
 
 // Header parameters OpenAPI says must be ignored: the runtime owns these.
 const RESERVED_HEADERS = new Set(["accept", "content-type", "authorization"]);
@@ -152,12 +160,16 @@ export function mapOpenApi(raw: unknown, options: MapOpenApiOptions = {}): MapOp
     }
   }
 
+  // Long API introductions (DigitalOcean's runs past 10,000 characters) are cut, not refused.
+  if ((doc.info.description?.length ?? 0) > 10_000) {
+    diagnostics.push({ severity: "info", code: "description_truncated", message: "the API's description is over 10,000 characters; cut to fit", pointer: "#/info/description" });
+  }
   const candidate = {
     irVersion: IR_VERSION,
     source: {
       id: sourceId,
-      name: doc.info.title,
-      ...(doc.info.description ? { description: doc.info.description } : {}),
+      name: truncate(doc.info.title.trim() || sourceId, 200),
+      ...(doc.info.description ? { description: truncate(doc.info.description, 10_000) } : {}),
       baseUrl,
       authSchemes: [...schemes.values()],
       defaultAuth,
@@ -277,7 +289,7 @@ function mapOperation(ctx: OperationContext) {
     parameters.push({ property, in: param.in, wireName: param.name, style, explode: param.explode ?? style === "form" });
   }
 
-  let body: { property: string; mediaType: string } | undefined;
+  let body: BodyBinding | undefined;
   if (op.requestBody !== undefined) {
     const rb = deref(doc, op.requestBody, OaRequestBody, `${pointer}/requestBody`);
     const mediaType = pickRequestMediaType(Object.keys(rb.value.content));
@@ -294,7 +306,8 @@ function mapOperation(ctx: OperationContext) {
       const schema = converter.convert(mt?.schema ?? {}, "input", bodyPointer, inputRefs);
       properties[property] = withAnnotations(schema, rb.value.description, undefined);
       if (rb.value.required === true) required.push(property);
-      body = { property, mediaType };
+      const encoding = formEncoding(mediaType, mt?.encoding, note, `${rb.pointer}/content/${escapePointerToken(mediaType)}/encoding`);
+      body = encoding ? { property, mediaType, encoding } : { property, mediaType };
     }
   }
 
@@ -371,7 +384,16 @@ function mapResponse(
   const refs = new Set<string>();
   const schemaPointer = `${resp.pointer}/content/${escapePointerToken(mediaType)}/schema`;
   const converted = rawSchema !== undefined ? ctx.converter.convert(rawSchema, "output", schemaPointer, refs) : undefined;
-  const output = isRecord(converted) ? ctx.converter.bundle(converted, "output", refs) : undefined;
+  let output: JsonSchema | undefined;
+  if (isRecord(converted)) {
+    const bounded = ctx.converter.bundleWithin(converted, "output", refs, MAX_OUTPUT_SCHEMA_CHARS);
+    if (bounded === undefined) {
+      note("warning", "output_schema_too_large", `response schema is over ${MAX_OUTPUT_SCHEMA_CHARS / 1024} KB even with nested types left open; output left untyped`, schemaPointer);
+    } else if (bounded.openAt !== undefined) {
+      note("info", "output_schema_trimmed", `response schema is over ${MAX_OUTPUT_SCHEMA_CHARS / 1024} KB; types nested ${bounded.openAt} or more levels deep are left open`, schemaPointer);
+    }
+    output = bounded?.schema;
+  }
   if (output === undefined) penalties.add("noOutputSchema");
 
   let decode: "json" | "text" | "binary" | "auto";
@@ -439,6 +461,33 @@ export function splitPathKey(key: string): { template: string; fixedQuery?: Reco
   }
   if (fragment) result.fragment = fragment;
   return result;
+}
+
+const FORM_BODY_STYLES = new Set(["form", "spaceDelimited", "pipeDelimited", "deepObject"]);
+
+/**
+ * The non-default field encodings of a form body. Without them Stripe-style nested fields
+ * (`metadata[key]=v`) would go out as JSON text, which such APIs reject.
+ */
+function formEncoding(
+  mediaType: string,
+  encoding: Record<string, { style?: string | undefined; explode?: boolean | undefined }> | undefined,
+  note: (severity: Diagnostic["severity"], code: string, message: string, at?: string) => void,
+  pointer: string,
+): Record<string, BodyFieldEncoding> | undefined {
+  if (encoding === undefined || mediaType.split(";")[0]?.trim().toLowerCase() !== "application/x-www-form-urlencoded") return undefined;
+  const out: Record<string, BodyFieldEncoding> = {};
+  for (const [field, e] of Object.entries(encoding)) {
+    const style = e.style ?? "form";
+    if (!FORM_BODY_STYLES.has(style)) {
+      note("warning", "unsupported_body_encoding", `form field "${field}" uses style "${style}", which form bodies don't support; sent as form`, `${pointer}/${escapePointerToken(field)}`);
+      continue;
+    }
+    const explode = e.explode ?? style === "form";
+    if (style === "form" && explode) continue;
+    out[field] = { style: style as BodyFieldEncoding["style"], explode };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function pickRequestMediaType(types: string[]): string | undefined {

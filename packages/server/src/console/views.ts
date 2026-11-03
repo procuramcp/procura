@@ -1,7 +1,7 @@
 // The JSON shapes the console API returns for IR objects, typed by the shared
 // contract (@cairnmcp/console-api) that the web console also uses.
 import type { AuthSchemeView, OperationView } from "@cairnmcp/console-api";
-import type { AuthScheme, Operation } from "@cairnmcp/core";
+import { omitUndefined, suggestRead, type AuthScheme, type Operation } from "@cairnmcp/core";
 
 export function schemeView(scheme: AuthScheme): AuthSchemeView {
   return {
@@ -24,10 +24,17 @@ export function operationView(op: Operation): OperationView {
     path: op.mapping.pathTemplate,
     tags: op.tags,
     deprecated: op.deprecated,
-    sideEffect: op.sideEffect,
+    sideEffect: omitUndefined(op.sideEffect),
+    ...suggestedRead(op),
     inputs: Object.entries(props).map(([name, schema]) => ({ name, type: typeof schema.type === "string" ? schema.type : "any", description: schema.description ?? "", required: required.has(name) })),
     inputSchema: op.input,
   };
+}
+
+function suggestedRead(op: Operation): { suggestedRead?: string } {
+  const name = [op.provenance.originalId ?? "", op.id].join(" ");
+  const reason = suggestRead({ method: op.mapping.method, name, pathTemplate: op.mapping.pathTemplate, sideEffect: op.sideEffect });
+  return reason ? { suggestedRead: reason } : {};
 }
 
 /** Which tool a Zod issue path in a toolset edit points at, for error messages. */
