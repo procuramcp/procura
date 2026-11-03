@@ -49,6 +49,15 @@ const oneDocument = (b: { url?: string | undefined; document?: string | undefine
 const ONE_DOCUMENT = { message: "give either a URL or the document, not both" };
 export const SourceInput = SourceFields.refine(oneDocument, ONE_DOCUMENT);
 export const SourcePreviewInput = SourceFields.partial({ id: true }).refine(oneDocument, ONE_DOCUMENT);
+// Updating (D-048): neither url nor document means the source's own document URL, fetched again.
+const SourceUpdateFields = z.object({
+  url: z.string().max(2000).optional(),
+  document: z.string().max(MAX_DOCUMENT_FETCH_BYTES).optional(),
+  baseUrl: z.enum(["current", "document"]).default("current"),
+});
+const atMostOneDocument = (b: { url?: string | undefined; document?: string | undefined }) => !(b.url && b.document);
+export const SourceUpdateInput = SourceUpdateFields.refine(atMostOneDocument, ONE_DOCUMENT);
+export const SourceUpdateApply = SourceUpdateFields.extend({ digest: z.string().regex(/^[0-9a-f]{64}$/) }).refine(atMostOneDocument, ONE_DOCUMENT);
 
 /** Fails to compile unless the schema accepts the contract's body shape (the schema also checks limits). */
 type Accepts<Schema extends z.ZodType, _Body extends z.input<Schema>> = true;
@@ -66,4 +75,6 @@ export type BodiesMatchContract = [
   Accepts<typeof ToolTest, Contract.ToolTestInput>,
   Accepts<typeof SourceInput, Contract.SourceInput>,
   Accepts<typeof SourcePreviewInput, Contract.SourcePreviewInput>,
+  Accepts<typeof SourceUpdateInput, Contract.SourceUpdateInput>,
+  Accepts<typeof SourceUpdateApply, Contract.SourceUpdateApply>,
 ];

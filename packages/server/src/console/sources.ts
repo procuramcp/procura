@@ -1,14 +1,15 @@
 // Adding an API (D-035): find its description, preview, add it with a starter
-// toolset, view it, and set or remove its credentials.
-import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceView } from "@procura/console-api";
-import { countBySideEffect, curateSideEffect, defaultToolset, slugify, type TenantId } from "@procura/core";
-import { getSource, getToolset, listSourceIds, listToolsets, putSource, putToolset, setToolsetAccess, type TenantTx } from "@procura/db";
-import { json } from "@procura/http";
+// toolset, view it, and set or remove its credentials. Updating it to a new
+// version of its description, with a diff first (D-048).
+import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceUpdated, SourceUpdatePreview, SourceView } from "@procura/console-api";
+import { canonicalJson, countBySideEffect, curateSideEffect, defaultToolset, planSourceUpdate, slugify, type SourceUpdatePlan, type TenantId } from "@procura/core";
+import { getSource, getToolset, listProfiles, listSourceIds, listToolsets, putProfile, putSource, putToolset, setToolsetAccess, type TenantTx } from "@procura/db";
+import { json, sha256Hex } from "@procura/http";
 import { credentialKindsFor } from "@procura/vault";
 import { AdminError, mapSource, summarize, type MappedSource } from "../admin.ts";
 import { discoverDocument, FetchRefused } from "../fetch-document.ts";
-import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SideEffectEdit, SourceInput, SourcePreviewInput } from "./bodies.ts";
-import { asTeam, endpointUrl, teamResponse, type ApiRoute, type ConsoleContext } from "./context.ts";
+import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SideEffectEdit, SourceInput, SourcePreviewInput, SourceUpdateApply, SourceUpdateInput } from "./bodies.ts";
+import { asTeam, endpointUrl, teamResponse, type ApiRequest, type ApiRoute, type ConsoleContext } from "./context.ts";
 import { schemeView } from "./views.ts";
 
 export const sourceRoutes: ApiRoute[] = [
@@ -96,6 +97,59 @@ export const sourceRoutes: ApiRoute[] = [
     },
   },
   {
+    // What updating to the new document would change; nothing is stored (D-048).
+    method: "POST",
+    path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/update\/preview$/,
+    handle: async (api, [tenant, sourceId]) => {
+      const body = await readBody(api.request, SourceUpdateInput, MAX_DOCUMENT_BODY_BYTES);
+      if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+      const next = await nextVersion(api, tenant!, sourceId!, body.data);
+      if (next instanceof Response) return next;
+      return teamResponse(api, tenant!, "editor", async (tx, tenantId) => {
+        const planned = await planUpdate(tx, sourceId!, next.mapped, body.data.baseUrl);
+        if (planned instanceof Response) return planned;
+        const { plan, current, digest } = planned;
+        const stored = await api.ctx.vault.listCredentials(tenantId, sourceId!);
+        const unusedCredentials = plan.diff.authSchemes.removed.filter((id) => stored.some((c) => c.schemeId === id));
+        return json(200, {
+          documentUrl: next.doc.documentUrl ?? null,
+          via: next.doc.via,
+          digest,
+          operations: { before: countBySideEffect(current.operations), after: countBySideEffect(plan.ir.operations) },
+          diff: plan.diff,
+          effects: { ...plan.effects, unusedCredentials },
+          warnings: next.mapped.warnings.slice(0, 50),
+          warningCount: next.mapped.warnings.length,
+        } satisfies SourceUpdatePreview);
+      });
+    },
+  },
+  {
+    // Apply exactly what was previewed: the plan is made again and must match its digest.
+    method: "POST",
+    path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/update$/,
+    handle: async (api, [tenant, sourceId]) => {
+      const body = await readBody(api.request, SourceUpdateApply, MAX_DOCUMENT_BODY_BYTES);
+      if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+      const next = await nextVersion(api, tenant!, sourceId!, body.data);
+      if (next instanceof Response) return next;
+      return teamResponse(api, tenant!, "editor", async (tx) => {
+        const planned = await planUpdate(tx, sourceId!, next.mapped, body.data.baseUrl);
+        if (planned instanceof Response) return planned;
+        const { plan, digest } = planned;
+        if (digest !== body.data.digest) {
+          return json(409, { error: "changed", message: "the document, the source, or its toolsets changed since the preview; preview again" });
+        }
+        // In one transaction: the source and the toolsets and plans that depend on it. Each
+        // write bumps its version, so MCP endpoints pick up the new tools.
+        await putSource(tx, plan.ir);
+        for (const toolset of plan.toolsets) await putToolset(tx, toolset);
+        for (const profile of plan.profiles) await putProfile(tx, profile);
+        return json(200, { operations: countBySideEffect(plan.ir.operations), toolsets: plan.toolsets.length, profiles: plan.profiles.length } satisfies SourceUpdated);
+      });
+    },
+  },
+  {
     method: ["PUT", "DELETE"],
     path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/credentials\/([^/]+)$/,
     handle: async (api, [tenant, sourceId, schemeInput]) => {
@@ -125,6 +179,36 @@ export const sourceRoutes: ApiRoute[] = [
     },
   },
 ];
+
+/** Fetch and map the new version of a source's document. Fetching happens outside any transaction. */
+async function nextVersion(api: ApiRequest, tenant: string, sourceId: string, body: { url?: string | undefined; document?: string | undefined }): Promise<Response | { doc: LoadedDocument; mapped: MappedSource }> {
+  const documentUrl = await asTeam(api, tenant, "editor", async (tx) => {
+    const source = await getSource(tx, sourceId);
+    return source ? (source.ir.source.derivation.documentUrl ?? null) : undefined;
+  });
+  if (documentUrl instanceof Response) return documentUrl;
+  if (documentUrl === undefined) return json(404, { error: "not_found", message: `no source ${sourceId}` });
+  const input = body.url || body.document ? body : documentUrl ? { url: documentUrl } : undefined;
+  if (!input) return json(422, { error: "fetch_refused", message: "this source was added from pasted text: give a URL or the new document" });
+  try {
+    const doc = await loadDocument(api.ctx, input);
+    // The base URL is decided by the plan (current unless asked), so it isn't passed here.
+    return { doc, mapped: mapSource({ sourceId, openapi: doc.text, ...(doc.documentUrl ? { documentUrl: doc.documentUrl } : {}) }) };
+  } catch (e) {
+    return sourceProblem(e);
+  }
+}
+
+/** The update plan against what's stored now, and a digest of everything it depends on. */
+async function planUpdate(tx: TenantTx, sourceId: string, mapped: MappedSource, baseUrl: "current" | "document"): Promise<Response | { plan: SourceUpdatePlan; current: SourceUpdatePlan["ir"]; digest: string }> {
+  const source = await getSource(tx, sourceId);
+  if (!source) return json(404, { error: "not_found", message: `no source ${sourceId}` });
+  const toolsets = await listToolsets(tx);
+  const profiles = (await listProfiles(tx)).map(({ members: _, ...p }) => p);
+  const plan = planSourceUpdate({ current: source.ir, next: mapped.ir, toolsets, profiles, baseUrl });
+  const digest = sha256Hex(canonicalJson({ current: source.ir, next: plan.ir, toolsets: plan.toolsets, profiles: plan.profiles }));
+  return { plan, current: source.ir, digest };
+}
 
 async function sourceView(ctx: ConsoleContext, tx: TenantTx, tenantId: TenantId, sourceId: string): Promise<Response> {
   const source = await getSource(tx, sourceId);

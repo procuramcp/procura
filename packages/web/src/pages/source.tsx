@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, CheckCircle2Icon, KeyRoundIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, CheckCircle2Icon, KeyRoundIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
@@ -30,7 +30,7 @@ import { Problem } from "@/pages/shell";
 export function SourcePage() {
   const { tenantId = "", sourceId = "" } = useParams();
   const view = useLoad(() => api.source(tenantId, sourceId), [tenantId, sourceId]);
-  const { isAdmin } = useRole(tenantId);
+  const { isAdmin, canEdit } = useRole(tenantId);
   if (view.error) return <Problem message={view.error.message} />;
   if (!view.data) return <Skeleton className="h-96 w-full" />;
   const source = view.data;
@@ -42,7 +42,16 @@ export function SourcePage() {
         <Link to={`/t/${tenantId}`} className="flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground">
           <ArrowLeftIcon className="size-3.5" /> Back
         </Link>
-        <h1 className="font-heading font-semibold text-2xl">{source.name}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-heading font-semibold text-2xl">{source.name}</h1>
+          {canEdit && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/t/${tenantId}/sources/${sourceId}/update`}>
+                <RefreshCwIcon /> Update from a new version
+              </Link>
+            </Button>
+          )}
+        </div>
         <p className="font-mono text-muted-foreground text-xs">{source.baseUrl}</p>
         <div className="mt-1 flex flex-wrap gap-1.5">
           <Badge variant="secondary">{source.operations.total} operations</Badge>

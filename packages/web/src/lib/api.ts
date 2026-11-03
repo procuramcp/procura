@@ -27,6 +27,10 @@ import type {
   SourceInput,
   SourcePreview,
   SourcePreviewInput,
+  SourceUpdateApply,
+  SourceUpdated,
+  SourceUpdateInput,
+  SourceUpdatePreview,
   SourceView,
   TenantView,
   TestResult,
@@ -88,6 +92,10 @@ export const api = {
   previewSource: (tenantId: string, input: SourcePreviewInput) => call<SourcePreview>("POST", `/tenants/${t(tenantId)}/sources/preview`, input),
   createSource: (tenantId: string, input: SourceInput) => call<CreatedSource>("POST", `/tenants/${t(tenantId)}/sources`, input),
   source: (tenantId: string, sourceId: string) => call<SourceView>("GET", `/tenants/${t(tenantId)}/sources/${t(sourceId)}`),
+  previewSourceUpdate: (tenantId: string, sourceId: string, input: SourceUpdateInput) =>
+    call<SourceUpdatePreview>("POST", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/update/preview`, input),
+  applySourceUpdate: (tenantId: string, sourceId: string, input: SourceUpdateApply) =>
+    call<SourceUpdated>("POST", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/update`, input),
   setCredential: (tenantId: string, sourceId: string, schemeId: string, credential: CredentialInput) =>
     call<SourceView>("PUT", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/credentials/${t(schemeId)}`, { credential } satisfies CredentialBody),
   removeCredential: (tenantId: string, sourceId: string, schemeId: string) =>

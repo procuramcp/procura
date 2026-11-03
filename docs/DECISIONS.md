@@ -680,7 +680,7 @@ planning handoff are not repeated here unless implementation added something.
 - **Shared with the CLI:** `mapSource` (ingest plus curation) is used by both `admin.sh source add`
   and the console, so they can't drift.
 - **Not yet:** replacing an existing source with a new version (a 409 for now). That needs a diff
-  of operations and a check of the toolsets and profiles that use removed ones, which is phase 2.
+  of operations and a check of the toolsets and profiles that use removed ones, which is phase 2. (Done in D-048.)
 - **Benchmark:** the Intervals.icu Swagger UI page
   (`https://intervals.icu/api/v1/docs/swagger-ui/index.html`) leads to `/api/v1/docs` in three
   fetches; the preview shows 153 operations, two auth schemes, and `API_KEY` pre-filled.
@@ -1015,4 +1015,44 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
 - **Rejected:** renaming the schema and roles with a migration (role renames need privileges the
   owner may not have, and plpgsql bodies would need rewriting), and rewriting earlier decisions
   (they are a record of what was decided at the time).
+
+## D-048 Updating a source: a diff first, then apply exactly what was previewed
+
+- **Context:** APIs change; an editor needs to bring a source up to date without breaking the
+  toolsets built on it (P-4). Storing a fresh ingest alone would make any toolset with an
+  enabled tool for a removed operation, or a pin on a removed input, fail closed (D-015), lose
+  people's classifications (D-043), and drop curated fixed usernames.
+- **Decision:** `planSourceUpdate` (core, pure) compares the stored version with a fresh ingest
+  of the new document and returns the new version plus the toolsets and plans to store:
+  - **Matching:** operations pair by id, then leftovers by method and path when exactly one
+    old and one new share them (a rename). Tools and plan rules follow a rename.
+  - **Carried over:** people's classifications (dropped when the new version agrees, reported
+    when ingest's own class changed), basic-auth fixed usernames, and the current base URL. A
+    different base URL in the document is shown and kept unless the person picks the
+    document's: it changes where every request goes.
+  - **Toolsets keep working:** tools for removed operations are dropped. An enabled tool whose
+    pinned input is gone is turned off with its pins kept, never unpinned: if the input was
+    renamed, dropping the pin would hand agents a value the toolset kept from them. Titles and
+    descriptions nobody edited follow the API; edited ones stay. New operations appear off,
+    as in any toolset (the editor lists every operation).
+  - **Flagged before applying:** enabled tools that are removed or turned off, enabled tools
+    whose class changes (that changes who may call them, D-023), plans listing removed
+    operations (dropped from the rule; a rule left with none is removed), stored keys for
+    auth schemes that are gone (kept, unused), and new auth schemes.
+- **Preview, then apply:** `POST …/sources/:id/update/preview` stores nothing and returns the diff,
+  the effects, and a digest of everything the plan depends on. `POST …/update` makes the plan
+  again in the write transaction and refuses (409) if the digest differs, so what's applied is
+  what was reviewed, even if the document or a toolset changed in between. The source, its
+  toolsets, and its plans are written in one transaction; each write bumps its version, so MCP
+  endpoints serve the new tools on their next request.
+- **Where the document comes from:** by default the source's own document URL, fetched again
+  with D-035's checks; or another URL, pasted text, or a file. Editors may update, as they may
+  add sources (D-038).
+- **Stored JSON compares by value:** `jsonb` reorders keys, so comparisons use `sameJson` and the
+  digest `canonicalJson`; otherwise every stored operation would look changed.
+- **Not yet:** `admin source update` in the CLI; keeping each version for rollback (re-applying
+  the old document works); a scheduled check that says when the document has changed.
+- **Benchmark:** the dev console's Intervals.icu fixture against the live document: 6 new, 1
+  removed, 34 changed (mostly new response fields), 113 unchanged; the 8-tool starter toolset
+  kept all its tools and pins.
 

@@ -41,6 +41,10 @@ const router = createBrowserRouter(
           path: "t/:tenantId/sources/:sourceId",
           lazy: async () => ({ Component: (await import("@/pages/source")).SourcePage }),
         },
+        {
+          path: "t/:tenantId/sources/:sourceId/update",
+          lazy: async () => ({ Component: (await import("@/pages/update-source")).UpdateSourcePage }),
+        },
       ],
     },
   ],
