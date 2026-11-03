@@ -184,6 +184,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
         ["PUT", `/members/${carol}`, { status: "suspended" }],
         ["POST", "/sources/preview", { document: OPENAPI }],
         ["PUT", "/sources/intervals-icu/credentials/APIKey", { credential: { kind: "basic", password: "x" } }],
+        ["PUT", "/sources/intervals-icu/side-effects", { changes: [{ operationId: "list_activities", class: "write" }] }],
       ];
       for (const [method, path, body] of writes) {
         expect((await vic_.json(method, `${API}/tenants/alpha${path}`, body)).status, `${method} ${path}`).toBe(403);
@@ -451,6 +452,49 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       const removed = (await (await browser.json("DELETE", url)).json()) as { authSchemes: Array<{ stored: unknown[] }> };
       expect(removed.authSchemes[0]?.stored).toEqual([]);
       expect((await browser.json("PUT", `${API}/tenants/alpha/sources/intervals-live/credentials/Nope`, { credential: { kind: "basic", password: "x" } })).status).toBe(404);
+    });
+
+    it("lets a person mark POST lookups as reads, for every toolset from the source (D-043)", async () => {
+      const rpc = JSON.stringify({
+        openapi: "3.0.3",
+        info: { title: "RPC API", version: "1" },
+        servers: [{ url: "https://rpc.test" }],
+        paths: Object.fromEntries(
+          ["/accounts/get", "/accounts/create", "/transactions/list"].map((path) => [path, { post: { responses: { "200": { description: "ok" } } } }]),
+        ),
+      });
+      const ed_ = await signIn({ sub: "ed", email: "ed@example.com" });
+      expect((await ed_.json("POST", `${API}/tenants/alpha/sources`, { id: "rpc", document: rpc, toolset: { id: "rpc-one", name: "RPC" } })).status).toBe(201);
+      type Ops = { operations: Array<{ id: string; path: string; sideEffect: { class: string; basis: string; automatic?: { class: string } }; suggestedRead?: string }> };
+      const ops = async (toolset: string) => ((await (await ed_.json("GET", `${API}/tenants/alpha/toolsets/${toolset}`)).json()) as Ops).operations;
+      const byPath = (list: Ops["operations"], path: string) => list.find((o) => o.path === path)!;
+
+      const before = await ops("rpc-one");
+      expect(before.filter((o) => o.suggestedRead).map((o) => o.path).sort()).toEqual(["/accounts/get", "/transactions/list"]);
+      expect(byPath(before, "/accounts/get").sideEffect.class).toBe("write");
+
+      const url = `${API}/tenants/alpha/sources/rpc/side-effects`;
+      const changes = [{ operationId: byPath(before, "/accounts/get").id, class: "read" }, { operationId: byPath(before, "/transactions/list").id, class: "read" }];
+      const marked = await ed_.json("PUT", url, { changes });
+      expect([marked.status, await marked.json()]).toEqual([200, { changed: 2, operations: { total: 3, read: 2, write: 1, destructive: 0 } }]);
+      const after = byPath(await ops("rpc-one"), "/accounts/get");
+      expect(after).toMatchObject({ sideEffect: { class: "read", basis: "curated", automatic: { class: "write" } } });
+      expect(after.suggestedRead).toBeUndefined();
+
+      // A new toolset from the source starts with them on, like any read.
+      expect((await ed_.json("POST", `${API}/tenants/alpha/toolsets`, { id: "rpc-two", sourceId: "rpc", name: "Two" })).status).toBe(201);
+      const two = (await (await ed_.json("GET", `${API}/tenants/alpha/toolsets/rpc-two`)).json()) as { toolset: { tools: Array<{ operationId: string; enabled: boolean }> } };
+      expect(two.toolset.tools.filter((t) => t.enabled).map((t) => t.operationId).sort()).toEqual(changes.map((c) => c.operationId).sort());
+
+      // Back to what ingest said; doing it twice changes nothing.
+      const restore = { changes: [{ operationId: changes[0]!.operationId, class: "automatic" }] };
+      expect(await (await ed_.json("PUT", url, restore)).json()).toMatchObject({ changed: 1, operations: { read: 1, write: 2 } });
+      expect(await (await ed_.json("PUT", url, restore)).json()).toMatchObject({ changed: 0 });
+      expect(byPath(await ops("rpc-one"), "/accounts/get").sideEffect).toEqual({ class: "write", basis: "http_method", reason: "default for POST" });
+
+      expect((await ed_.json("PUT", url, { changes: [{ operationId: "nope", class: "read" }] })).status).toBe(422);
+      expect((await ed_.json("PUT", `${API}/tenants/alpha/sources/missing/side-effects`, { changes })).status).toBe(404);
+      expect((await ed_.json("PUT", url, { changes: [] })).status).toBe(400);
     });
 
     it("is for editors only, and caps the body size", async () => {

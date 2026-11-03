@@ -22,6 +22,8 @@ import type {
   Removed,
   Role,
   RoleEdit,
+  SideEffectEdit,
+  SideEffectsUpdated,
   SourceInput,
   SourcePreview,
   SourcePreviewInput,
@@ -90,6 +92,8 @@ export const api = {
     call<SourceView>("PUT", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/credentials/${t(schemeId)}`, { credential } satisfies CredentialBody),
   removeCredential: (tenantId: string, sourceId: string, schemeId: string) =>
     call<SourceView>("DELETE", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/credentials/${t(schemeId)}`),
+  setSideEffects: (tenantId: string, sourceId: string, changes: SideEffectEdit["changes"]) =>
+    call<SideEffectsUpdated>("PUT", `/tenants/${t(tenantId)}/sources/${t(sourceId)}/side-effects`, { changes } satisfies SideEffectEdit),
   testTool: (tenantId: string, toolsetId: string, tool: ToolBinding, args: Record<string, JsonValue>, confirm = false) =>
     call<TestResult>("POST", `/tenants/${t(tenantId)}/toolsets/${t(toolsetId)}/test`, { tool, args, confirm } satisfies ToolTestInput),
 };

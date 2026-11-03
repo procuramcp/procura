@@ -58,7 +58,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | `toolsets.ts` | `GET`/`PUT /tenants/:t/toolsets/:id`, `PUT …/access`, `POST …/test` |
 | `access.ts` | `GET /tenants/:t/access` (profiles, team, customer count), `PUT`/`DELETE …/profiles/:id` |
 | `people.ts` | `GET …/customers` (search, paging), `PUT …/members/:user/role`, `PUT`/`DELETE …/members/:user` (suspend, note, remove), `PUT …/members/:user/profiles` |
-| `sources.ts` | `POST …/sources/preview`, `POST …/sources`, `GET …/sources/:id`, `PUT`/`DELETE …/credentials/:scheme` |
+| `sources.ts` | `POST …/sources/preview`, `POST …/sources`, `GET …/sources/:id`, `PUT …/side-effects` (a person's classifications), `PUT`/`DELETE …/credentials/:scheme` |
 | `sign-in.ts` | Browser sign-in through OIDC, session cookies, `purgeExpiredConsoleState` |
 | `bodies.ts` | Zod schemas for request bodies, `readBody`, `issuesText`, size limits; `BodiesMatchContract` checks them against the contract |
 | `views.ts` | Operations and auth schemes as contract types (`OperationView`, `AuthSchemeView`) |
@@ -73,6 +73,7 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
 | Slug from text, cut text | `slugify`, `truncate` (core) |
 | `Date` → `Instant` | `instantOf` (core); never format ISO strings by hand |
 | Count read/write/destructive | `countBySideEffect` (core) |
+| A person's classification; POSTs that look like reads | `curateSideEffect`, `suggestRead` (core `side-effect.ts`) |
 | Can this level call this tool? | `canCall`, `allowsTool`, `highestLevel` (core `access.ts`) |
 | A call's plan limits (most generous rule) | `callLimits`, `PlanLimits` (core `access.ts`) |
 | Count a call against allowances, refund it, show usage | `takeAllowance`, `refundAllowance`, `usageFor`, `usagePeriods` (db); the MCP side is `withinLimits` (mcp `limits.ts`) |
@@ -156,5 +157,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-042, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-043, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{oracle,auth0}`.

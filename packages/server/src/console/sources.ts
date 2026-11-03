@@ -1,13 +1,13 @@
 // Adding an API (D-035): find its description, preview, add it with a starter
 // toolset, view it, and set or remove its credentials.
-import type { CreatedSource, SourcePreview, SourceView } from "@cairnmcp/console-api";
-import { countBySideEffect, defaultToolset, slugify, type TenantId } from "@cairnmcp/core";
+import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceView } from "@cairnmcp/console-api";
+import { countBySideEffect, curateSideEffect, defaultToolset, slugify, type TenantId } from "@cairnmcp/core";
 import { getSource, getToolset, listSourceIds, listToolsets, putSource, putToolset, setToolsetAccess, type TenantTx } from "@cairnmcp/db";
 import { json } from "@cairnmcp/http";
 import { credentialKindsFor } from "@cairnmcp/vault";
 import { AdminError, mapSource, summarize, type MappedSource } from "../admin.ts";
 import { discoverDocument, FetchRefused } from "../fetch-document.ts";
-import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SourceInput, SourcePreviewInput } from "./bodies.ts";
+import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SideEffectEdit, SourceInput, SourcePreviewInput } from "./bodies.ts";
 import { asTeam, endpointUrl, teamResponse, type ApiRoute, type ConsoleContext } from "./context.ts";
 import { schemeView } from "./views.ts";
 
@@ -65,6 +65,35 @@ export const sourceRoutes: ApiRoute[] = [
     method: "GET",
     path: /^\/tenants\/([^/]+)\/sources\/([^/]+)$/,
     handle: (api, [tenant, sourceId]) => teamResponse(api, tenant!, "viewer", (tx, tenantId) => sourceView(api.ctx, tx, tenantId, sourceId!)),
+  },
+  {
+    // A person's classification, for every toolset from the source (D-043). Editors already
+    // decide who may call writes (profiles, D-038), so they may also say what is a write.
+    method: "PUT",
+    path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/side-effects$/,
+    handle: async (api, [tenant, sourceId]) => {
+      const body = await readBody(api.request, SideEffectEdit);
+      if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+      return teamResponse(api, tenant!, "editor", async (tx) => {
+        const source = await getSource(tx, sourceId!);
+        if (!source) return json(404, { error: "not_found", message: `no source ${sourceId}` });
+        const changes = new Map(body.data.changes.map((c) => [c.operationId as string, c]));
+        const unknown = [...changes.keys()].filter((id) => !source.ir.operations.some((op) => op.id === id));
+        if (unknown.length > 0) return json(422, { error: "unknown_operation", message: `no operation ${unknown.slice(0, 5).join(", ")} in ${sourceId}` });
+        let changed = 0;
+        const operations = source.ir.operations.map((op) => {
+          const change = changes.get(op.id);
+          if (!change) return op;
+          const sideEffect = curateSideEffect(op.sideEffect, change.class, change.reason);
+          if (JSON.stringify(sideEffect) === JSON.stringify(op.sideEffect)) return op;
+          changed++;
+          return { ...op, sideEffect };
+        });
+        // putSource bumps the source's version, so MCP endpoints pick the change up.
+        if (changed > 0) await putSource(tx, { ...source.ir, operations });
+        return json(200, { changed, operations: countBySideEffect(operations) } satisfies SideEffectsUpdated);
+      });
+    },
   },
   {
     method: ["PUT", "DELETE"],

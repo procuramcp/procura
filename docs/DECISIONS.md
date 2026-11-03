@@ -881,9 +881,7 @@ Kubernetes) through ingest (D-041).
 - **Found, not fixed yet:**
   - **RPC-style APIs look like all writes.** Plaid has 345 POST operations, about 154 of them reads
     (`/accounts/get`, `…/list`). Classification by method only escalates (D-005), so a default
-    toolset offers 5 tools out of 351. The fix belongs in the console: lowering a
-    classification (P-3), with suggestions for POST operations that look like reads, which a
-    person accepts.
+    toolset offers 5 tools out of 351. Fixed by D-043.
   - **Multi-file descriptions.** DigitalOcean's description splits into 873 files; every
     operation fails with `external_ref`. Bundling relative refs when the document comes from a
     URL would cover it, with the same fetch limits as the document itself.
@@ -891,3 +889,34 @@ Kubernetes) through ingest (D-041).
     address; ingest refuses it without a base URL. The console should ask for one.
 - **Corpus:** Stripe is added (MIT, about 8 MB). The others stay out to limit repository size;
   each goes in with its fix.
+
+## D-043 People classify operations; POST lookups are suggested as reads
+
+- **Context:** RPC-style APIs use POST to look things up. Plaid has 345 POSTs out of 351
+  operations, about 157 of them reads (`/accounts/get`, `/transactions/list`). Ingest
+  classifies by method and only escalates (D-005), so all of them were writes: off in a new
+  toolset, and callable only with `use_writes`. The IR already allowed a `curated` class below
+  the method default; nothing set one.
+- **Decision:** a person sets an operation's class in the toolset editor (read, write,
+  destructive, or back to automatic). It's stored on the source's operation, with
+  `basis: "curated"` and ingest's classification kept as `automatic`, so it applies to every
+  toolset from the source, to access checks, MCP hints, counts, and new default toolsets alike,
+  and can be undone. Setting the automatic class again restores it, so `curated` always means a
+  person disagreed with ingest. `PUT /tenants/:t/sources/:id/side-effects` takes up to 2,000
+  changes at once; editors may use it, since they already decide who may call writes (D-038).
+- **Suggestions, never automatic:** `suggestRead` flags a POST whose class is just the method
+  default, whose path ends in (or name starts with) a lookup verb (get, list, search, query,
+  find, lookup, fetch, retrieve, read, describe), and with no change word anywhere in it. The
+  editor shows them as one banner; the person reviews the list, unticks any that change data,
+  and confirms, optionally turning them on in the toolset. Heuristics still only escalate on
+  their own (D-005).
+- **How well it guesses:** Plaid 157 of 345 POSTs; GitHub 2 (`…/attestations/bulk-list`), OpenAI 1
+  (vector store search), Box 1 (`/metadata_queries/execute_read`), all reads; none in Stripe,
+  Discord, Twilio, Adyen, or Intervals.icu. A name's last word is often a noun, so only its first
+  word counts (Stripe's `PostRadarValueListsValueList` updates a list).
+- **Source updates must keep these.** Re-ingesting replaces operations, so the source-update work
+  (milestone 3) carries curated classifications over to operations that still exist, and shows
+  any whose automatic class changed.
+- **Rejected:** lowering by heuristic at ingest (D-005); a per-toolset override (the class is a
+  fact about the API, and access rules across toolsets would disagree); an LLM classifier
+  (non-deterministic, and still needs a person to confirm).

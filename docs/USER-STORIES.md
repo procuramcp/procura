@@ -28,7 +28,7 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 | --- | --- | --- | --- |
 | P-1 | As a provider, I add my API from its OpenAPI document (URL, Swagger UI page, paste, or file). | Preview shows operations and auth schemes before saving (D-035). | built |
 | P-2 | I choose which operations become tools and how they're named and described. | Toolset editor: enable, rename, describe, pin inputs; reads on by default (D-016). | built |
-| P-3 | I see which tools write or delete, and can correct a classification. | Side effects shown on every tool; heuristics only escalate, a person may lower one (D-005). | partial: shown, not yet editable in the console |
+| P-3 | I see which tools write or delete, and can correct a classification. | Side effects shown on every tool; heuristics only escalate, a person may lower one (D-005). | built: set per operation in the toolset editor, with suggested reads for POST lookups (D-043) |
 | P-4 | When my API changes, I update the source and see what changed before it reaches customers. | Diff of added, removed, and changed operations; toolsets and plans that use removed ones are flagged. | — |
 | P-5 | I edit a toolset without changing what customers see until I publish it. | Draft and published versions; publish is one action and can be rolled back. | — |
 | P-6 | My server runs on my domain, with my name and logo on sign-in and consent. | Custom domain with TLS; branded sign-in, consent, and server name and instructions. | — |
