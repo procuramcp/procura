@@ -106,8 +106,15 @@ export class OidcIdentityProvider implements IdentityProvider {
 
   #configuration(): Promise<oidc.Configuration> {
     // Discovery runs once and is cached; a failure is retried on the next sign-in.
+    // Plain http reaches here only for a localhost issuer (the server's config refuses
+    // others), such as the self-host compose setup's local Dex; openid-client needs leave for it.
+    const issuer = new URL(this.#config.issuer);
+    const options: oidc.DiscoveryRequestOptions = {
+      ...(this.#fetch ? { [oidc.customFetch]: this.#fetch } : {}),
+      ...(issuer.protocol === "http:" ? { execute: [oidc.allowInsecureRequests] } : {}),
+    };
     this.#discovered ??= oidc
-      .discovery(new URL(this.#config.issuer), this.#config.clientId, this.#config.clientSecret, undefined, this.#fetch ? { [oidc.customFetch]: this.#fetch } : {})
+      .discovery(issuer, this.#config.clientId, this.#config.clientSecret, undefined, options)
       .then((config) => {
         if (this.#fetch) config[oidc.customFetch] = this.#fetch;
         return config;

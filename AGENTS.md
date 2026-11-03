@@ -46,8 +46,12 @@ a superuser URL; each test file creates and drops its own database. A local Post
 | `web` | The console UI (React, shadcn/ui), built to static files served at `/app`. | `src/lib/api.ts` (every API call; types from `console-api`), `src/lib/act.ts`, `src/lib/hooks.ts`, `src/pages/*` |
 | `eval` | Ingest eval over a corpus of public API descriptions; large ones are downloaded on demand, pinned by hash (D-017). | `src/ingest-eval.ts`, `src/fetch.ts`, `corpus/manifest.json` |
 
-`examples/intervals-icu` calls a real API through the whole pipeline. `deploy/` holds the Oracle
-VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
+`examples/intervals-icu` calls a real API through the whole pipeline. `deploy/` holds the
+self-host setup (`deploy/self-host`: Compose with Postgres, a migration step, Dex, Caddy; what
+users run with the published image, D-046), the Oracle VM (Docker Compose + Caddy), and Auth0
+(Terraform, not OpenTofu). `scripts/image-smoke.sh` and `scripts/compose-smoke.sh` are CI's
+checks of the image and of the self-host setup; run them locally after changing either
+(`docker build -t cairnmcp:dev . && scripts/compose-smoke.sh cairnmcp:dev`).
 
 ### The console (`packages/server/src/console/`)
 
@@ -130,6 +134,8 @@ VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
   test that runs against the real database (`describe.skipIf(!adminUrl)`).
 - **Comments** say why, briefly; cite decisions as `D-0xx`. A new decision gets an entry in
   `docs/DECISIONS.md`.
+- **A new setting** goes in `server/src/config.ts` (validated at startup), both `.env.example`
+  files (root for development, `deploy/self-host/` for Docker), and `deploy/self-host/compose.yaml`.
 - **Never commit** `.env*`, `*.tfstate`, `*.tfvars`, or real API data. Fixtures are synthetic or public.
 
 ## Recipes
@@ -158,5 +164,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-045, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
-and `deploy/{oracle,auth0}`.
+`docs/DECISIONS.md` (D-001…D-046, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+and `deploy/{self-host,oracle,auth0}`.

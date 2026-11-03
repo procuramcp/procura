@@ -971,4 +971,20 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
   open licence stays open; later versions can change.
 - **Not claimed:** that cairnmcp's tools make agents succeed more often than others'. It's
   tested by one person; D-041's quality work is about finding where it breaks, not a market edge.
-- **Rejected for now:** choosing a licence before anyone outside has run it.
+- **Rejected for now:** choosing a licence before anyone outside has run it. (Superseded by
+  D-046: AGPL-3.0.)
+
+## D-046 Licence: AGPL-3.0, and a public image
+
+- **Context:** D-045 left the licence open. Self-hosting needs a published image, and the image
+  carries the full TypeScript source (no build step, D-009), so publishing it is publishing the
+  code: the licence has to be chosen first.
+- **Decision:** AGPL-3.0-only (`LICENSE`), the licence Speakeasy's Gram uses. Anyone may run,
+  change, and host cairnmcp; a hosted copy must offer its changed source to its users. The image
+  is public on GitHub Container Registry (`ghcr.io/cairnmcp/cairnmcp`).
+- **"-only", not "-or-later":** a future GNU licence doesn't apply without our choosing it.
+- **Still possible later:** a later version under another licence (D-045); what was released
+  under AGPL stays AGPL. Taking outside contributions would need a contributor agreement first
+  if we want to keep that option, so none are taken until that's decided.
+- **Rejected:** a private image (self-hosters would need an invitation to pull), and
+  source-available licences (BSL, FSL), which make a hosted copy depend on our permission.

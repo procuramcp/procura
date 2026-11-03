@@ -7,10 +7,12 @@ import { loadConfig } from "./config.ts";
 import { serve } from "./node-http.ts";
 
 const provider = { id: "google", name: "Google", issuer: "https://accounts.google.com", clientId: "id", clientSecret: "shh-not-real" };
+// 32 bytes of zeros, base64: shaped like a real key, used for nothing.
+const KEY = Buffer.alloc(32).toString("base64");
 const env = {
   CAIRNMCP_PUBLIC_URL: "https://cairn.example.com/",
   CAIRNMCP_DATABASE_URL: "postgres://app@db/cairnmcp",
-  CAIRNMCP_MASTER_KEY: "c2VjcmV0",
+  CAIRNMCP_MASTER_KEY: KEY,
   CAIRNMCP_OIDC_PROVIDERS: JSON.stringify([provider]),
   CAIRNMCP_TRUSTED_ISSUERS: JSON.stringify([{ issuer: "https://auth.example.com", jwksUri: "https://auth.example.com/jwks" }]),
 };
@@ -32,6 +34,21 @@ describe("loadConfig", () => {
     const run = () => loadConfig({ CAIRNMCP_PUBLIC_URL: "http://cairn.example.com", CAIRNMCP_MASTER_KEY: "c2VjcmV0", CAIRNMCP_OIDC_PROVIDERS: "[" });
     expect(run).toThrow(/CAIRNMCP_PUBLIC_URL: must be https[\s\S]*CAIRNMCP_DATABASE_URL[\s\S]*CAIRNMCP_OIDC_PROVIDERS: must be JSON/);
     expect(run).not.toThrow(/c2VjcmV0/);
+  });
+
+  it("says which required settings are missing, and counts empty values as unset", () => {
+    expect(() => loadConfig({})).toThrow(/CAIRNMCP_PUBLIC_URL: required, but not set[\s\S]*CAIRNMCP_DATABASE_URL: required[\s\S]*CAIRNMCP_MASTER_KEY: required[\s\S]*CAIRNMCP_OIDC_PROVIDERS: required/);
+    // As in .env.example, which lists optional settings with no value.
+    const config = loadConfig({ ...env, CAIRNMCP_TRUSTED_ISSUERS: "", CAIRNMCP_ALLOWED_ORIGINS: "", PORT: "" });
+    expect(config).toMatchObject({ trustedIssuers: [], allowedOrigins: [], port: 8080 });
+    expect(() => loadConfig({ ...env, CAIRNMCP_MASTER_KEY: " " })).toThrow(/CAIRNMCP_MASTER_KEY: required/);
+  });
+
+  it("checks the master key's shape at startup, without echoing it", () => {
+    const short = Buffer.from("not-32-bytes").toString("base64");
+    expect(() => loadConfig({ ...env, CAIRNMCP_MASTER_KEY: short })).toThrow(/CAIRNMCP_MASTER_KEY: must decode to 32 bytes/);
+    expect(() => loadConfig({ ...env, CAIRNMCP_MASTER_KEY: short })).not.toThrow(new RegExp(short.replace(/[+/=]/g, ".")));
+    expect(() => loadConfig({ ...env, CAIRNMCP_MASTER_KEY: "not base64!" })).toThrow(/must be base64/);
   });
 
   it("requires a sign-in provider; other trusted issuers are optional", () => {
