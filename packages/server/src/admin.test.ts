@@ -100,6 +100,8 @@ describe.skipIf(!adminUrl)("admin commands (Postgres)", () => {
     const exec = (args: string[], input?: string) => {
       const env = { ...process.env, PROCURA_DATABASE_URL: scratch.appUrl, PROCURA_MASTER_KEY: masterKey, PROCURA_PUBLIC_URL: BASE };
       const child = run(process.execPath, [cli, ...args], { env });
+      // A command that exits on bad arguments doesn't read stdin: ignore the closed pipe.
+      child.child.stdin!.on("error", () => {});
       if (input !== undefined) child.child.stdin!.end(input);
       else child.child.stdin!.end();
       return child.then(

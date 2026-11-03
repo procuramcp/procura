@@ -1,5 +1,6 @@
 // The lightweight repo queries: they must agree with what the full IR says.
 import { AccessProfile, countBySideEffect, defaultToolset, type TenantId, type UserId } from "@procura/core";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import { PG, pgErrorCode } from "./errors.ts";
@@ -7,6 +8,7 @@ import {
   countOwners,
   ensureMember,
   getMember,
+  getSource,
   getToolsetWithSource,
   listCustomers,
   listTeam,
@@ -51,6 +53,21 @@ describe.skipIf(!adminUrl)("repo queries", () => {
   afterAll(async () => {
     await db?.close();
     await scratch?.drop();
+  });
+
+  it("survives the server ending its idle connections, and reconnects", async () => {
+    await db.withTenant(tenantId, (tx) => getSource(tx, "intervals-icu")); // at least one idle connection in the pool
+    const admin = new pg.Client({ connectionString: adminUrl });
+    await admin.connect();
+    try {
+      // What a Postgres restart or a suspended Neon compute does to idle connections.
+      const { rowCount } = await admin.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()", [new URL(scratch.appUrl).pathname.slice(1)]);
+      expect(rowCount).toBeGreaterThan(0);
+    } finally {
+      await admin.end();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100)); // let the pool see the closed sockets
+    expect((await db.withTenant(tenantId, (tx) => getSource(tx, "intervals-icu")))?.id).toBe("intervals-icu");
   });
 
   it("summarizes sources and their side effects in SQL, matching the IR", async () => {

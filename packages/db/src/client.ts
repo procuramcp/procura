@@ -37,6 +37,10 @@ export class Database {
    */
   static async connect(options: DatabaseOptions): Promise<Database> {
     const pool = new pg.Pool({ connectionString: options.url, max: options.max ?? 10 });
+    // When the server ends an idle connection (a restart, a suspended Neon compute, a dropped
+    // test database), the pool drops it and reports here; with no listener, that error would
+    // end the process. The next query opens a new connection.
+    pool.on("error", (e: Error & { code?: string }) => console.warn(`postgres: an idle connection was closed (${e.code ?? e.message})`));
     try {
       await assertAppRole(pool);
     } catch (e) {
