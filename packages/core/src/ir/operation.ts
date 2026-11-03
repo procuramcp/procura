@@ -47,10 +47,23 @@ export const ParameterBinding = z.object({
 });
 export type ParameterBinding = z.infer<typeof ParameterBinding>;
 
+/** How one field of a form body is serialized, when not the default (`form`, exploded). */
+export const BodyFieldEncoding = z.object({
+  style: z.enum(["form", "spaceDelimited", "pipeDelimited", "deepObject"]),
+  explode: z.boolean(),
+});
+export type BodyFieldEncoding = z.infer<typeof BodyFieldEncoding>;
+
 /** Maps one property of the tool input to the request body. */
 export const BodyBinding = z.object({
   property: z.string().min(1),
   mediaType: z.string().min(1),
+  /**
+   * Per-field serialization of an `application/x-www-form-urlencoded` body, keyed by field
+   * name (OpenAPI `encoding`). `deepObject` fields nest with brackets: `metadata[key]=v`,
+   * `items[0][price]=p` (Stripe's convention; OpenAPI leaves deeper nesting undefined).
+   */
+  encoding: z.record(z.string().min(1), BodyFieldEncoding).optional(),
 });
 export type BodyBinding = z.infer<typeof BodyBinding>;
 

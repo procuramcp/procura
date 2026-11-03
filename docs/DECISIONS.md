@@ -21,7 +21,8 @@ planning handoff are not repeated here unless implementation added something.
 - **Why:** The runtime and MCP layers can use an operation without the source document. Recursive
   types work without inlining.
 - **Cost:** Shared components are repeated per operation. The Intervals.icu IR is ~0.9 MB as
-  compact JSON (148 operations). Fine in Postgres `jsonb`.
+  compact JSON (148 operations). Fine in Postgres `jsonb`. Not fine for Stripe, whose responses
+  reference most of the API: output schemas are now bounded (D-042).
 - **Rejected:** A shared schema registry on `Source` (smaller, but every consumer must resolve
   refs across objects); full inlining (breaks on recursion, much larger).
 
@@ -150,7 +151,7 @@ planning handoff are not repeated here unless implementation added something.
 - **Decision:** `packages/eval/corpus/manifest.json` pins a vendored corpus by URL, license,
   SHA-256, and retrieval date. `pnpm eval:ingest` runs offline and writes a deterministic report
   to `docs/eval/`; `pnpm --filter @cairnmcp/eval corpus:fetch` refreshes it.
-- **Corpus choice:** 13 documents, chosen for variety over volume: OpenAPI 3.0 and 3.1, JSON and
+- **Corpus choice:** 13 documents (14 since Stripe, D-042), chosen for variety over volume: OpenAPI 3.0 and 3.1, JSON and
   YAML, hand-written and generated (no single generator for more than two entries), small
   reference examples to large real APIs (OpenAI, Box, Discord, Twilio), a 3.1 document with only
   webhooks, and one tiny Swagger 2.0 document to check rejection. Only redistributable licenses
@@ -850,3 +851,43 @@ planning handoff are not repeated here unless implementation added something.
   moves up if we decide to release. No dependency or design that only works on our deployment.
 - **Rejected:** setting tiers and prices now (no users to ask, D-040's open questions); dropping
   allowances with billing (they protect upstream quotas whether or not anyone pays).
+
+## D-042 Real-world edge cases: bounded output schemas, form field encodings
+
+Found by running large public descriptions (Stripe, GitHub, Plaid, DigitalOcean, Adyen,
+Kubernetes) through ingest (D-041).
+
+- **Output schemas are bounded at 64 KB.** Stripe's responses are expandable objects that
+  reference most of the API, so a self-contained output schema (D-002) was about 1 MB per
+  operation: 363 MB of IR, 48 s and 2.1 GB of memory to ingest. That is over Postgres's 255 MB
+  limit for one `jsonb` value and would crash our 512 MB app (D-029) when an editor adds Stripe.
+  Now, above the limit, `bundleWithin` keeps the components nearest the root whole and leaves
+  those from some depth on open (title, description, and type only), picking the deepest level
+  that fits; `output_schema_trimmed` (info) says so. Stripe: 17 MB, 4 s, under 300 MB. Elsewhere
+  it touches a handful of operations (Box 14, OpenAI 15, Plaid 10, GitHub 1).
+- **Why loosen, not cut:** output schemas only describe; nothing validates responses against
+  them yet. A looser schema still accepts every real response, so it stays safe to use later
+  (e.g. as an MCP `outputSchema`). If even the shallowest version is too big, the output is left
+  untyped with `output_schema_too_large`. Input schemas are never trimmed: the runtime validates
+  them, and none in the corpus comes close (largest: Adyen, 184 KB).
+- **Form bodies keep their field encodings.** Stripe sends every write as
+  `application/x-www-form-urlencoded`, with nested fields declared `deepObject`
+  (1,346 of them). We ignored `encoding` and sent nested objects as JSON text
+  (`metadata={"a":"1"}`), which Stripe rejects. The body binding now carries non-default field
+  encodings, and the runtime nests `deepObject` fields with brackets, arrays by index
+  (`metadata[a]=1`, `line_items[0][price]=p`): Stripe's convention, since OpenAPI leaves
+  deeper nesting undefined. Unexploded arrays are joined (`,` `|` or space). Optional field, so
+  stored IR stays valid; the ingestor version is now 0.2.0.
+- **Found, not fixed yet:**
+  - **RPC-style APIs look like all writes.** Plaid has 345 POST operations, about 154 of them reads
+    (`/accounts/get`, `…/list`). Classification by method only escalates (D-005), so a default
+    toolset offers 5 tools out of 351. The fix belongs in the console: lowering a
+    classification (P-3), with suggestions for POST operations that look like reads, which a
+    person accepts.
+  - **Multi-file descriptions.** DigitalOcean's description splits into 873 files; every
+    operation fails with `external_ref`. Bundling relative refs when the document comes from a
+    URL would cover it, with the same fetch limits as the document itself.
+  - **Relative server URLs with no host.** Kubernetes declares `/`, since every cluster has its own
+    address; ingest refuses it without a base URL. The console should ask for one.
+- **Corpus:** Stripe is added (MIT, about 8 MB). The others stay out to limit repository size;
+  each goes in with its fix.

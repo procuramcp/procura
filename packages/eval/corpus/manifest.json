@@ -89,6 +89,15 @@
       "retrievedOn": "2026-10-30"
     },
     {
+      "id": "stripe-v1",
+      "file": "stripe/spec3.json",
+      "sourceUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "license": "MIT",
+      "sha256": "7cff4cc46d0654101a36a3302f7544640f5f73e4f3cad6f264f0e23c19fa1776",
+      "retrievedOn": "2026-11-03",
+      "notes": "Large generated OpenAPI 3.0 document: form-encoded bodies with deepObject field encodings, and response schemas that reference most of the API (about 1 MB each when bundled in full, D-042)."
+    },
+    {
       "id": "swagger-petstore-v3",
       "file": "swagger-petstore/openapi.yaml",
       "sourceUrl": "https://raw.githubusercontent.com/swagger-api/swagger-petstore/master/src/main/resources/openapi.yaml",

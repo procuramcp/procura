@@ -1,21 +1,22 @@
 # Ingest eval report
 
-Corpus entries: 13
-Mapped: 12
+Corpus entries: 14
+Mapped: 13
 Rejected: 1
 
 | id | outcome | doc ops | IR ops | skipped | warnings | errors | mean confidence | input Ajv | output Ajv | IR bytes |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | apisguru-listennotes-v2 | mapped | 24 | 24 | 0 | 0 | 0 | 0.900 | 24/24 | 24/24 | 196445 |
 | apisguru-urlbox-v1 | mapped | 1 | 1 | 0 | 0 | 0 | 0.900 | 1/1 | 1/1 | 3871 |
-| box-v2 | mapped | 297 | 297 | 0 | 10 | 0 | 0.895 | 297/297 | 247/247 | 3716280 |
+| box-v2 | mapped | 297 | 297 | 0 | 10 | 0 | 0.895 | 297/297 | 247/247 | 3442394 |
 | discord-v10 | mapped | 250 | 250 | 0 | 6 | 0 | 0.898 | 250/250 | 189/189 | 3246395 |
 | intervals-icu | mapped | 148 | 148 | 0 | 149 | 0 | 0.800 | 148/148 | 131/131 | 886838 |
 | oai-petstore-expanded-v3-0 | mapped | 4 | 4 | 0 | 0 | 0 | 0.900 | 4/4 | 3/3 | 6180 |
 | oai-petstore-minimal-swagger-2-0 | rejected (unsupported_version) | 1 | 0 | 0 | 0 | 1 | - | 0/0 | 0/0 | 0 |
 | oai-uspto-v3-0 | mapped | 3 | 3 | 0 | 0 | 0 | 0.900 | 3/3 | 3/3 | 6287 |
 | oai-webhook-example-v3-1 | mapped | 0 | 0 | 0 | 0 | 0 | - | 0/0 | 0/0 | 499 |
-| openai-openapi | mapped | 376 | 376 | 0 | 27 | 0 | 0.893 | 376/376 | 367/367 | 6317643 |
+| openai-openapi | mapped | 376 | 376 | 0 | 27 | 0 | 0.893 | 376/376 | 367/367 | 5058589 |
+| stripe-v1 | mapped | 612 | 612 | 0 | 1 | 0 | 0.900 | 612/612 | 612/612 | 17501515 |
 | swagger-petstore-v3 | mapped | 19 | 19 | 0 | 16 | 0 | 0.863 | 19/19 | 14/14 | 27736 |
 | twilio-api-v2010-json | mapped | 197 | 197 | 0 | 1 | 0 | 0.899 | 197/197 | 164/164 | 1037120 |
 | twilio-conversations-v2-yaml | mapped | 22 | 22 | 0 | 0 | 0 | 0.900 | 22/22 | 22/22 | 159894 |
@@ -60,10 +61,11 @@ Error samples:
 - side effects: read 129, write 120, destructive 48 (name escalations 5)
 - confidence: mean 0.895, min 0.700
 - strict Ajv: input 297/297, output 247/247
-- compact IR bytes: 3716280
+- compact IR bytes: 3442394
 
 Top diagnostics:
 - info path_key_fragment: 19
+- info output_schema_trimmed: 14
 - warning response_media_type_unspecified: 6
 - warning binary_request_body: 4
 
@@ -178,14 +180,31 @@ Error samples:
 - side effects: read 165, write 157, destructive 54 (name escalations 0)
 - confidence: mean 0.893, min 0.700
 - strict Ajv: input 376/376, output 367/367
-- compact IR bytes: 6317643
+- compact IR bytes: 5058589
 
 Top diagnostics:
+- info output_schema_trimmed: 15
 - warning binary_request_body: 9
 - warning response_media_type_unspecified: 9
 - warning path_key_query: 7
 - warning unknown_schema_keyword: 1
-- warning wildcard_media_type: 1
+
+Error samples:
+- none
+
+## stripe-v1
+
+- file: `stripe/spec3.json`
+- outcome: mapped
+- operations: 612/612 mapped (skipped 0)
+- side effects: read 273, write 305, destructive 34 (name escalations 2)
+- confidence: mean 0.900, min 0.700
+- strict Ajv: input 612/612, output 612/612
+- compact IR bytes: 17501515
+
+Top diagnostics:
+- info output_schema_trimmed: 364
+- warning binary_request_body: 1
 
 Error samples:
 - none

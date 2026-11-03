@@ -122,6 +122,59 @@ export class SchemaConverter {
     return (Object.keys(sorted).length > 0 ? { ...root, $defs: sorted } : root) as JsonSchema;
   }
 
+  /**
+   * Like `bundle`, but keeps the JSON under `maxChars` by leaving components beyond some
+   * number of hops from the root open: just their title, description, and type (D-042). That
+   * only loosens the schema, so it still accepts everything the full one does. `openAt` is the
+   * first open level (1 = the components the root names directly). Undefined when even that is
+   * too big.
+   */
+  bundleWithin(
+    root: Record<string, unknown>,
+    direction: Direction,
+    refs: Set<string>,
+    maxChars: number,
+  ): { schema: JsonSchema; openAt?: number } | undefined {
+    const full = this.bundle(root, direction, refs);
+    if (JSON.stringify(full).length <= maxChars) return { schema: full };
+
+    // levels[i]: components first reached i + 1 hops from the root. A component's refs are at
+    // its own level or the next, so keeping levels below `keep` whole and opening level `keep`
+    // leaves no dangling ref.
+    const levels: string[][] = [];
+    const seen = new Set(refs);
+    for (let frontier = [...refs]; frontier.length > 0; ) {
+      levels.push(frontier);
+      const next: string[] = [];
+      for (const name of frontier) {
+        for (const r of this.#component(name, direction).refs) {
+          if (!seen.has(r)) {
+            seen.add(r);
+            next.push(r);
+          }
+        }
+      }
+      frontier = next;
+    }
+
+    let best: { schema: JsonSchema; openAt: number } | undefined;
+    for (let keep = 0; keep < levels.length; keep++) {
+      const defs: Record<string, Schema> = {};
+      for (const [i, names] of levels.entries()) {
+        if (i > keep) break;
+        for (const name of names) {
+          const schema = this.#component(name, direction).schema;
+          defs[name] = i < keep ? schema : openSchema(schema);
+        }
+      }
+      const sorted = Object.fromEntries(Object.entries(defs).sort(([a], [b]) => a.localeCompare(b)));
+      const schema = { ...root, $defs: sorted } as JsonSchema;
+      if (JSON.stringify(schema).length > maxChars) break;
+      best = { schema, openAt: keep + 1 };
+    }
+    return best;
+  }
+
   #component(name: string, direction: Direction): { schema: Schema; refs: Set<string> } {
     const key = `${direction}:${name}`;
     const cached = this.#components.get(key);
@@ -204,6 +257,14 @@ export class SchemaConverter {
     if (target === undefined) throw new MappingError("unresolved_ref", `$ref target not found: ${ref}`, pointer);
     return this.#node(target, direction, ref, refs, depth + 1);
   }
+}
+
+/** A component reduced to what describes it, without constraints on its contents or refs. */
+function openSchema(schema: Schema): Schema {
+  if (typeof schema === "boolean") return schema;
+  const out: Record<string, unknown> = {};
+  for (const key of ["title", "description", "type"]) if (schema[key] !== undefined) out[key] = schema[key];
+  return out;
 }
 
 /** OpenAPI 3.0 `nullable: true` → JSON Schema `null` type. */

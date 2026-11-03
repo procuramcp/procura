@@ -47,7 +47,14 @@ export const OaOperation = z.looseObject({
 });
 export type OaOperation = z.infer<typeof OaOperation>;
 
-const MediaTypeObject = z.looseObject({ schema: z.unknown().optional() });
+const EncodingObject = z.looseObject({
+  style: z.string().optional(),
+  explode: z.boolean().optional(),
+});
+const MediaTypeObject = z.looseObject({
+  schema: z.unknown().optional(),
+  encoding: z.record(z.string(), EncodingObject).optional(),
+});
 const Content = z.record(z.string(), MediaTypeObject);
 
 export const OaParameter = z.looseObject({

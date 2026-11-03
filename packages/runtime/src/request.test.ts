@@ -103,6 +103,29 @@ describe("buildRequest", () => {
     expect(buildRequest(formOp, { body: { a: "x y", tags: ["p", "q"] } }).body).toBe("a=x+y&tags=p&tags=q");
   });
 
+  it("nests deepObject form fields with brackets and joins unexploded arrays", () => {
+    const encoding = {
+      metadata: { style: "deepObject", explode: true },
+      line_items: { style: "deepObject", explode: true },
+      ids: { style: "form", explode: false },
+      codes: { style: "pipeDelimited", explode: false },
+    } as const;
+    const o = op("/x", [], { mapping: { method: "POST", body: { property: "body", mediaType: "application/x-www-form-urlencoded", encoding } } });
+    const body = buildRequest(o, {
+      body: { email: "a@b.c", metadata: { order: "7" }, line_items: [{ price: "p_1", quantity: 2 }], ids: ["a", "b"], codes: ["x", "y"], tags: ["t"] },
+    }).body;
+    expect(new URLSearchParams(body).toString()).toBe(body);
+    expect([...new URLSearchParams(body)]).toEqual([
+      ["email", "a@b.c"],
+      ["metadata[order]", "7"],
+      ["line_items[0][price]", "p_1"],
+      ["line_items[0][quantity]", "2"],
+      ["ids", "a,b"],
+      ["codes", "x|y"],
+      ["tags", "t"],
+    ]);
+  });
+
   it("refuses body types it cannot encode yet", () => {
     const o = op("/x", [], { mapping: { method: "POST", body: { property: "body", mediaType: "multipart/form-data" } } });
     expect(errorOf(() => buildRequest(o, { body: {} })).kind).toBe("unsupported");

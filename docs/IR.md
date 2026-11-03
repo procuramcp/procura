@@ -26,8 +26,8 @@ Toolset    { id, sourceId, name, tools: ToolBinding[] }   // curated per tenant
 | `id` | Stable snake_case id, unique per source; also the default tool name |
 | `title`, `description` | As ingested; toolsets override them for agents |
 | `input` | JSON Schema 2020-12, root `type: object`, self-contained (`$defs`) |
-| `output` | Schema of the success response, if known |
-| `mapping` | `kind: "http"`: method, path template, one binding per input property, optional `fixedQuery` (always-sent query values), body binding, response decode |
+| `output` | Schema of the success response, if known; over 64 KB, deeper types are left open (D-042) |
+| `mapping` | `kind: "http"`: method, path template, one binding per input property, optional `fixedQuery` (always-sent query values), body binding (with per-field `encoding` for form bodies, e.g. `deepObject` as `a[b]=v`), response decode |
 | `sideEffect` | `{ class: read/write/destructive, basis, reason }` |
 | `auth` | Overrides `defaultAuth` when present |
 | `provenance` | `{ kind: spec/introspection/inferred/verified, sourceRef, originalId }` |

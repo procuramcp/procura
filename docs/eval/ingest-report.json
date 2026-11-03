@@ -1,10 +1,10 @@
 {
   "summary": {
-    "corpusEntries": 13,
-    "mapped": 12,
+    "corpusEntries": 14,
+    "mapped": 13,
     "rejected": 1,
-    "operationsInDocuments": 1342,
-    "operationsInIr": 1341,
+    "operationsInDocuments": 1954,
+    "operationsInIr": 1953,
     "operationsSkipped": 0,
     "operationsInRejectedDocuments": 1
   },
@@ -123,6 +123,7 @@
         },
         "errorsByCode": {},
         "infosByCode": {
+          "output_schema_trimmed": 14,
           "path_key_fragment": 19
         }
       },
@@ -148,12 +149,17 @@
           "strictAjvCompiles": 247
         }
       },
-      "compactIrBytes": 3716280,
+      "compactIrBytes": 3442394,
       "topDiagnostics": [
         {
           "code": "path_key_fragment",
           "severity": "info",
           "count": 19
+        },
+        {
+          "code": "output_schema_trimmed",
+          "severity": "info",
+          "count": 14
         },
         {
           "code": "response_media_type_unspecified",
@@ -516,7 +522,9 @@
           "wildcard_media_type": 1
         },
         "errorsByCode": {},
-        "infosByCode": {}
+        "infosByCode": {
+          "output_schema_trimmed": 15
+        }
       },
       "sideEffects": {
         "classCounts": {
@@ -540,8 +548,13 @@
           "strictAjvCompiles": 367
         }
       },
-      "compactIrBytes": 6317643,
+      "compactIrBytes": 5058589,
       "topDiagnostics": [
+        {
+          "code": "output_schema_trimmed",
+          "severity": "info",
+          "count": 15
+        },
         {
           "code": "binary_request_body",
           "severity": "warning",
@@ -561,9 +574,65 @@
           "code": "unknown_schema_keyword",
           "severity": "warning",
           "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
+    {
+      "id": "stripe-v1",
+      "file": "stripe/spec3.json",
+      "sourceUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "license": "MIT",
+      "sha256": "7cff4cc46d0654101a36a3302f7544640f5f73e4f3cad6f264f0e23c19fa1776",
+      "retrievedOn": "2026-11-03",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 612,
+        "ir": 612,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "binary_request_body": 1
+        },
+        "errorsByCode": {},
+        "infosByCode": {
+          "output_schema_trimmed": 364
+        }
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 273,
+          "write": 305,
+          "destructive": 34
+        },
+        "nameHeuristicEscalations": 2
+      },
+      "confidence": {
+        "mean": 0.9,
+        "min": 0.7
+      },
+      "schemas": {
+        "input": {
+          "total": 612,
+          "strictAjvCompiles": 612
+        },
+        "output": {
+          "total": 612,
+          "strictAjvCompiles": 612
+        }
+      },
+      "compactIrBytes": 17501515,
+      "topDiagnostics": [
+        {
+          "code": "output_schema_trimmed",
+          "severity": "info",
+          "count": 364
         },
         {
-          "code": "wildcard_media_type",
+          "code": "binary_request_body",
           "severity": "warning",
           "count": 1
         }
