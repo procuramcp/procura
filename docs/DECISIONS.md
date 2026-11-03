@@ -1008,7 +1008,7 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
   - `deploy/oracle` (the running VM: Compose project, volumes, `cairnmcp:<tag>` images; CI
     won't deploy a change to its files without a manual ship) and the Terraform in
     `deploy/oracle/infra` and `deploy/auth0` (renaming resources would replace the VM and the
-    Auth0 application), including the Auth0 tenant `cairnmcp.us.auth0.com`.
+    Auth0 application). (`cairnmcp.us.auth0.com` in `deploy/auth0` is only an example domain.)
 - **Old setting names still work for now:** each entry point copies a set `CAIRNMCP_X` to an
   unset `PROCURA_X` and warns (`applyLegacyEnvNames` in `db`), so the VM keeps running on its
   existing `app.env` and `migrate.env`. Remove it once those files are renamed.
