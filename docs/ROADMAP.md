@@ -95,8 +95,8 @@ themselves and getting the order or the ids wrong (P-8). Speakeasy's Gram offers
 - **Fail closed, report what ran:** stop at the first failing step and return which step failed
   and which earlier steps already ran (writes are not rolled back), as a tool result (D-020).
 - **Audit and limits per step:** every upstream call is audited as today, tagged with the
-  composite. Whether a composite counts once or once per step against plan allowances is decided
-  with the cost-per-tool work in 3c step 2.
+  composite. Each step is one upstream request, so it counts once per step against plan
+  allowances and our pricing (D-040).
 - **Source updates:** a composite that uses a removed or changed operation is flagged in the
   source diff (P-4) and fails closed until fixed (D-015).
 

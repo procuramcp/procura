@@ -808,3 +808,23 @@ planning handoff are not repeated here unless implementation added something.
 - **Rejected:** counting from the audit log (writes only, and too heavy, D-037); limits per rule
   instead of per profile (a plan is one price, whatever toolsets it covers); retrying refused calls
   automatically (D-020).
+
+## D-040 Our pricing unit: requests that reach the provider's API
+
+- **Context:** cairnmcp needs a unit to charge providers by (D-037), and composite tools (3d)
+  raised whether one tool call that makes several API requests counts once or several times.
+- **Decision:** we charge a provider per upstream request: each request cairnmcp sends to their
+  API. A composite tool with three steps is three requests. What counts is what D-039 already
+  counts: requests that reach the API, plus ones it turns away for being busy; requests that fail
+  before they're sent are not charged. Billing reads the same counters as allowances and usage.
+- **Why requests, not bytes:** our cost per request is roughly flat (one fetch, an audit row, a
+  counter update) and barely moves with response size, which the runtime already caps at 2 MB. A
+  provider can't predict bytes (agents choose page sizes), and "GB a month" means nothing to
+  someone buying an MCP server; requests are how providers already price their own APIs. Bytes
+  may become a fair-use limit if a tenant's traffic is unusual, not a price.
+- **Separate from the provider's own plans:** this is what we charge the provider. What a
+  provider charges its customers stays theirs to set with allowances (D-039); a cost per tool (an
+  expensive tool counting as several calls) remains an option for those plans, not something our
+  pricing needs.
+- **Not decided here:** the prices, the free tier, and tiers or overage.
+- **Rejected:** per MCP tool call (a composite would hide its real cost); per byte (above).
