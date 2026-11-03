@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { MAX_DOCUMENT_BYTES } from "@cairnmcp/ingest";
+import { MAX_DOCUMENT_BYTES } from "@procura/ingest";
 import { isPresent, isVendored, resolveCorpusFile, type CorpusEntry } from "./manifest.ts";
 
 const TIMEOUT_MS = 60_000;
@@ -30,7 +30,7 @@ export function writeCorpusFile(manifestPath: string, entry: CorpusEntry, text: 
 /**
  * Download every fetched document that's missing or doesn't match its pinned hash. A download
  * that doesn't match means the source changed: refuse, so the eval never silently runs on
- * different input. `pnpm --filter @cairnmcp/eval corpus:fetch <id>` re-pins it.
+ * different input. `pnpm --filter @procura/eval corpus:fetch <id>` re-pins it.
  */
 export async function ensureFetched(manifestPath: string, entries: CorpusEntry[], log: (line: string) => void = console.log): Promise<void> {
   for (const entry of entries) {

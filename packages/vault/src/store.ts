@@ -1,4 +1,4 @@
-import type { TenantId } from "@cairnmcp/core";
+import type { TenantId } from "@procura/core";
 import type { Sealed } from "./aead.ts";
 import type { WrappedKey } from "./key-wrapper.ts";
 

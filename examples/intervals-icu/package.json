@@ -1,17 +1,17 @@
 {
-  "name": "@cairnmcp/example-intervals-icu",
+  "name": "@procura/example-intervals-icu",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Example: call Intervals.icu through cairnmcp with your own API key.",
+  "description": "Example: call Intervals.icu through procura with your own API key.",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "start": "node try.ts"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
-    "@cairnmcp/ingest": "workspace:*",
-    "@cairnmcp/runtime": "workspace:*",
-    "@cairnmcp/vault": "workspace:*"
+    "@procura/core": "workspace:*",
+    "@procura/ingest": "workspace:*",
+    "@procura/runtime": "workspace:*",
+    "@procura/vault": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-import { isRecord, type JsonSchema } from "@cairnmcp/core";
+import { isRecord, type JsonSchema } from "@procura/core";
 import { MappingError, resolvePointer, unescapePointerToken } from "./refs.ts";
 
 /**

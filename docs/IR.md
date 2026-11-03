@@ -1,4 +1,4 @@
-# The cairnmcp IR
+# The procura IR
 
 Every ingestor produces an `IrDocument`; everything downstream (runtime, MCP server, curation UI,
 evals) reads only the IR. Source: `packages/core/src/ir/`.

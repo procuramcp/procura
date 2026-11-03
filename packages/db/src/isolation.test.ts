@@ -1,9 +1,9 @@
 // Tenant and member isolation against real Postgres, connected as the app role.
 // Every test here is about something that must NOT happen.
 import { randomBytes } from "node:crypto";
-import { AccessProfile, canCall, defaultToolset, Toolset, ToolsetId, UserId, type TenantId } from "@cairnmcp/core";
-import type { AuditEvent } from "@cairnmcp/runtime";
-import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
+import { AccessProfile, canCall, defaultToolset, Toolset, ToolsetId, UserId, type TenantId } from "@procura/core";
+import type { AuditEvent } from "@procura/runtime";
+import { LocalKeyWrapper, Vault } from "@procura/vault";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";

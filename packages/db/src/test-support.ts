@@ -1,24 +1,26 @@
 // Shared helpers for database tests. Not in the package index; other packages
-// import them from `@cairnmcp/db/test-support` (tests only).
+// import them from `@procura/db/test-support` (tests only).
 //
-// Tests need a Postgres superuser URL in CAIRNMCP_TEST_DATABASE_URL. Each test
+// Tests need a Postgres superuser URL in PROCURA_TEST_DATABASE_URL. Each test
 // file gets its own scratch database, migrated by a non-superuser owner role,
 // and connects as a separate app role, the same split as production.
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { IrDocument, TenantId, UserId } from "@cairnmcp/core";
-import { ingestOpenApiText } from "@cairnmcp/ingest";
+import { IrDocument, TenantId, UserId } from "@procura/core";
+import { ingestOpenApiText } from "@procura/ingest";
 import pg from "pg";
 import { Database } from "./client.ts";
 import { migrate, type Migration } from "./migrate.ts";
+import { applyLegacyEnvNames } from "./legacy-env.ts";
 
-const ENV = "CAIRNMCP_TEST_DATABASE_URL";
+const ENV = "PROCURA_TEST_DATABASE_URL";
 
 /**
  * The superuser URL, or undefined (tests skip; the config warns). In CI a
  * missing URL is an error: these are the isolation tests and must run.
  */
 export function testDatabaseUrl(): string | undefined {
+  applyLegacyEnvNames();
   const url = process.env[ENV];
   if (url) return url;
   if (process.env["CI"]) throw new Error(`${ENV} must be set in CI: the tenant isolation tests require Postgres`);
@@ -28,7 +30,7 @@ export function testDatabaseUrl(): string | undefined {
 // Fixed role names: roles are cluster-wide, so concurrent test files share them.
 export const TEST_OWNER_ROLE = "cairnmcp_test_owner";
 export const TEST_APP_ROLE = "cairnmcp_test_app";
-const TEST_PASSWORD = "cairnmcp-test-only-not-a-secret";
+const TEST_PASSWORD = "procura-test-only-not-a-secret";
 
 export type ScratchDatabase = {
   adminUrl: string;

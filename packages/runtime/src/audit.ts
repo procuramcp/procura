@@ -1,4 +1,4 @@
-import type { Instant, JsonValue, SideEffect, TenantId, UserId } from "@cairnmcp/core";
+import type { Instant, JsonValue, SideEffect, TenantId, UserId } from "@procura/core";
 
 /**
  * One entry in the tenant-scoped audit log. Every non-read tool call writes an

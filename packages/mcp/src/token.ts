@@ -1,4 +1,4 @@
-import type { JsonValue } from "@cairnmcp/core";
+import type { JsonValue } from "@procura/core";
 import { createRemoteJWKSet, decodeJwt, errors, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
 
 /**
@@ -13,7 +13,7 @@ export type TrustedIssuer = {
   jwksUri: string;
   /**
    * True for the embedded authorization server, whose `sub` is already a
-   * cairnmcp user id. Other issuers' subjects are looked up by issuer + subject.
+   * procura user id. Other issuers' subjects are looked up by issuer + subject.
    */
   subjectIsUserId?: boolean;
 };

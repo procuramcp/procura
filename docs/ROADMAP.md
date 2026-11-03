@@ -12,14 +12,14 @@ comes after 3c; 4 and 5 wait.
 | --- | --- | --- |
 | 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
 | 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025); embedded authorization server with OIDC sign-in (D-026); container image built and smoke-tested in CI (D-027); Neon set up; deployed on an Oracle Cloud Always Free VM behind Caddy, infrastructure in Terraform (D-029); push to main deploys there after CI (D-036). admin CLI for tenants, sources, toolsets, access, and credentials (D-030) |
-| 2b | Self-host: published image, `docker compose`, config and upgrade docs | Built 2026-11-02 (D-045, D-046): AGPL-3.0; CI publishes the image to `ghcr.io/cairnmcp/cairnmcp` (amd64, arm64) from main and version tags; `deploy/self-host` with Postgres, migrations before start, a local Dex for laptops, Caddy for HTTPS; config checked at startup; guide for TLS, sign-in, backups, upgrades; CI runs it end to end (`scripts/compose-smoke.sh`). Left: tag v0.1.0 and make the package public |
+| 2b | Self-host: published image, `docker compose`, config and upgrade docs | Built 2026-11-02 (D-045, D-046): AGPL-3.0; CI publishes the image to `ghcr.io/procuramcp/procura` (amd64, arm64) from main and version tags; `deploy/self-host` with Postgres, migrations before start, a local Dex for laptops, Caddy for HTTPS; config checked at startup; guide for TLS, sign-in, backups, upgrades; CI runs it end to end (`scripts/compose-smoke.sh`). Left: tag v0.1.0 and make the package public |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | Started: curation console at `/app` (D-033): sign-in, toolset editor (tools, names, descriptions, pins, write tools marked), access, and a tool test panel; access profiles, named permission sets assigned to members (D-034); adding APIs from OpenAPI (URL, Swagger UI page, paste, or file) and their keys (D-035); classification review, with suggested reads for RPC-style APIs (D-043). Next: updating a source with a diff of what changed, keeping people's classifications |
 | 3b | Custom and on-behalf-of upstream auth; provider-hosted servers with per-user credentials (D-032); external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
 | 3c | Provider features: customers separate from the team, plans with per-customer limits and allowances, the provider's own sign-in with plans from claims, usage page, draft and published toolsets, branding. Details below | Next after 3 |
 | 3d | Composite tools: one tool that runs several API calls in order (P-8). Details below | After 3c |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
-| 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
+| 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; procura returns API output as-is (D-021) |
 | 7 | Docs: architecture diagram, threat model, decisions doc, eval report | Ingest eval started (`packages/eval`) |
 | — | Hybrid runner: hosted control plane, credential-holding runner in the user's infra | Parked until users ask (D-018) |
 
@@ -33,7 +33,7 @@ Cheap now, expensive to retrofit (D-022, D-023):
 - **Token checking is separate from token issuing.** The MCP endpoint validates tokens as an
   OAuth resource server (with protected-resource metadata, RFC 9728). The embedded authorization
   server is one issuer it trusts; a company's own identity provider can be another.
-- **cairnmcp authorizes every call itself** (D-023). A token resolves to tenant, user, and role;
+- **procura authorizes every call itself** (D-023). A token resolves to tenant, user, and role;
   each member has access per toolset (`use` for reads, `use_writes` to also call write and
   destructive tools that the toolset enables). Checked on `tools/list` (hide what the caller can't
   use) and again on `tools/call` (never trust that the client only calls what it was shown).
@@ -43,7 +43,7 @@ Cheap now, expensive to retrofit (D-022, D-023):
 
 ## Milestone 2b: self-host
 
-Done when someone can run their own cairnmcp with only Docker, a Postgres URL, and a master key:
+Done when someone can run their own procura with only Docker, a Postgres URL, and a master key:
 
 - The same container image we deploy, published with version tags.
 - A `docker compose` file (app and Postgres) that works out of the box on a laptop.

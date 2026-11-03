@@ -23,12 +23,12 @@ const MIME: Record<string, string> = {
   ".wasm": "application/wasm",
 };
 
-const NOT_BUILT = "The console isn't built. Run: pnpm --filter @cairnmcp/web build";
+const NOT_BUILT = "The console isn't built. Run: pnpm --filter @procura/web build";
 
 /** A one-line HTML page with a link back to the console. */
 export function page(status: number, message: string): Response {
   const escaped = message.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  return new Response(`<!doctype html><meta charset="utf-8"><title>cairnmcp</title><p>${escaped}. <a href="/app/">Back to the console</a></p>`, {
+  return new Response(`<!doctype html><meta charset="utf-8"><title>procura</title><p>${escaped}. <a href="/app/">Back to the console</a></p>`, {
     status,
     headers: { ...APP_HEADERS, "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
   });

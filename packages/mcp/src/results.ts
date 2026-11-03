@@ -1,5 +1,5 @@
-import { omitUndefined, type ResolvedTool } from "@cairnmcp/core";
-import type { ToolResult } from "@cairnmcp/runtime";
+import { omitUndefined, type ResolvedTool } from "@procura/core";
+import type { ToolResult } from "@procura/runtime";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 
 /** A resolved tool as MCP describes it. */

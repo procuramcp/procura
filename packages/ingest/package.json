@@ -1,9 +1,9 @@
 {
-  "name": "@cairnmcp/ingest",
+  "name": "@procura/ingest",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Ingestors that turn API descriptions into the cairnmcp IR.",
+  "description": "Ingestors that turn API descriptions into the procura IR.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -12,7 +12,7 @@
     "ir:dump": "node scripts/dump-ir.ts"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
+    "@procura/core": "workspace:*",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },

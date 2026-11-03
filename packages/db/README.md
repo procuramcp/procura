@@ -1,4 +1,4 @@
-# @cairnmcp/db
+# @procura/db
 
 Postgres storage for tenants, their team and customers, sources, toolsets, the vault, and the audit log, with
 tenant isolation enforced by row-level security (RLS). Design: `docs/DECISIONS.md` D-024.
@@ -12,7 +12,7 @@ Two login roles, created once by an administrator before the first migration:
 CREATE ROLE cairnmcp_app NOLOGIN NOBYPASSRLS;
 -- Owns the schema and runs migrations. Not a superuser.
 CREATE ROLE cairnmcp_owner LOGIN NOBYPASSRLS PASSWORD '…';
-GRANT CREATE ON DATABASE cairnmcp TO cairnmcp_owner;
+GRANT CREATE ON DATABASE procura TO cairnmcp_owner;
 -- What the app connects as. Not the owner, not a superuser, no BYPASSRLS.
 CREATE ROLE cairnmcp_server LOGIN NOBYPASSRLS PASSWORD '…' IN ROLE cairnmcp_app;
 ```
@@ -26,7 +26,7 @@ transaction. They are append-only: editing an applied file makes the migrator re
 fix forward with a new file.
 
 ```bash
-CAIRNMCP_DATABASE_OWNER_URL=postgres://cairnmcp_owner:…@host/cairnmcp pnpm --filter @cairnmcp/db migrate
+PROCURA_DATABASE_OWNER_URL=postgres://cairnmcp_owner:…@host/procura pnpm --filter @procura/db migrate
 ```
 
 When you change a table, update `src/schema.ts` (Drizzle's typed view of it) too; a test checks
@@ -35,7 +35,7 @@ that every Drizzle column exists after migrating.
 ## Using it
 
 ```ts
-const db = await Database.connect({ url: process.env.CAIRNMCP_DATABASE_URL });
+const db = await Database.connect({ url: process.env.PROCURA_DATABASE_URL });
 await db.withTenant(tenantId, async (tx) => {
   if (!(await mayCallTool(tx, { toolsetId, userId, sideEffect }))) throw new Error("forbidden");
   // ...
@@ -55,7 +55,7 @@ The isolation tests need a real Postgres and a superuser URL (they create roles 
 database per test file, then drop it):
 
 ```bash
-CAIRNMCP_TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm test
+PROCURA_TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm test
 ```
 
 Without the variable they are skipped with a warning. In CI they are required: CI provides a

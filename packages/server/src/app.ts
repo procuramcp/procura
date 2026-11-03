@@ -1,8 +1,8 @@
-import { createAuthHandler, SigningKeys, type IdentityProvider } from "@cairnmcp/auth";
-import { PgAuditSink, PgVaultStore, type Database } from "@cairnmcp/db";
-import { createMcpHandler, TokenVerifier, type TrustedIssuer } from "@cairnmcp/mcp";
-import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
-import { Vault, type KeyWrapper } from "@cairnmcp/vault";
+import { createAuthHandler, SigningKeys, type IdentityProvider } from "@procura/auth";
+import { PgAuditSink, PgVaultStore, type Database } from "@procura/db";
+import { createMcpHandler, TokenVerifier, type TrustedIssuer } from "@procura/mcp";
+import { InMemoryRateLimiter, Runtime, type FetchLike } from "@procura/runtime";
+import { Vault, type KeyWrapper } from "@procura/vault";
 import { createConsoleHandler } from "./console/index.ts";
 import type { DocumentGetter } from "./fetch-document.ts";
 

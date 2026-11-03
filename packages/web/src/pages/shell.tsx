@@ -55,7 +55,7 @@ export function Shell() {
           <SidebarHeader>
             <NavLink to="/" className="flex items-center gap-2 px-2 py-1.5 font-heading font-semibold">
               <MountainIcon className="size-5" />
-              cairnmcp
+              procura
             </NavLink>
           </SidebarHeader>
           <SidebarContent>
@@ -127,7 +127,7 @@ function SignIn({ providers }: { providers: Provider[] }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MountainIcon className="size-5" />
-            cairnmcp
+            procura
           </CardTitle>
           <CardDescription>Sign in to curate your MCP toolsets.</CardDescription>
         </CardHeader>

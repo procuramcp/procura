@@ -6,12 +6,12 @@
 // (packages/console-api), put the route in the table of its area (tenants.ts,
 // toolsets.ts, access.ts, sources.ts) with `satisfies` on the body it sends, add
 // the call to packages/web/src/lib/api.ts, and cover it in console.test.ts.
-import type { IdentityProvider } from "@cairnmcp/auth";
-import type { ApiErrorBody, Me } from "@cairnmcp/console-api";
-import type { Database } from "@cairnmcp/db";
-import { BodyError, dispatch, json, redirect } from "@cairnmcp/http";
-import type { Runtime } from "@cairnmcp/runtime";
-import type { Vault } from "@cairnmcp/vault";
+import type { IdentityProvider } from "@procura/auth";
+import type { ApiErrorBody, Me } from "@procura/console-api";
+import type { Database } from "@procura/db";
+import { BodyError, dispatch, json, redirect } from "@procura/http";
+import type { Runtime } from "@procura/runtime";
+import type { Vault } from "@procura/vault";
 import { safeGet, type DocumentGetter } from "../fetch-document.ts";
 import { accessRoutes } from "./access.ts";
 import { peopleRoutes } from "./people.ts";

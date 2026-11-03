@@ -1,7 +1,7 @@
 // The JSON shapes the console API returns for IR objects, typed by the shared
-// contract (@cairnmcp/console-api) that the web console also uses.
-import type { AuthSchemeView, OperationView } from "@cairnmcp/console-api";
-import { omitUndefined, suggestRead, type AuthScheme, type Operation } from "@cairnmcp/core";
+// contract (@procura/console-api) that the web console also uses.
+import type { AuthSchemeView, OperationView } from "@procura/console-api";
+import { omitUndefined, suggestRead, type AuthScheme, type Operation } from "@procura/core";
 
 export function schemeView(scheme: AuthScheme): AuthSchemeView {
   return {

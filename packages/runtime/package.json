@@ -1,5 +1,5 @@
 {
-  "name": "@cairnmcp/runtime",
+  "name": "@procura/runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
-    "@cairnmcp/vault": "workspace:*",
+    "@procura/core": "workspace:*",
+    "@procura/vault": "workspace:*",
     "ajv": "^8.20.0"
   },
   "devDependencies": {
-    "@cairnmcp/ingest": "workspace:*"
+    "@procura/ingest": "workspace:*"
   }
 }

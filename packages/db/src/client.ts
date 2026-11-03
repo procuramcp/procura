@@ -1,4 +1,4 @@
-import { TenantId, UserId, type TeamRole } from "@cairnmcp/core";
+import { TenantId, UserId, type TeamRole } from "@procura/core";
 import { sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";

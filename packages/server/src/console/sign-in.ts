@@ -1,10 +1,10 @@
 // Console sign-in through an OIDC provider, and the session cookie it sets.
 // Login state and sessions are stored only as hashes (base64url SHA-256).
-import type { LoggedOut } from "@cairnmcp/console-api";
-import { finishSignIn, startSignIn, type IdentityProvider } from "@cairnmcp/auth";
-import { UserId } from "@cairnmcp/core";
-import { schema, type Database } from "@cairnmcp/db";
-import { json, randomToken, readCookie, redirect, safeEqual, setCookie, sha256Base64url as sha256 } from "@cairnmcp/http";
+import type { LoggedOut } from "@procura/console-api";
+import { finishSignIn, startSignIn, type IdentityProvider } from "@procura/auth";
+import { UserId } from "@procura/core";
+import { schema, type Database } from "@procura/db";
+import { json, randomToken, readCookie, redirect, safeEqual, setCookie, sha256Base64url as sha256 } from "@procura/http";
 import { and, eq, gt, lt } from "drizzle-orm";
 import type { Session } from "./context.ts";
 import { page } from "./static.ts";
@@ -21,8 +21,8 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
   const secure = base.startsWith("https://");
   const at = (offsetSeconds = 0) => new Date(now() + offsetSeconds * 1000);
   // __Host- cookies need Secure, so plain-http development uses plain names.
-  const SESSION_COOKIE = secure ? "__Host-cairnmcp_session" : "cairnmcp_session";
-  const LOGIN_COOKIE = secure ? "__Host-cairnmcp_login" : "cairnmcp_login";
+  const SESSION_COOKIE = secure ? "__Host-procura_session" : "procura_session";
+  const LOGIN_COOKIE = secure ? "__Host-procura_login" : "procura_login";
   const cookie = (name: string, value: string, maxAgeSeconds: number) => setCookie(name, value, { path: "/", maxAgeSeconds, secure });
   const callbackUri = (providerId: string) => `${base}/app/callback/${providerId}`;
 

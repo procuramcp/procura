@@ -1,5 +1,5 @@
-import { highestLevel } from "@cairnmcp/core";
-import { getToolset, memberRole, schema, tenantName, toolsetAccessFor, type Database } from "@cairnmcp/db";
+import { highestLevel } from "@procura/core";
+import { getToolset, memberRole, schema, tenantName, toolsetAccessFor, type Database } from "@procura/db";
 import {
   dispatch,
   json,
@@ -14,8 +14,8 @@ import {
   sha256Hex as sha256,
   withHeaders,
   type Route,
-} from "@cairnmcp/http";
-import { parseMcpResource } from "@cairnmcp/mcp";
+} from "@procura/http";
+import { parseMcpResource } from "@procura/mcp";
 import { and, eq, gt, isNull, lt, or, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { finishSignIn, startSignIn, type IdentityProvider } from "./identity.ts";
@@ -40,7 +40,7 @@ export type AuthServerOptions = {
 export const SCOPE = "mcp";
 const REQUEST_SECONDS = 10 * 60;
 const CODE_SECONDS = 60;
-const COOKIE = "cairnmcp_auth";
+const COOKIE = "procura_auth";
 const MAX_BODY_BYTES = 16 * 1024;
 
 const { oauthClients: clients, oauthRequests: requests, oauthRefreshTokens: refreshTokens } = schema;
@@ -130,7 +130,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     const clientId = q.get("client_id") ?? "";
     const [client] = clientId ? await db.withoutTenant((tx) => tx.select().from(clients).where(eq(clients.id, clientId))) : [];
     // Until the client and redirect URI check out, errors are shown here, never redirected (no open redirect).
-    if (!client) return htmlResponse(400, errorPage("Unknown app", "This app isn't registered with cairnmcp. Try connecting again from the app."));
+    if (!client) return htmlResponse(400, errorPage("Unknown app", "This app isn't registered with procura. Try connecting again from the app."));
     const redirectUri = q.get("redirect_uri") ?? (client.redirectUris.length === 1 ? client.redirectUris[0]! : "");
     if (!redirectUri || !matchesRegistered(redirectUri, client.redirectUris)) {
       return htmlResponse(400, errorPage("Can't continue", "The app asked to return to an address it didn't register."));
@@ -146,7 +146,7 @@ export function createAuthHandler(options: AuthServerOptions): (request: Request
     }
     const resources = q.getAll("resource");
     const target = resources.length === 1 ? parseMcpResource(base, resources[0]!) : undefined;
-    if (!target) return fail("invalid_target", "resource must be exactly one cairnmcp MCP endpoint URL");
+    if (!target) return fail("invalid_target", "resource must be exactly one procura MCP endpoint URL");
 
     const id = random(24);
     await db.withoutTenant((tx) =>

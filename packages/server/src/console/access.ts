@@ -1,8 +1,8 @@
 // Access profiles (D-034) and the access page: profiles, the team, and how many customers (D-038).
-import type { AccessView } from "@cairnmcp/console-api";
-import { AccessProfile } from "@cairnmcp/core";
-import { deleteProfile, listCustomers, listOperationEffects, listProfiles, listTeam, listToolsets, memberProfileIds, putProfile, type TenantTx } from "@cairnmcp/db";
-import { json } from "@cairnmcp/http";
+import type { AccessView } from "@procura/console-api";
+import { AccessProfile } from "@procura/core";
+import { deleteProfile, listCustomers, listOperationEffects, listProfiles, listTeam, listToolsets, memberProfileIds, putProfile, type TenantTx } from "@procura/db";
+import { json } from "@procura/http";
 import { issuesText, ProfileEdit, readBody } from "./bodies.ts";
 import { teamResponse, type ApiRoute, type Session } from "./context.ts";
 import { person } from "./people.ts";

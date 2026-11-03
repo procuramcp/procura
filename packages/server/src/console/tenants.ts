@@ -1,8 +1,8 @@
 // The tenant overview and creating a toolset from a source.
-import type { CreatedToolset, TenantView } from "@cairnmcp/console-api";
-import { defaultToolset } from "@cairnmcp/core";
-import { getSource, getToolset, listCustomers, listSourceSummaries, listTeam, listToolsets, putToolset, setToolsetAccess, tenantName } from "@cairnmcp/db";
-import { json } from "@cairnmcp/http";
+import type { CreatedToolset, TenantView } from "@procura/console-api";
+import { defaultToolset } from "@procura/core";
+import { getSource, getToolset, listCustomers, listSourceSummaries, listTeam, listToolsets, putToolset, setToolsetAccess, tenantName } from "@procura/db";
+import { json } from "@procura/http";
 import { issuesText, NewToolset, readBody } from "./bodies.ts";
 import { endpointUrl, teamResponse, type ApiRoute } from "./context.ts";
 

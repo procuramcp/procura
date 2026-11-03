@@ -5,11 +5,11 @@ import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
-import { Database, PgAuditSink, PgVaultStore, schema } from "@cairnmcp/db";
-import { scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
-import { createMcpHandler, TokenVerifier } from "@cairnmcp/mcp";
-import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
-import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
+import { Database, PgAuditSink, PgVaultStore, schema } from "@procura/db";
+import { scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@procura/db/test-support";
+import { createMcpHandler, TokenVerifier } from "@procura/mcp";
+import { InMemoryRateLimiter, Runtime, type FetchLike } from "@procura/runtime";
+import { LocalKeyWrapper, Vault } from "@procura/vault";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
@@ -18,7 +18,7 @@ import { AdminError, addSource, createTenant, grantAccess, putToolsetFor, setCre
 
 const adminUrl = testDatabaseUrl();
 const ISSUER = "https://accounts.test";
-const BASE = "https://cairn.test";
+const BASE = "https://procura.test";
 const SECRET = "fake-intervals-api-key-0123456789";
 const openapi = readFileSync(new URL("../../ingest/fixtures/intervals-icu/openapi.json", import.meta.url), "utf8");
 const starter = JSON.parse(readFileSync(new URL("../../../examples/intervals-icu/toolset.json", import.meta.url), "utf8")) as unknown;
@@ -98,7 +98,7 @@ describe.skipIf(!adminUrl)("admin commands (Postgres)", () => {
 
   describe("the CLI (as admin.sh runs it)", () => {
     const exec = (args: string[], input?: string) => {
-      const env = { ...process.env, CAIRNMCP_DATABASE_URL: scratch.appUrl, CAIRNMCP_MASTER_KEY: masterKey, CAIRNMCP_PUBLIC_URL: BASE };
+      const env = { ...process.env, PROCURA_DATABASE_URL: scratch.appUrl, PROCURA_MASTER_KEY: masterKey, PROCURA_PUBLIC_URL: BASE };
       const child = run(process.execPath, [cli, ...args], { env });
       if (input !== undefined) child.child.stdin!.end(input);
       else child.child.stdin!.end();

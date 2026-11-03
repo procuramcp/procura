@@ -35,5 +35,5 @@ crash.log
 # Large eval documents, downloaded on demand and checked against the manifest (D-017).
 packages/eval/corpus/fetched/
 
-# Built console (D-033): made by `pnpm --filter @cairnmcp/web build` and in the image.
+# Built console (D-033): made by `pnpm --filter @procura/web build` and in the image.
 packages/web/dist/

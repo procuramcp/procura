@@ -1,4 +1,4 @@
-// Example: call Intervals.icu through cairnmcp with your own API key.
+// Example: call Intervals.icu through procura with your own API key.
 // Runs the whole pipeline (ingest → toolset → vault → runtime), read-only,
 // and prints a short summary. Never prints the key.
 //
@@ -7,10 +7,10 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { resolveToolset, TenantId, Toolset, UserId, type Source } from "@cairnmcp/core";
-import { ingestOpenApiText } from "@cairnmcp/ingest";
-import { InMemoryAuditSink, InMemoryRateLimiter, Runtime } from "@cairnmcp/runtime";
-import { InMemoryVaultStore, LocalKeyWrapper, parseMasterKey, Vault } from "@cairnmcp/vault";
+import { resolveToolset, TenantId, Toolset, UserId, type Source } from "@procura/core";
+import { ingestOpenApiText } from "@procura/ingest";
+import { InMemoryAuditSink, InMemoryRateLimiter, Runtime } from "@procura/runtime";
+import { InMemoryVaultStore, LocalKeyWrapper, parseMasterKey, Vault } from "@procura/vault";
 
 const here = import.meta.dirname;
 if (existsSync(resolve(here, ".env"))) process.loadEnvFile(resolve(here, ".env"));
@@ -20,7 +20,7 @@ if (!apiKey) {
   console.error("INTERVALS_API_KEY is not set. Copy examples/intervals-icu/.env.example to .env there and add your key.");
   process.exit(1);
 }
-const masterKey = process.env["CAIRNMCP_MASTER_KEY"] ? parseMasterKey(process.env["CAIRNMCP_MASTER_KEY"]) : randomBytes(32);
+const masterKey = process.env["PROCURA_MASTER_KEY"] ? parseMasterKey(process.env["PROCURA_MASTER_KEY"]) : randomBytes(32);
 
 // 1. Ingest the API description.
 const text = readFileSync(resolve(here, "../../packages/ingest/fixtures/intervals-icu/openapi.json"), "utf8");

@@ -3,19 +3,19 @@
 # database, migrate from inside the image, start it, and check that the
 # authorization server and MCP endpoint answer.
 #
-#   scripts/image-smoke.sh cairnmcp:dev
+#   scripts/image-smoke.sh procura:dev
 #
-# Needs docker, psql, curl, and CAIRNMCP_TEST_DATABASE_URL (a superuser URL,
+# Needs docker, psql, curl, and PROCURA_TEST_DATABASE_URL (a superuser URL,
 # as for the tests). Postgres must be reachable from containers through
 # host.docker.internal (true for Docker Desktop and for CI's service container).
 set -euo pipefail
 
 IMAGE="${1:?usage: scripts/image-smoke.sh <image>}"
-ADMIN_URL="${CAIRNMCP_TEST_DATABASE_URL:?CAIRNMCP_TEST_DATABASE_URL must be set}"
+ADMIN_URL="${PROCURA_TEST_DATABASE_URL:?PROCURA_TEST_DATABASE_URL must be set}"
 PORT="${SMOKE_PORT:-18080}"
 DB="cairnmcp_smoke_$RANDOM"
-PASSWORD="cairnmcp-smoke-only-not-a-secret"
-NAME="cairnmcp-smoke-$RANDOM"
+PASSWORD="procura-smoke-only-not-a-secret"
+NAME="procura-smoke-$RANDOM"
 BASE="http://localhost:$PORT"
 
 # Same server as the admin URL, seen from inside a container.
@@ -56,15 +56,15 @@ SQL
 DOCKER_HOST_ARGS=(--add-host=host.docker.internal:host-gateway)
 
 step "migrate (inside the image, as the owner)"
-docker run --rm "${DOCKER_HOST_ARGS[@]}" -e CAIRNMCP_DATABASE_OWNER_URL="$(container_url cairnmcp_smoke_owner "$DB")" \
+docker run --rm "${DOCKER_HOST_ARGS[@]}" -e PROCURA_DATABASE_OWNER_URL="$(container_url cairnmcp_smoke_owner "$DB")" \
   "$IMAGE" node packages/db/scripts/migrate.ts
 
 step "start (as the app role)"
 docker run -d --name "$NAME" "${DOCKER_HOST_ARGS[@]}" -p "$PORT:8080" \
-  -e CAIRNMCP_PUBLIC_URL="$BASE" \
-  -e CAIRNMCP_DATABASE_URL="$(container_url cairnmcp_smoke_app "$DB")" \
-  -e CAIRNMCP_MASTER_KEY="$(openssl rand -base64 32)" \
-  -e CAIRNMCP_OIDC_PROVIDERS='[{"id":"idp","name":"Test IdP","issuer":"https://idp.invalid","clientId":"smoke","clientSecret":"smoke-not-a-secret"}]' \
+  -e PROCURA_PUBLIC_URL="$BASE" \
+  -e PROCURA_DATABASE_URL="$(container_url cairnmcp_smoke_app "$DB")" \
+  -e PROCURA_MASTER_KEY="$(openssl rand -base64 32)" \
+  -e PROCURA_OIDC_PROVIDERS='[{"id":"idp","name":"Test IdP","issuer":"https://idp.invalid","clientId":"smoke","clientSecret":"smoke-not-a-secret"}]' \
   "$IMAGE" >/dev/null
 
 step "healthz"

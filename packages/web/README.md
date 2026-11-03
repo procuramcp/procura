@@ -1,4 +1,4 @@
-# @cairnmcp/web: the curation console
+# @procura/web: the curation console
 
 A React app (Vite, Tailwind, shadcn/ui, AI Elements) that the server serves at `/app` (D-033).
 The team signs in here (D-038): viewers look, editors edit toolsets (tools on or off, names,
@@ -12,12 +12,12 @@ No Auth0 or real data needed: `dev:console` starts the server with a throwaway l
 database, a sign-in that approves you at once, and a stand-in for the Intervals.icu API.
 
 ```bash
-pnpm --filter @cairnmcp/web build
-CAIRNMCP_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres pnpm --filter @cairnmcp/server dev:console
+pnpm --filter @procura/web build
+PROCURA_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres pnpm --filter @procura/server dev:console
 ```
 
-Open http://localhost:8787/app/. For live reload, also run `pnpm --filter @cairnmcp/web dev` with
-`CAIRNMCP_DEV_SERVER=http://localhost:8787` and open the URL Vite prints (`/app/` on its port); it
+Open http://localhost:8787/app/. For live reload, also run `pnpm --filter @procura/web dev` with
+`PROCURA_DEV_SERVER=http://localhost:8787` and open the URL Vite prints (`/app/` on its port); it
 proxies the API and sign-in to the dev server.
 
 ## Notes

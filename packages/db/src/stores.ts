@@ -1,6 +1,6 @@
-import { TenantId } from "@cairnmcp/core";
-import type { AuditEvent, AuditSink } from "@cairnmcp/runtime";
-import type { CredentialRecord, VaultStore, WrappedKey } from "@cairnmcp/vault";
+import { TenantId } from "@procura/core";
+import type { AuditEvent, AuditSink } from "@procura/runtime";
+import type { CredentialRecord, VaultStore, WrappedKey } from "@procura/vault";
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "./client.ts";
 import { auditEvents, credentials, dataKeys } from "./schema.ts";

@@ -5,19 +5,19 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { OidcIdentityProvider } from "@cairnmcp/auth";
-import { Toolset, type TenantId, type UserId } from "@cairnmcp/core";
-import { addMember, Database, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@cairnmcp/db";
-import { intervalsIr, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
-import type { FetchLike } from "@cairnmcp/runtime";
-import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
+import { OidcIdentityProvider } from "@procura/auth";
+import { Toolset, type TenantId, type UserId } from "@procura/core";
+import { addMember, Database, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@procura/db";
+import { intervalsIr, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@procura/db/test-support";
+import type { FetchLike } from "@procura/runtime";
+import { LocalKeyWrapper, Vault } from "@procura/vault";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.ts";
 import { FetchRefused, type DocumentGetter } from "./fetch-document.ts";
 import { FakeOidcProvider, TestBrowser } from "./test-support.ts";
 
 const adminUrl = testDatabaseUrl();
-const BASE = "https://cairn.test";
+const BASE = "https://procura.test";
 const API = `${BASE}/app/api`;
 const OPENAPI = readFileSync(new URL("../../ingest/fixtures/intervals-icu/openapi.json", import.meta.url), "utf8");
 const SECRET = "fake-console-key-0123456789";
@@ -81,7 +81,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
     const vault = new Vault({ store: new PgVaultStore(db), keyWrapper });
     await vault.putCredential({ tenantId: a, sourceId: "intervals-icu", schemeId: "APIKey", credential: { kind: "basic", username: "API_KEY", password: "fake-key-0000" } });
 
-    const staticDir = mkdtempSync(join(tmpdir(), "cairnmcp-console-"));
+    const staticDir = mkdtempSync(join(tmpdir(), "procura-console-"));
     mkdirSync(join(staticDir, "assets"));
     writeFileSync(join(staticDir, "index.html"), "<!doctype html><title>console</title>");
     writeFileSync(join(staticDir, "assets", "app-123.js"), "console.log(1)");
@@ -134,9 +134,9 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
     it("sets __Host- cookies that scripts can't read", async () => {
       const browser = new TestBrowser(app);
       const start = await browser.get(`${BASE}/app/login/idp`);
-      expect(start.headers.getSetCookie()[0]).toMatch(/^__Host-cairnmcp_login=[^;]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=600; Secure$/);
+      expect(start.headers.getSetCookie()[0]).toMatch(/^__Host-procura_login=[^;]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=600; Secure$/);
       const back = await browser.get(op.approve(start.headers.get("location")!, { sub: "alice", email: "alice@example.com" }));
-      expect(back.headers.getSetCookie()[0]).toMatch(/^__Host-cairnmcp_session=[^;]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=28800; Secure$/);
+      expect(back.headers.getSetCookie()[0]).toMatch(/^__Host-procura_session=[^;]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=28800; Secure$/);
     });
 
     it("refuses a callback in a different browser, and a replayed one", async () => {

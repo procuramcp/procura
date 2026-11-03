@@ -1,9 +1,9 @@
-import { randomToken } from "@cairnmcp/http";
+import { randomToken } from "@procura/http";
 import * as oidc from "openid-client";
 
 /** Who an upstream identity provider says signed in. */
 export type UpstreamIdentity = {
-  /** The provider's `iss`; with `subject`, the key of a cairnmcp user. */
+  /** The provider's `iss`; with `subject`, the key of a procura user. */
   issuer: string;
   subject: string;
   /** For display on the consent page only (an email or name). Never used for identity. */
@@ -11,7 +11,7 @@ export type UpstreamIdentity = {
 };
 
 /**
- * Where people sign in. cairnmcp delegates authentication (D-026) and issues
+ * Where people sign in. procura delegates authentication (D-026) and issues
  * its own tokens afterwards; it never sees a password.
  */
 export interface IdentityProvider {

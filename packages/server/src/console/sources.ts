@@ -1,10 +1,10 @@
 // Adding an API (D-035): find its description, preview, add it with a starter
 // toolset, view it, and set or remove its credentials.
-import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceView } from "@cairnmcp/console-api";
-import { countBySideEffect, curateSideEffect, defaultToolset, slugify, type TenantId } from "@cairnmcp/core";
-import { getSource, getToolset, listSourceIds, listToolsets, putSource, putToolset, setToolsetAccess, type TenantTx } from "@cairnmcp/db";
-import { json } from "@cairnmcp/http";
-import { credentialKindsFor } from "@cairnmcp/vault";
+import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceView } from "@procura/console-api";
+import { countBySideEffect, curateSideEffect, defaultToolset, slugify, type TenantId } from "@procura/core";
+import { getSource, getToolset, listSourceIds, listToolsets, putSource, putToolset, setToolsetAccess, type TenantTx } from "@procura/db";
+import { json } from "@procura/http";
+import { credentialKindsFor } from "@procura/vault";
 import { AdminError, mapSource, summarize, type MappedSource } from "../admin.ts";
 import { discoverDocument, FetchRefused } from "../fetch-document.ts";
 import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SideEffectEdit, SourceInput, SourcePreviewInput } from "./bodies.ts";

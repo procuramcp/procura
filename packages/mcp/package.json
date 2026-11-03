@@ -1,5 +1,5 @@
 {
-  "name": "@cairnmcp/mcp",
+  "name": "@procura/mcp",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,15 +11,15 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
-    "@cairnmcp/db": "workspace:*",
-    "@cairnmcp/http": "workspace:*",
-    "@cairnmcp/runtime": "workspace:*",
-    "@cairnmcp/vault": "workspace:*",
+    "@procura/core": "workspace:*",
+    "@procura/db": "workspace:*",
+    "@procura/http": "workspace:*",
+    "@procura/runtime": "workspace:*",
+    "@procura/vault": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "jose": "^6.2.12"
   },
   "devDependencies": {
-    "@cairnmcp/ingest": "workspace:*"
+    "@procura/ingest": "workspace:*"
   }
 }

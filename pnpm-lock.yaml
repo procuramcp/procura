@@ -26,34 +26,34 @@ importers:
 
   examples/intervals-icu:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@cairnmcp/ingest':
+      '@procura/ingest':
         specifier: workspace:*
         version: link:../../packages/ingest
-      '@cairnmcp/runtime':
+      '@procura/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
-      '@cairnmcp/vault':
+      '@procura/vault':
         specifier: workspace:*
         version: link:../../packages/vault
 
   packages/auth:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
-      '@cairnmcp/db':
+      '@procura/db':
         specifier: workspace:*
         version: link:../db
-      '@cairnmcp/http':
+      '@procura/http':
         specifier: workspace:*
         version: link:../http
-      '@cairnmcp/mcp':
+      '@procura/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@cairnmcp/vault':
+      '@procura/vault':
         specifier: workspace:*
         version: link:../vault
       drizzle-orm:
@@ -69,12 +69,12 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
-      '@cairnmcp/ingest':
-        specifier: workspace:*
-        version: link:../ingest
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
+      '@procura/ingest':
+        specifier: workspace:*
+        version: link:../ingest
 
   packages/console-api: {}
 
@@ -86,13 +86,13 @@ importers:
 
   packages/db:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
-      '@cairnmcp/runtime':
+      '@procura/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@cairnmcp/vault':
+      '@procura/vault':
         specifier: workspace:*
         version: link:../vault
       drizzle-orm:
@@ -102,7 +102,7 @@ importers:
         specifier: ^8.23.1
         version: 8.23.1
     devDependencies:
-      '@cairnmcp/ingest':
+      '@procura/ingest':
         specifier: workspace:*
         version: link:../ingest
       '@types/pg':
@@ -111,10 +111,10 @@ importers:
 
   packages/eval:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
-      '@cairnmcp/ingest':
+      '@procura/ingest':
         specifier: workspace:*
         version: link:../ingest
       ajv:
@@ -131,7 +131,7 @@ importers:
 
   packages/ingest:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
       yaml:
@@ -147,75 +147,75 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@cairnmcp/core':
-        specifier: workspace:*
-        version: link:../core
-      '@cairnmcp/db':
-        specifier: workspace:*
-        version: link:../db
-      '@cairnmcp/http':
-        specifier: workspace:*
-        version: link:../http
-      '@cairnmcp/runtime':
-        specifier: workspace:*
-        version: link:../runtime
-      '@cairnmcp/vault':
-        specifier: workspace:*
-        version: link:../vault
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
+      '@procura/core':
+        specifier: workspace:*
+        version: link:../core
+      '@procura/db':
+        specifier: workspace:*
+        version: link:../db
+      '@procura/http':
+        specifier: workspace:*
+        version: link:../http
+      '@procura/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@procura/vault':
+        specifier: workspace:*
+        version: link:../vault
       jose:
         specifier: ^6.2.12
         version: 6.2.12
     devDependencies:
-      '@cairnmcp/ingest':
+      '@procura/ingest':
         specifier: workspace:*
         version: link:../ingest
 
   packages/runtime:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
-      '@cairnmcp/vault':
+      '@procura/vault':
         specifier: workspace:*
         version: link:../vault
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
     devDependencies:
-      '@cairnmcp/ingest':
+      '@procura/ingest':
         specifier: workspace:*
         version: link:../ingest
 
   packages/server:
     dependencies:
-      '@cairnmcp/auth':
+      '@procura/auth':
         specifier: workspace:*
         version: link:../auth
-      '@cairnmcp/console-api':
+      '@procura/console-api':
         specifier: workspace:*
         version: link:../console-api
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
-      '@cairnmcp/db':
+      '@procura/db':
         specifier: workspace:*
         version: link:../db
-      '@cairnmcp/http':
+      '@procura/http':
         specifier: workspace:*
         version: link:../http
-      '@cairnmcp/ingest':
+      '@procura/ingest':
         specifier: workspace:*
         version: link:../ingest
-      '@cairnmcp/mcp':
+      '@procura/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@cairnmcp/runtime':
+      '@procura/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@cairnmcp/vault':
+      '@procura/vault':
         specifier: workspace:*
         version: link:../vault
       drizzle-orm:
@@ -234,7 +234,7 @@ importers:
 
   packages/vault:
     dependencies:
-      '@cairnmcp/core':
+      '@procura/core':
         specifier: workspace:*
         version: link:../core
       zod:
@@ -243,12 +243,12 @@ importers:
 
   packages/web:
     devDependencies:
-      '@cairnmcp/console-api':
-        specifier: workspace:*
-        version: link:../console-api
       '@fontsource-variable/geist':
         specifier: ^5.3.0
         version: 5.3.0
+      '@procura/console-api':
+        specifier: workspace:*
+        version: link:../console-api
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.3.5(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.1))

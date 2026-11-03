@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1
 #
-# The cairnmcp image (D-018): the authorization server, the MCP endpoint, and the
+# The procura image (D-018): the authorization server, the MCP endpoint, and the
 # curation console. No build step for the server: Node runs the TypeScript
 # sources directly (D-009); only the console's browser bundle is built (D-033).
 #
-#   docker build -t cairnmcp .
-#   docker run --rm -e CAIRNMCP_DATABASE_OWNER_URL=… cairnmcp node packages/db/scripts/migrate.ts
-#   docker run -p 8080:8080 --env-file .env cairnmcp
+#   docker build -t procura .
+#   docker run --rm -e PROCURA_DATABASE_OWNER_URL=… procura node packages/db/scripts/migrate.ts
+#   docker run -p 8080:8080 --env-file .env procura
 #
-# Published as ghcr.io/cairnmcp/cairnmcp (D-046); deploy/self-host runs it with compose.
+# Published as ghcr.io/procuramcp/procura (D-046); deploy/self-host runs it with compose.
 #
 # The base image is pinned by digest so a moved tag can't change what we ship;
 # Dependabot updates both FROM lines together.
@@ -24,7 +24,7 @@ COPY . .
 # Only the server and what it needs at runtime. Workspace packages stay symlinks into
 # packages/, outside node_modules, which is where Node strips types.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --prod --filter "@cairnmcp/server..."
+    pnpm install --offline --frozen-lockfile --prod --filter "@procura/server..."
 
 # The curation console (D-033): a browser bundle, the only thing that is built.
 # Its dev dependencies (Vite, Tailwind) stay in this stage.
@@ -36,11 +36,11 @@ RUN corepack enable && corepack install
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --filter "@cairnmcp/web" && \
-    pnpm --filter @cairnmcp/web build
+    pnpm install --offline --frozen-lockfile --filter "@procura/web" && \
+    pnpm --filter @procura/web build
 
 FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
-LABEL org.opencontainers.image.source="https://github.com/cairnmcp/cairnmcp" \
+LABEL org.opencontainers.image.source="https://github.com/procuramcp/procura" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080

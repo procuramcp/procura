@@ -1,10 +1,10 @@
 // What every console route needs: the app's services, the signed-in user, and
 // the team-role check that runs tenant work inside the tenant (RLS).
-import { hasTeamRole, TenantId, type TeamRole, type UserId } from "@cairnmcp/core";
-import { memberRole, type Database, type TenantTx } from "@cairnmcp/db";
-import { json, type Route } from "@cairnmcp/http";
-import type { Runtime } from "@cairnmcp/runtime";
-import type { Vault } from "@cairnmcp/vault";
+import { hasTeamRole, TenantId, type TeamRole, type UserId } from "@procura/core";
+import { memberRole, type Database, type TenantTx } from "@procura/db";
+import { json, type Route } from "@procura/http";
+import type { Runtime } from "@procura/runtime";
+import type { Vault } from "@procura/vault";
 import type { DocumentGetter } from "../fetch-document.ts";
 
 /** Services and settings shared by every console route. */
@@ -13,7 +13,7 @@ export type ConsoleContext = {
   vault: Vault;
   runtime: Runtime;
   getDocument: DocumentGetter;
-  /** Public origin, e.g. `https://cairnmcp.example.com`. */
+  /** Public origin, e.g. `https://procura.example.com`. */
   base: string;
 };
 

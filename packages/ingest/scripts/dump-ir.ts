@@ -3,7 +3,7 @@
 // Defaults to the Intervals.icu fixture.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { instantOf } from "@cairnmcp/core";
+import { instantOf } from "@procura/core";
 import { ingestOpenApiText } from "../src/index.ts";
 
 const input = resolve(process.argv[2] ?? new URL("../fixtures/intervals-icu/openapi.json", import.meta.url).pathname);

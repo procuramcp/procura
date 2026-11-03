@@ -24,7 +24,7 @@ const input = { redirectUri: "http://localhost:8080/app/callback/dex", state: "s
 describe("OidcIdentityProvider", () => {
   it("accepts a plain-http localhost issuer, like the self-host setup's Dex", async () => {
     const issuer = "http://localhost:5556/dex";
-    const provider = new OidcIdentityProvider({ id: "dex", name: "Dex", issuer, clientId: "cairnmcp", clientSecret: "x" }, { fetch: discoveryOnly(issuer) });
+    const provider = new OidcIdentityProvider({ id: "dex", name: "Dex", issuer, clientId: "procura", clientSecret: "x" }, { fetch: discoveryOnly(issuer) });
     const url = await provider.authorizationUrl(input);
     expect(url.origin + url.pathname).toBe(`${issuer}/auth`);
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
@@ -32,7 +32,7 @@ describe("OidcIdentityProvider", () => {
 
   it("uses https issuers as before", async () => {
     const issuer = "https://idp.example";
-    const provider = new OidcIdentityProvider({ id: "idp", name: "IdP", issuer, clientId: "cairnmcp", clientSecret: "x" }, { fetch: discoveryOnly(issuer) });
+    const provider = new OidcIdentityProvider({ id: "idp", name: "IdP", issuer, clientId: "procura", clientSecret: "x" }, { fetch: discoveryOnly(issuer) });
     expect((await provider.authorizationUrl(input)).origin).toBe(issuer);
   });
 });

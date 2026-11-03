@@ -1,6 +1,6 @@
 // The console's JSON API (packages/server/src/console/). Same origin, cookie
 // session; unsafe methods send JSON, which the server requires (CSRF). The
-// request and response types are the shared contract in @cairnmcp/console-api,
+// request and response types are the shared contract in @procura/console-api,
 // which the server's handlers are checked against.
 import type {
   AccessEdit,
@@ -34,9 +34,9 @@ import type {
   ToolsetEdit,
   ToolsetView,
   ToolTestInput,
-} from "@cairnmcp/console-api";
+} from "@procura/console-api";
 
-export type * from "@cairnmcp/console-api";
+export type * from "@procura/console-api";
 
 export class ApiError extends Error {
   readonly status: number;

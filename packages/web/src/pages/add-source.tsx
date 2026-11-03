@@ -213,7 +213,7 @@ function Review({ tenantId, found, onAdded }: { tenantId: string; found: { input
         <Field data-invalid={taken || undefined}>
           <FieldLabel htmlFor="source-id">Source id</FieldLabel>
           <Input id="source-id" className="font-mono" value={id} onChange={(e) => setId(slugify(e.target.value))} aria-invalid={taken} />
-          <FieldDescription>{taken ? "Already used in this tenant. Updating an existing source comes later." : "A short name for this API in cairnmcp."}</FieldDescription>
+          <FieldDescription>{taken ? "Already used in this tenant. Updating an existing source comes later." : "A short name for this API in procura."}</FieldDescription>
         </Field>
 
         <div className="flex flex-col gap-2">

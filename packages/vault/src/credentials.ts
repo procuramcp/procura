@@ -1,4 +1,4 @@
-import { Instant } from "@cairnmcp/core";
+import { Instant } from "@procura/core";
 import { z } from "zod";
 import { Secret } from "./secret.ts";
 

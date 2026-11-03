@@ -1,9 +1,9 @@
 {
-  "name": "@cairnmcp/server",
+  "name": "@procura/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The cairnmcp app: the authorization server and the MCP endpoint in one process, configured from the environment.",
+  "description": "The procura app: the authorization server and the MCP endpoint in one process, configured from the environment.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,15 +13,15 @@
     "dev:console": "node scripts/dev-console.ts"
   },
   "dependencies": {
-    "@cairnmcp/auth": "workspace:*",
-    "@cairnmcp/console-api": "workspace:*",
-    "@cairnmcp/core": "workspace:*",
-    "@cairnmcp/db": "workspace:*",
-    "@cairnmcp/http": "workspace:*",
-    "@cairnmcp/ingest": "workspace:*",
-    "@cairnmcp/mcp": "workspace:*",
-    "@cairnmcp/runtime": "workspace:*",
-    "@cairnmcp/vault": "workspace:*",
+    "@procura/auth": "workspace:*",
+    "@procura/console-api": "workspace:*",
+    "@procura/core": "workspace:*",
+    "@procura/db": "workspace:*",
+    "@procura/http": "workspace:*",
+    "@procura/ingest": "workspace:*",
+    "@procura/mcp": "workspace:*",
+    "@procura/runtime": "workspace:*",
+    "@procura/vault": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "zod": "^4.6.7"
   },

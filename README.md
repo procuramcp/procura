@@ -1,8 +1,9 @@
-# cairnmcp
+# procura
 
-A cairn marks the safe path on a trail. cairnmcp marks the safe path from APIs to agents: it
-ingests an API description, curates a safe set of operations, and serves them as a remote
-MCP server, on our hosting or yours.
+A procura (Italian, Spanish, Portuguese) is a power of attorney: the authority to act on someone's
+behalf, within set limits. procura gives agents that for APIs: it ingests an API description,
+curates a safe set of operations, and serves them as a remote MCP server, on our hosting or yours.
+(It was called cairnmcp until D-047.)
 
 It's built for API providers: one MCP server for all of a provider's customers, with different
 tools and limits per plan and usage it can bill for. Anyone can also host a server for their own
@@ -63,7 +64,7 @@ Copy its `.env.example` to `.env` in that folder, set `INTERVALS_API_KEY`, then 
 
 Run your own with Docker: [`deploy/self-host`](deploy/self-host/README.md) has a Compose setup
 (the app, Postgres, and a local sign-in provider for trying it on a laptop) and the guide for
-HTTPS, sign-in, backups, and upgrades. The image is `ghcr.io/cairnmcp/cairnmcp`.
+HTTPS, sign-in, backups, and upgrades. The image is `ghcr.io/procuramcp/procura`.
 
 ## Licence
 
@@ -75,5 +76,5 @@ copy over a network, offer them its source.
 Never commit secrets, `.env` files, or real personal data from any API. Fixtures are synthetic
 or public API descriptions.
 
-cairnmcp returns each API's output as-is. It doesn't analyze or interpret data; that belongs to
+procura returns each API's output as-is. It doesn't analyze or interpret data; that belongs to
 whatever agent or app consumes the tools.

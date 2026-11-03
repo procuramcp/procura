@@ -1,4 +1,4 @@
-import { parseMasterKey } from "@cairnmcp/vault";
+import { parseMasterKey } from "@procura/vault";
 import { z } from "zod";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -49,19 +49,19 @@ const OidcProviders = jsonEnv(
 const TrustedIssuers = jsonEnv(z.array(z.object({ issuer: z.url(), jwksUri: httpsUrl })));
 
 const Env = z.object({
-  CAIRNMCP_PUBLIC_URL: PublicUrl,
-  CAIRNMCP_DATABASE_URL: z.string().startsWith("postgres", "must be a postgres:// URL"),
-  CAIRNMCP_MASTER_KEY: z.string().superRefine((key, ctx) => {
+  PROCURA_PUBLIC_URL: PublicUrl,
+  PROCURA_DATABASE_URL: z.string().startsWith("postgres", "must be a postgres:// URL"),
+  PROCURA_MASTER_KEY: z.string().superRefine((key, ctx) => {
     try {
       parseMasterKey(key);
     } catch (e) {
       // parseMasterKey's messages name the problem, never the value.
-      ctx.addIssue({ code: "custom", message: (e as Error).message.replace(/^CAIRNMCP_MASTER_KEY /, "") });
+      ctx.addIssue({ code: "custom", message: (e as Error).message.replace(/^PROCURA_MASTER_KEY /, "") });
     }
   }),
-  CAIRNMCP_OIDC_PROVIDERS: OidcProviders,
-  CAIRNMCP_TRUSTED_ISSUERS: TrustedIssuers.optional(),
-  CAIRNMCP_ALLOWED_ORIGINS: z
+  PROCURA_OIDC_PROVIDERS: OidcProviders,
+  PROCURA_TRUSTED_ISSUERS: TrustedIssuers.optional(),
+  PROCURA_ALLOWED_ORIGINS: z
     .string()
     .optional()
     .transform((s) => (s ?? "").split(",").map((o) => o.trim()).filter(Boolean)),
@@ -97,12 +97,12 @@ export function loadConfig(env: Record<string, string | undefined>): ServerConfi
   }
   const e = parsed.data;
   return {
-    publicUrl: e.CAIRNMCP_PUBLIC_URL,
-    databaseUrl: e.CAIRNMCP_DATABASE_URL,
-    masterKey: e.CAIRNMCP_MASTER_KEY,
-    oidcProviders: e.CAIRNMCP_OIDC_PROVIDERS,
-    trustedIssuers: e.CAIRNMCP_TRUSTED_ISSUERS ?? [],
-    allowedOrigins: e.CAIRNMCP_ALLOWED_ORIGINS,
+    publicUrl: e.PROCURA_PUBLIC_URL,
+    databaseUrl: e.PROCURA_DATABASE_URL,
+    masterKey: e.PROCURA_MASTER_KEY,
+    oidcProviders: e.PROCURA_OIDC_PROVIDERS,
+    trustedIssuers: e.PROCURA_TRUSTED_ISSUERS ?? [],
+    allowedOrigins: e.PROCURA_ALLOWED_ORIGINS,
     port: e.PORT,
   };
 }

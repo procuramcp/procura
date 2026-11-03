@@ -4,7 +4,7 @@ A map of this repo for coding agents: where things live, which helpers already e
 rules the code follows. Read this before searching. When you add a package, a shared helper, or
 a new kind of file, update this map in the same change.
 
-cairnmcp turns an API description (OpenAPI) into a curated set of tools served as a remote MCP
+procura turns an API description (OpenAPI) into a curated set of tools served as a remote MCP
 server. One Node process serves the OAuth authorization server, the MCP endpoint, and the curation
 console. Why things are the way they are: `docs/DECISIONS.md`, cited in code as `D-0xx`.
 
@@ -20,14 +20,14 @@ If `node -v` is older, use `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` (
 | One package's tests | `pnpm vitest run packages/<name>` |
 | One test file | `pnpm vitest run packages/db/src/repo.test.ts` |
 | Both | `pnpm check` |
-| Build the console | `pnpm --filter @cairnmcp/web build` |
-| Run the console locally with fake data | `CAIRNMCP_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres pnpm --filter @cairnmcp/server dev:console` (http://localhost:8787/app/) |
+| Build the console | `pnpm --filter @procura/web build` |
+| Run the console locally with fake data | `PROCURA_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres pnpm --filter @procura/server dev:console` (http://localhost:8787/app/) |
 | Ingest eval report (`docs/eval/`) | `pnpm eval:ingest` (downloads large corpus documents on first run; `--offline` skips them) |
-| Migrate a database | `pnpm --filter @cairnmcp/db migrate` (owner role) |
+| Migrate a database | `pnpm --filter @procura/db migrate` (owner role) |
 
-The Postgres tests (`db`, `mcp`, `auth`, `server`) skip unless `CAIRNMCP_TEST_DATABASE_URL` is
+The Postgres tests (`db`, `mcp`, `auth`, `server`) skip unless `PROCURA_TEST_DATABASE_URL` is
 a superuser URL; each test file creates and drops its own database. A local Postgres works:
-`CAIRNMCP_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres`. CI always runs them.
+`PROCURA_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres`. CI always runs them.
 
 ## Packages (lowest first; each may import only those above it)
 
@@ -51,7 +51,7 @@ self-host setup (`deploy/self-host`: Compose with Postgres, a migration step, De
 users run with the published image, D-046), the Oracle VM (Docker Compose + Caddy), and Auth0
 (Terraform, not OpenTofu). `scripts/image-smoke.sh` and `scripts/compose-smoke.sh` are CI's
 checks of the image and of the self-host setup; run them locally after changing either
-(`docker build -t cairnmcp:dev . && scripts/compose-smoke.sh cairnmcp:dev`).
+(`docker build -t procura:dev . && scripts/compose-smoke.sh procura:dev`).
 
 ### The console (`packages/server/src/console/`)
 
@@ -89,7 +89,7 @@ checks of the image and of the self-host setup; run them locally after changing 
 | Cookies | `readCookie`, `setCookie` (http) |
 | Random secret, hashes, constant-time compare | `randomToken`, `sha256Hex`, `sha256Base64url`, `safeEqual` (http) |
 | Route table | `dispatch` + `Route<C>` (http) |
-| Console request/response types | `@cairnmcp/console-api`; never re-declare them in `web` or `server` |
+| Console request/response types | `@procura/console-api`; never re-declare them in `web` or `server` |
 | Postgres error code (FK, unique) | `pgErrorCode(e) === PG.FOREIGN_KEY_VIOLATION` (db) |
 | Toolset plus its source | `getToolsetWithSource` (db) |
 | Source ids / names and counts / per-operation side effects | `listSourceIds`, `listSourceSummaries`, `listOperationEffects` (db): no IR parse |
@@ -100,11 +100,11 @@ checks of the image and of the self-host setup; run them locally after changing 
 | Ingest OpenAPI for storage | `mapSource` (server `admin.ts`), which wraps `ingestOpenApiText` |
 | Console action with busy flag + error toast | `act` (web `lib/act.ts`) |
 | Load data in a page | `useLoad` (web `lib/hooks.ts`) |
-| Test doubles | `@cairnmcp/db/test-support` (scratch DB, `newTenant`, `intervalsIr`), `server/src/test-support.ts` (fake OIDC provider, `TestBrowser`), `runtime/src/test-support.ts` (`fakeFetch`), `core/src/ir/test-helpers.ts` |
+| Test doubles | `@procura/db/test-support` (scratch DB, `newTenant`, `intervalsIr`), `server/src/test-support.ts` (fake OIDC provider, `TestBrowser`), `runtime/src/test-support.ts` (`fakeFetch`), `core/src/ir/test-helpers.ts` |
 
 ## Rules the code follows
 
-- **Imports** end in `.ts`; packages import each other by name (`@cairnmcp/core`), never by path.
+- **Imports** end in `.ts`; packages import each other by name (`@procura/core`), never by path.
   New workspace deps use `"workspace:*"`; external deps use caret ranges (`^1.2.3`).
 - **Strict TypeScript**: `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess` are on. For an
   optional property that may be undefined, use `omitUndefined({...})` or a conditional spread.
@@ -136,6 +136,9 @@ checks of the image and of the self-host setup; run them locally after changing 
   `docs/DECISIONS.md`.
 - **A new setting** goes in `server/src/config.ts` (validated at startup), both `.env.example`
   files (root for development, `deploy/self-host/` for Docker), and `deploy/self-host/compose.yaml`.
+- **The old name, cairnmcp, stays where it's stored** (D-047): the Postgres schema and roles,
+  the vault and signing-key contexts (`cairnmcp:v1:…`, `cairnmcp-kek-id`), `deploy/oracle`, and
+  the Terraform. Never rename those; everything else says procura.
 - **Never commit** `.env*`, `*.tfstate`, `*.tfvars`, or real API data. Fixtures are synthetic or public.
 
 ## Recipes
@@ -164,5 +167,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-046, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-047, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{self-host,oracle,auth0}`.

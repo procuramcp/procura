@@ -11,7 +11,7 @@ type Pending = { nonce: string; challenge: string; redirectUri: string; sub: str
  */
 export class FakeOidcProvider {
   readonly issuer = "https://idp.test";
-  readonly clientId = "cairnmcp-test";
+  readonly clientId = "procura-test";
   readonly clientSecret = "idp-test-secret-not-real";
   readonly #codes = new Map<string, Pending>();
   #privateKey!: CryptoKey;

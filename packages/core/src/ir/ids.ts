@@ -41,7 +41,7 @@ export const AuthSchemeId = z.string().regex(/^[A-Za-z0-9._-]{1,64}$/).brand<"Au
 export type AuthSchemeId = z.infer<typeof AuthSchemeId>;
 
 /**
- * Tenant identifier. Opaque to cairnmcp: a UUID in the hosted deployment, any
+ * Tenant identifier. Opaque to procura: a UUID in the hosted deployment, any
  * slug-like value in tests and self-hosted setups. Not part of the IR itself
  * (D-004); used by the vault, runtime, and storage layers.
  */
@@ -49,7 +49,7 @@ export const TenantId = opaqueId<"TenantId">();
 export type TenantId = z.infer<typeof TenantId>;
 
 /**
- * A cairnmcp user: one identity from one issuer (token `iss` + `sub`). Global,
+ * A procura user: one identity from one issuer (token `iss` + `sub`). Global,
  * not per tenant; a user joins tenants through memberships. Opaque like
  * `TenantId` (a UUID in practice).
  */

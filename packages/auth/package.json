@@ -1,5 +1,5 @@
 {
-  "name": "@cairnmcp/auth",
+  "name": "@procura/auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,18 +11,18 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
-    "@cairnmcp/db": "workspace:*",
-    "@cairnmcp/http": "workspace:*",
-    "@cairnmcp/mcp": "workspace:*",
-    "@cairnmcp/vault": "workspace:*",
+    "@procura/core": "workspace:*",
+    "@procura/db": "workspace:*",
+    "@procura/http": "workspace:*",
+    "@procura/mcp": "workspace:*",
+    "@procura/vault": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "jose": "^6.2.12",
     "openid-client": "^6.8.8",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@cairnmcp/ingest": "workspace:*",
+    "@procura/ingest": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.1"
   }
 }

@@ -981,10 +981,38 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
   code: the licence has to be chosen first.
 - **Decision:** AGPL-3.0-only (`LICENSE`), the licence Speakeasy's Gram uses. Anyone may run,
   change, and host cairnmcp; a hosted copy must offer its changed source to its users. The image
-  is public on GitHub Container Registry (`ghcr.io/cairnmcp/cairnmcp`).
+  is public on GitHub Container Registry (`ghcr.io/procuramcp/procura`).
 - **"-only", not "-or-later":** a future GNU licence doesn't apply without our choosing it.
 - **Still possible later:** a later version under another licence (D-045); what was released
   under AGPL stays AGPL. Taking outside contributions would need a contributor agreement first
   if we want to keep that option, so none are taken until that's decided.
 - **Rejected:** a private image (self-hosters would need an invitation to pull), and
   source-available licences (BSL, FSL), which make a hosted copy depend on our permission.
+
+## D-047 Renamed to procura; stored identifiers keep cairnmcp
+
+- **Context:** the GitHub organization is now `procuramcp` and the repository `procura`. A
+  procura is a power of attorney (Italian, Spanish, Portuguese): authority to act on someone's
+  behalf within set limits, which is what the product gives agents. Entries before this one
+  say cairnmcp; read it as procura.
+- **Renamed:** the product name in the UI, pages, and docs; packages (`@procura/*`); settings
+  (`PROCURA_*`); cookies (signs console users and in-flight sign-ins out once); the MCP server
+  name clients see; the image (`ghcr.io/procuramcp/procura`) and the self-host stack (Compose
+  project, database name, Dex client).
+- **Kept as cairnmcp, because they are stored or live:**
+  - the Postgres schema `cairnmcp` and roles `cairnmcp_app`, `cairnmcp_owner`,
+    `cairnmcp_server`: migrations are append-only, function bodies name the schema, and roles
+    are shared with existing databases;
+  - the encryption and signing-key contexts (`cairnmcp:v1:…`) and the key id derivation
+    (`cairnmcp-kek-id`): changing them makes every stored credential and signing key unreadable;
+  - `deploy/oracle` (the running VM: Compose project, volumes, `cairnmcp:<tag>` images; CI
+    won't deploy a change to its files without a manual ship) and the Terraform in
+    `deploy/oracle/infra` and `deploy/auth0` (renaming resources would replace the VM and the
+    Auth0 application), including the Auth0 tenant `cairnmcp.us.auth0.com`.
+- **Old setting names still work for now:** each entry point copies a set `CAIRNMCP_X` to an
+  unset `PROCURA_X` and warns (`applyLegacyEnvNames` in `db`), so the VM keeps running on its
+  existing `app.env` and `migrate.env`. Remove it once those files are renamed.
+- **Rejected:** renaming the schema and roles with a migration (role renames need privileges the
+  owner may not have, and plpgsql bodies would need rewriting), and rewriting earlier decisions
+  (they are a record of what was decided at the time).
+

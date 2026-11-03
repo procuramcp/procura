@@ -1,7 +1,7 @@
-import { allowsTool, callLimits, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccess } from "@cairnmcp/core";
-import { getToolsetWithSource, memberRole, toolsetAccessFor, toolsetVersion, type Database } from "@cairnmcp/db";
-import { json } from "@cairnmcp/http";
-import type { Runtime } from "@cairnmcp/runtime";
+import { allowsTool, callLimits, TenantId, ToolsetId, UserId, type Caller, type IrDocument, type ResolvedTool, type Toolset, type ToolsetAccess } from "@procura/core";
+import { getToolsetWithSource, memberRole, toolsetAccessFor, toolsetVersion, type Database } from "@procura/db";
+import { json } from "@procura/http";
+import type { Runtime } from "@procura/runtime";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js";
@@ -14,7 +14,7 @@ export type McpHandlerOptions = {
   db: Database;
   verifier: TokenVerifier;
   runtime: Runtime;
-  /** Public base URL, e.g. `https://cairnmcp.example.com`. Resource URLs and token audiences derive from it. */
+  /** Public base URL, e.g. `https://procura.example.com`. Resource URLs and token audiences derive from it. */
   publicUrl: string;
   /** Browser origins allowed to call the endpoint. Requests with any other `Origin` are refused (DNS rebinding). */
   allowedOrigins?: string[];
@@ -61,7 +61,7 @@ export function createMcpHandler(options: McpHandlerOptions): (request: Request)
         authorization_servers: issuers,
         bearer_methods_supported: ["header"],
         scopes_supported: ["mcp"],
-        resource_name: "cairnmcp",
+        resource_name: "procura",
       });
     }
 
@@ -128,7 +128,7 @@ async function serveMcp(request: Request, s: Session): Promise<Response> {
   const visible = new Map(s.tools.filter((t) => allowsTool(s.access, t.operation.id, t.operation.sideEffect.class)).map((t) => [t.name as string, t]));
 
   const server = new Server(
-    { name: "cairnmcp", title: s.toolset.name, version: s.version ?? "0.0.0" },
+    { name: "procura", title: s.toolset.name, version: s.version ?? "0.0.0" },
     { capabilities: { tools: {} }, ...(s.toolset.description ? { instructions: s.toolset.description } : {}) },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...visible.values()].map(toMcpTool) }));

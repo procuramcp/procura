@@ -1,11 +1,11 @@
-# @cairnmcp/mcp
+# @procura/mcp
 
 The MCP endpoint (Streamable HTTP, protocol 2025-11-25). An OAuth resource server: it checks tokens,
 it doesn't issue them (D-022). Design: `docs/DECISIONS.md` D-025.
 
 - **One endpoint per toolset:** `POST /mcp/{tenantId}/{toolsetId}`. Stateless, with JSON responses.
 - **Tokens:** `Authorization: Bearer <JWT>` from a trusted issuer (the embedded one, plus any in
-  `CAIRNMCP_TRUSTED_ISSUERS`), with `aud`
+  `PROCURA_TRUSTED_ISSUERS`), with `aud`
   set to the endpoint's exact URL (RFC 8707) and a `sub`. Without a valid token the endpoint
   answers 401 with a `WWW-Authenticate` header pointing at its protected-resource metadata
   (`/.well-known/oauth-protected-resource/mcp/{tenantId}/{toolsetId}`, RFC 9728).
@@ -15,4 +15,4 @@ it doesn't issue them (D-022). Design: `docs/DECISIONS.md` D-025.
   writes and destructive tools), and `tools/call` treats any other tool as unknown.
 
 It runs as part of `packages/server`, together with the embedded authorization server
-(`packages/auth`), whose tokens carry the cairnmcp user id as `sub`.
+(`packages/auth`), whose tokens carry the procura user id as `sub`.

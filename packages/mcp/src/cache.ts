@@ -1,11 +1,11 @@
-import { resolveToolset, type IrDocument, type ResolveResult, type TenantId, type Toolset } from "@cairnmcp/core";
+import { resolveToolset, type IrDocument, type ResolveResult, type TenantId, type Toolset } from "@procura/core";
 
 /** A toolset resolved against its source, as served at one version of both rows. */
 export type ResolvedToolset = { version: string; toolset: Toolset; ir: IrDocument; resolved: ResolveResult };
 
 /**
  * Resolved toolsets by tenant and toolset id, reused while their version
- * (`toolsetVersion` in @cairnmcp/db) is unchanged. Loading, parsing, and
+ * (`toolsetVersion` in @procura/db) is unchanged. Loading, parsing, and
  * resolving a big IR on every MCP request is the expensive part of a call;
  * reusing the same resolved tool objects also lets the runtime reuse its
  * compiled input validators. Least recently used entries are evicted.

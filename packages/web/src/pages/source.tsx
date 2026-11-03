@@ -154,7 +154,7 @@ function KeyCard(props: { tenantId: string; source: SourceView; scheme: SourceVi
         )}
       </div>
       {scheme.description && <p className="line-clamp-3 text-muted-foreground text-xs">{scheme.description}</p>}
-      {!kind && <p className="text-muted-foreground text-sm">cairnmcp can't store keys for this kind of sign-in yet.</p>}
+      {!kind && <p className="text-muted-foreground text-sm">procura can't store keys for this kind of sign-in yet.</p>}
 
       {kind && editing && (
         <FieldGroup>

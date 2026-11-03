@@ -12,10 +12,10 @@ import {
   ToolsetAccessLevel,
   ToolsetId,
   UserId,
-} from "@cairnmcp/core";
-import { ensureMember, getSource, getToolset, listSourceSummaries, listToolsets, PG, pgErrorCode, putSource, putToolset, schema, setToolsetAccess, type Database } from "@cairnmcp/db";
-import { ingestOpenApiText } from "@cairnmcp/ingest";
-import { CredentialInput, type Vault } from "@cairnmcp/vault";
+} from "@procura/core";
+import { ensureMember, getSource, getToolset, listSourceSummaries, listToolsets, PG, pgErrorCode, putSource, putToolset, schema, setToolsetAccess, type Database } from "@procura/db";
+import { ingestOpenApiText } from "@procura/ingest";
+import { CredentialInput, type Vault } from "@procura/vault";
 import { eq } from "drizzle-orm";
 
 export class AdminError extends Error {}

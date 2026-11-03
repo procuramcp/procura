@@ -1,5 +1,5 @@
 {
-  "name": "@cairnmcp/db",
+  "name": "@procura/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,14 +14,14 @@
     "roles": "node --env-file-if-exists=../../.env.local scripts/create-app-role.ts"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
-    "@cairnmcp/runtime": "workspace:*",
-    "@cairnmcp/vault": "workspace:*",
+    "@procura/core": "workspace:*",
+    "@procura/runtime": "workspace:*",
+    "@procura/vault": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@cairnmcp/ingest": "workspace:*",
+    "@procura/ingest": "workspace:*",
     "@types/pg": "^8.23.1"
   }
 }

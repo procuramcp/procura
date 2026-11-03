@@ -1,7 +1,7 @@
 // The team and customers (D-038): roles, suspending, notes, removing, and
 // which profiles someone holds.
-import type { CustomerPage, Person, Removed } from "@cairnmcp/console-api";
-import { hasTeamRole, UserId, type MemberRole, type TeamRole } from "@cairnmcp/core";
+import type { CustomerPage, Person, Removed } from "@procura/console-api";
+import { hasTeamRole, UserId, type MemberRole, type TeamRole } from "@procura/core";
 import {
   ensureMember,
   getMember,
@@ -16,8 +16,8 @@ import {
   usageFor,
   type Member,
   type TenantTx,
-} from "@cairnmcp/db";
-import { json } from "@cairnmcp/http";
+} from "@procura/db";
+import { json } from "@procura/http";
 import { accessView } from "./access.ts";
 import { issuesText, MemberEdit, MemberProfiles, readBody, RoleEdit } from "./bodies.ts";
 import { asTeam, result, teamResponse, type ApiRequest, type ApiRoute } from "./context.ts";

@@ -1,6 +1,6 @@
 import { createPrivateKey, generateKeyPairSync, type KeyObject } from "node:crypto";
-import { schema, type Database } from "@cairnmcp/db";
-import type { KeyWrapper } from "@cairnmcp/vault";
+import { schema, type Database } from "@procura/db";
+import type { KeyWrapper } from "@procura/vault";
 import { isNull, or, gt, sql } from "drizzle-orm";
 import { calculateJwkThumbprint, createLocalJWKSet, SignJWT, type JWK, type JWTVerifyGetKey } from "jose";
 

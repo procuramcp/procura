@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { bearerToken, TokenVerifier } from "./token.ts";
 
 const ISSUER = "https://issuer.test";
-const AUDIENCE = "https://cairn.test/mcp/tenant-a/mine";
+const AUDIENCE = "https://procura.test/mcp/tenant-a/mine";
 
 let verifier: TokenVerifier;
 let sign: (claims: Record<string, unknown>, options?: { alg?: string; key?: CryptoKey; exp?: string | number }) => Promise<string>;
@@ -31,7 +31,7 @@ describe("TokenVerifier", () => {
   });
 
   it.each([
-    ["a token for another resource", { ...valid, aud: "https://cairn.test/mcp/tenant-b/mine" }, "token is not for this resource"],
+    ["a token for another resource", { ...valid, aud: "https://procura.test/mcp/tenant-b/mine" }, "token is not for this resource"],
     ["an untrusted issuer", { ...valid, iss: "https://evil.test" }, "token is from an issuer this server doesn't trust"],
     ["no subject", { iss: ISSUER, aud: AUDIENCE }, "invalid sub claim"],
   ])("rejects %s", async (_, claims, reason) => {
