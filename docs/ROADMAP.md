@@ -5,7 +5,7 @@ them, so new work gets a letter suffix (e.g. 2b) instead of renumbering. What ea
 needs to be able to do is in `docs/USER-STORIES.md` (story ids like P-13 below).
 
 **Order** (D-037: API providers are the main customer): finish 3 (source updates with a diff),
-then 3c, then the rest of 3b, then 2b. 4 and 5 wait. 2b moves up if a provider needs to run
+then 3c, then the rest of 3b, then 2b. 3d (composite tools) comes after 3c; 4 and 5 wait. 2b moves up if a provider needs to run
 cairnmcp itself.
 
 | | Milestone | Status |
@@ -16,6 +16,7 @@ cairnmcp itself.
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | Started: curation console at `/app` (D-033): sign-in, toolset editor (tools, names, descriptions, pins, write tools marked), access, and a tool test panel; access profiles, named permission sets assigned to members (D-034); adding APIs from OpenAPI (URL, Swagger UI page, paste, or file) and their keys (D-035). Next: updating a source with a diff of what changed |
 | 3b | Custom and on-behalf-of upstream auth; provider-hosted servers with per-user credentials (D-032); external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
 | 3c | Provider features: customers separate from the team, plans with per-customer limits and allowances, the provider's own sign-in with plans from claims, usage page and export, draft and published toolsets, branding. Details below | Next after 3 |
+| 3d | Composite tools: one tool that runs several API calls in order (P-8). Details below | After 3c |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
 | 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
@@ -74,6 +75,30 @@ each step is usable on its own:
    service key plus a signed identity header; decided in D-037's open question before this step.
 6. **Drafts and branding** (P-5, P-6): draft and published toolset versions; custom domain,
    branded sign-in and consent.
+
+## Milestone 3d: composite tools
+
+A provider builds one tool for a task that takes several calls (e.g. "find the customer by
+email, then list their open invoices"), so agents make one call instead of chaining several
+themselves and getting the order or the ids wrong (P-8). Speakeasy's Gram offers this as
+"custom tools".
+
+- **Declarative, no code:** a composite is an ordered list of steps over the source's
+  operations, each step's inputs taken from the tool's inputs, a pinned value, or an earlier
+  step's output (a path into its JSON). No loops or branches at first. The hosted service never
+  runs customer code (same rule as 3b).
+- **Stored with the toolset,** edited in the console next to the other tools, and tested in the
+  tool test panel step by step.
+- **Side effect is the most severe step,** so a composite with any write step is a write tool
+  and needs `use_writes` (D-005, D-023). Each step is still checked against egress rules and
+  the toolset's pins.
+- **Fail closed, report what ran:** stop at the first failing step and return which step failed
+  and which earlier steps already ran (writes are not rolled back), as a tool result (D-020).
+- **Audit and limits per step:** every upstream call is audited as today, tagged with the
+  composite. Whether a composite counts once or once per step against plan allowances is decided
+  with the cost-per-tool work in 3c step 2.
+- **Source updates:** a composite that uses a removed or changed operation is flagged in the
+  source diff (P-4) and fails closed until fixed (D-015).
 
 ## Milestone 3b: custom and on-behalf-of auth
 

@@ -33,6 +33,7 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 | P-5 | I edit a toolset without changing what customers see until I publish it. | Draft and published versions; publish is one action and can be rolled back. | — |
 | P-6 | My server runs on my domain, with my name and logo on sign-in and consent. | Custom domain with TLS; branded sign-in, consent, and server name and instructions. | — |
 | P-7 | I can run cairnmcp myself, next to my API. | Published image, compose file, config docs (milestone 2b); private-network targets allowed explicitly (D-022). | partial: image exists, not published |
+| P-8 | I combine several operations into one tool for a common task, so agents don't have to chain calls themselves. | Composite tools: ordered steps whose inputs come from the tool's inputs, pins, or earlier steps' outputs; side effect is the most severe step; stops at the first failure and says what ran (milestone 3d). | — |
 
 ## Provider: customers and plans
 
