@@ -76,7 +76,7 @@ export function createConsoleHandler(options: ConsoleOptions): (request: Request
       }
     }
     const login = /^\/app\/login\/([a-z0-9-]+)$/.exec(path);
-    if (login && request.method === "GET") return auth.login(login[1]!);
+    if (login && request.method === "GET") return auth.login(request, login[1]!);
     const callback = /^\/app\/callback\/([a-z0-9-]+)$/.exec(path);
     if (callback && request.method === "GET") return auth.callback(request, url, callback[1]!);
     if (request.method !== "GET" && request.method !== "HEAD") return json(405, { error: "method_not_allowed" });

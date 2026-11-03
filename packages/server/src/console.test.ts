@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
+import type { Me } from "@procura/console-api";
 import { OidcIdentityProvider } from "@procura/auth";
 import { Toolset, type TenantId, type UserId } from "@procura/core";
 import { addMember, Database, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@procura/db";
@@ -151,6 +152,20 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       const browser = await signIn();
       expect((await browser.json("POST", `${API}/logout`, {})).status).toBe(200);
       expect((await browser.json("GET", `${API}/me`)).status).toBe(401);
+    });
+
+    it("after signing out, makes the provider ask again, so another account can be picked", async () => {
+      const prompt = async (b: TestBrowser) => new URL((await b.get(`${BASE}/app/login/idp`)).headers.get("location")!).searchParams.get("prompt");
+      expect(await prompt(new TestBrowser(app))).toBeNull();
+      const browser = await signIn();
+      await browser.json("POST", `${API}/logout`, {});
+      // Sign in again, now as someone else: the provider was asked to show its page.
+      const start = await browser.get(`${BASE}/app/login/idp`);
+      expect(new URL(start.headers.get("location")!).searchParams.get("prompt")).toBe("login");
+      await browser.get(op.approve(start.headers.get("location")!, { sub: "bob", email: "bob@example.com" }));
+      expect(((await (await browser.json("GET", `${API}/me`)).json()) as Me).user.label).toBe("bob@example.com");
+      // Signed in again: later sign-ins don't force the page.
+      expect(await prompt(browser)).toBeNull();
     });
   });
 

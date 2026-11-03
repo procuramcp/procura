@@ -23,6 +23,11 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
   // __Host- cookies need Secure, so plain-http development uses plain names.
   const SESSION_COOKIE = secure ? "__Host-procura_session" : "procura_session";
   const LOGIN_COOKIE = secure ? "__Host-procura_login" : "procura_login";
+  // Set by signing out. The next sign-in asks the provider to show its sign-in page, because
+  // it usually still remembers the person and would sign them straight back in as the same
+  // account, leaving no way to switch (e.g. from Google to a password at the same provider).
+  const SIGNED_OUT_COOKIE = secure ? "__Host-procura_signed_out" : "procura_signed_out";
+  const SIGNED_OUT_SECONDS = 24 * 60 * 60;
   const cookie = (name: string, value: string, maxAgeSeconds: number) => setCookie(name, value, { path: "/", maxAgeSeconds, secure });
   const callbackUri = (providerId: string) => `${base}/app/callback/${providerId}`;
 
@@ -38,10 +43,11 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
       return row ? { userId: UserId.parse(row.userId), label: row.userLabel } : undefined;
     },
 
-    async login(providerId: string): Promise<Response> {
+    async login(request: Request, providerId: string): Promise<Response> {
       const provider = providers.get(providerId);
       if (!provider) return page(404, "Unknown sign-in provider");
-      const { location, secrets } = await startSignIn(provider, callbackUri(provider.id));
+      const signedOut = readCookie(request, SIGNED_OUT_COOKIE) === "1";
+      const { location, secrets } = await startSignIn(provider, callbackUri(provider.id), signedOut ? { prompt: "login" } : {});
       const { state, nonce, verifier, browser } = secrets;
       await db.withoutTenant((tx) =>
         tx.insert(logins).values({ stateHash: sha256(state), provider: provider.id, nonce, verifier, browserHash: sha256(browser), expiresAt: at(LOGIN_SECONDS) }),
@@ -68,13 +74,17 @@ export function signIn({ db, base, providers: list, now }: SignInOptions) {
       const headers = new Headers({ location: `${base}/app/`, "cache-control": "no-store" });
       headers.append("set-cookie", cookie(SESSION_COOKIE, token, SESSION_SECONDS));
       headers.append("set-cookie", cookie(LOGIN_COOKIE, "", 0));
+      if (readCookie(request, SIGNED_OUT_COOKIE)) headers.append("set-cookie", cookie(SIGNED_OUT_COOKIE, "", 0));
       return new Response(null, { status: 302, headers });
     },
 
     async logout(request: Request): Promise<Response> {
       const token = readCookie(request, SESSION_COOKIE);
       if (token) await db.withoutTenant((tx) => tx.delete(sessions).where(eq(sessions.tokenHash, sha256(token))));
-      return json(200, { ok: true } satisfies LoggedOut, { "set-cookie": cookie(SESSION_COOKIE, "", 0) });
+      const headers = new Headers({ "content-type": "application/json" });
+      headers.append("set-cookie", cookie(SESSION_COOKIE, "", 0));
+      headers.append("set-cookie", cookie(SIGNED_OUT_COOKIE, "1", SIGNED_OUT_SECONDS));
+      return new Response(JSON.stringify({ ok: true } satisfies LoggedOut), { status: 200, headers });
     },
   };
 }

@@ -30,6 +30,13 @@ describe("OidcIdentityProvider", () => {
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
+  it("asks for the sign-in page with prompt=login, and only then", async () => {
+    const issuer = "https://idp.example";
+    const provider = new OidcIdentityProvider({ id: "idp", name: "IdP", issuer, clientId: "procura", clientSecret: "x" }, { fetch: discoveryOnly(issuer) });
+    expect((await provider.authorizationUrl({ ...input, prompt: "login" })).searchParams.get("prompt")).toBe("login");
+    expect((await provider.authorizationUrl(input)).searchParams.has("prompt")).toBe(false);
+  });
+
   it("uses https issuers as before", async () => {
     const issuer = "https://idp.example";
     const provider = new OidcIdentityProvider({ id: "idp", name: "IdP", issuer, clientId: "procura", clientSecret: "x" }, { fetch: discoveryOnly(issuer) });
