@@ -1,3 +1,4 @@
+import { parseMasterKey } from "@cairnmcp/vault";
 import { z } from "zod";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -50,7 +51,14 @@ const TrustedIssuers = jsonEnv(z.array(z.object({ issuer: z.url(), jwksUri: http
 const Env = z.object({
   CAIRNMCP_PUBLIC_URL: PublicUrl,
   CAIRNMCP_DATABASE_URL: z.string().startsWith("postgres", "must be a postgres:// URL"),
-  CAIRNMCP_MASTER_KEY: z.string().min(1),
+  CAIRNMCP_MASTER_KEY: z.string().superRefine((key, ctx) => {
+    try {
+      parseMasterKey(key);
+    } catch (e) {
+      // parseMasterKey's messages name the problem, never the value.
+      ctx.addIssue({ code: "custom", message: (e as Error).message.replace(/^CAIRNMCP_MASTER_KEY /, "") });
+    }
+  }),
   CAIRNMCP_OIDC_PROVIDERS: OidcProviders,
   CAIRNMCP_TRUSTED_ISSUERS: TrustedIssuers.optional(),
   CAIRNMCP_ALLOWED_ORIGINS: z
@@ -77,10 +85,15 @@ export type ServerConfig = {
  * error listing every problem, never echoing values (they include secrets).
  */
 export function loadConfig(env: Record<string, string | undefined>): ServerConfig {
-  const parsed = Env.safeParse(env);
+  // An empty value counts as unset: .env files and compose pass optional settings as `NAME=`.
+  const set = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+  const parsed = Env.safeParse(set);
   if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => `  ${i.path.join(".") || "(env)"}: ${i.message}`);
-    throw new Error(`invalid configuration:\n${problems.join("\n")}`);
+    const problems = parsed.error.issues.map((i) => {
+      const name = String(i.path[0] ?? "(env)");
+      return `  ${name}: ${i.path.length === 1 && !(name in set) ? "required, but not set" : i.message}`;
+    });
+    throw new Error(`invalid configuration (every setting is described in .env.example):\n${problems.join("\n")}`);
   }
   const e = parsed.data;
   return {

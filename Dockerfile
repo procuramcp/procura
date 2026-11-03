@@ -8,6 +8,8 @@
 #   docker run --rm -e CAIRNMCP_DATABASE_OWNER_URL=… cairnmcp node packages/db/scripts/migrate.ts
 #   docker run -p 8080:8080 --env-file .env cairnmcp
 #
+# Published as ghcr.io/cairnmcp/cairnmcp (D-046); deploy/self-host runs it with compose.
+#
 # The base image is pinned by digest so a moved tag can't change what we ship;
 # Dependabot updates both FROM lines together.
 FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS deps
@@ -38,6 +40,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cairnmcp/web build
 
 FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
+LABEL org.opencontainers.image.source="https://github.com/cairnmcp/cairnmcp" \
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080
 COPY --from=deps --chown=root:root /app /app

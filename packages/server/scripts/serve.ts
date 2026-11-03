@@ -14,7 +14,12 @@ try {
   process.exit(1);
 }
 
-const db = await Database.connect({ url: config.databaseUrl });
+// Connecting also checks the role can't bypass row-level security (D-024).
+// pg's messages name the host or role, never the password.
+const db = await Database.connect({ url: config.databaseUrl }).catch((e: unknown) => {
+  console.error(`can't use CAIRNMCP_DATABASE_URL: ${(e as Error).message}`);
+  process.exit(1);
+});
 const handler = await createApp({
   db,
   keyWrapper: new LocalKeyWrapper(parseMasterKey(config.masterKey)),

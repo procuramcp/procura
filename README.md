@@ -59,6 +59,17 @@ diagnostics to `out/` (gitignored).
 Copy its `.env.example` to `.env` in that folder, set `INTERVALS_API_KEY`, then run
 `pnpm example:intervals`. It only reads, and prints a summary.
 
+## Self-host
+
+Run your own with Docker: [`deploy/self-host`](deploy/self-host/README.md) has a Compose setup
+(the app, Postgres, and a local sign-in provider for trying it on a laptop) and the guide for
+HTTPS, sign-in, backups, and upgrades. The image is `ghcr.io/cairnmcp/cairnmcp`.
+
+## Licence
+
+[AGPL-3.0](LICENSE) (D-046): use, change, and host it freely; if you let others use a changed
+copy over a network, offer them its source.
+
 ## Data and secrets
 
 Never commit secrets, `.env` files, or real personal data from any API. Fixtures are synthetic
