@@ -1,8 +1,7 @@
-import { ArrowLeftIcon, CircleAlertIcon, FileUpIcon, LinkIcon, SearchIcon, TextIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowLeftIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,31 +10,21 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { act } from "@/lib/act";
 import { api, type DocumentInput, type SourcePreview } from "@/lib/api";
 import { useRole } from "@/lib/hooks";
+import { DocumentFinder } from "@/pages/document-finder";
 import { slugify } from "@/pages/parts";
 
 /** Bring in an API from its OpenAPI document (D-035): find it, preview it, add it. */
 export function AddSourcePage() {
   const { tenantId = "" } = useParams();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"url" | "paste" | "file">("url");
-  const [url, setUrl] = useState("");
-  const [pasted, setPasted] = useState("");
-  const [file, setFile] = useState<{ name: string; text: string } | undefined>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [found, setFound] = useState<{ input: DocumentInput; result: SourcePreview } | undefined>();
 
-  const input = (): DocumentInput | undefined =>
-    mode === "url" ? (url.trim() ? { url: url.trim() } : undefined) : mode === "paste" ? (pasted.trim() ? { document: pasted } : undefined) : file ? { document: file.text } : undefined;
-
-  async function preview() {
-    const doc = input();
-    if (!doc) return;
+  async function preview(doc: DocumentInput) {
     setBusy(true);
     setProblem(undefined);
     setFound(undefined);
@@ -58,68 +47,7 @@ export function AddSourcePage() {
         <p className="text-muted-foreground text-sm">From its OpenAPI (Swagger) description. Nothing is saved until you add it.</p>
       </div>
 
-      <Card className="gap-4 p-4">
-        <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-          <TabsList>
-            <TabsTrigger value="url">
-              <LinkIcon /> URL
-            </TabsTrigger>
-            <TabsTrigger value="paste">
-              <TextIcon /> Paste
-            </TabsTrigger>
-            <TabsTrigger value="file">
-              <FileUpIcon /> Upload
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="url">
-            <Field>
-              <FieldLabel htmlFor="doc-url">Document, docs page, or API address</FieldLabel>
-              <Input
-                id="doc-url"
-                type="url"
-                placeholder="https://intervals.icu/api/v1/docs/swagger-ui/index.html"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void preview()}
-              />
-              <FieldDescription>
-                The OpenAPI document itself, a Swagger UI page (we follow it to the document), or the API's address (we try the usual places, like
-                /openapi.json). Public https addresses only.
-              </FieldDescription>
-            </Field>
-          </TabsContent>
-          <TabsContent value="paste">
-            <Field>
-              <FieldLabel htmlFor="doc-text">OpenAPI document (JSON or YAML)</FieldLabel>
-              <Textarea id="doc-text" rows={8} className="font-mono text-xs" value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder='{"openapi": "3.1.0", ...}' />
-            </Field>
-          </TabsContent>
-          <TabsContent value="file">
-            <Field>
-              <FieldLabel htmlFor="doc-file">OpenAPI file (.json, .yaml)</FieldLabel>
-              <Input
-                id="doc-file"
-                type="file"
-                accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  setFile(f ? { name: f.name, text: await f.text() } : undefined);
-                }}
-              />
-            </Field>
-          </TabsContent>
-        </Tabs>
-        <Button className="self-start" onClick={preview} disabled={busy || !input()}>
-          {busy ? <Spinner /> : <SearchIcon />} {busy ? "Reading the document…" : "Preview"}
-        </Button>
-        {problem && (
-          <Alert variant="destructive">
-            <CircleAlertIcon />
-            <AlertTitle>Couldn't use that</AlertTitle>
-            <AlertDescription className="whitespace-pre-wrap">{problem}</AlertDescription>
-          </Alert>
-        )}
-      </Card>
+      <DocumentFinder busy={busy} problem={problem} onSubmit={(doc) => void preview(doc)} />
 
       {found && (
         <Review

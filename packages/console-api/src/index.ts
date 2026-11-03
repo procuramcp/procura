@@ -260,7 +260,75 @@ export type SourceView = {
   operations: OperationCounts;
   authSchemes: Array<AuthSchemeView & { accepts: CredentialKind[]; stored: Array<{ kind: CredentialKind }> }>;
   toolsets: Array<{ id: string; name: string }>;
+  /** The latest scheduled check of `documentUrl` for a new version (D-049); null before the first. */
+  check:
+    | { status: "current"; checkedAt: string }
+    | { status: "changed"; checkedAt: string; added: number; removed: number; changed: number }
+    | { status: "failed"; checkedAt: string; message: string }
+    | null;
+  /** Versions earlier updates replaced, newest first; any can be restored. */
+  versions: Array<{ version: number; replacedAt: string; replacedBy: string | null; operations: number }>;
 };
+
+/**
+ * `POST /tenants/:t/sources/:id/update/preview` and `POST …/update` bodies (D-048). With
+ * none of `url`, `document`, or `version`, the source's own document URL is fetched again;
+ * `version` restores a kept version (D-049).
+ * `baseUrl` says which to keep when the new document's differs (default: the current one).
+ */
+export type SourceUpdateInput = { url?: string; document?: string; version?: number; baseUrl?: "current" | "document" };
+/** `POST …/update` body: the preview's `digest`, so only what was reviewed is applied. */
+export type SourceUpdateApply = SourceUpdateInput & { digest: string };
+
+export type OperationRef = { id: string; title: string; method: string; path: string; class: SideEffect };
+export type OperationChangeKind = "request" | "inputs" | "output" | "description" | "auth" | "deprecated" | "side_effect" | "details";
+export type OperationChange = OperationRef & { renamedFrom?: string; kinds: OperationChangeKind[]; details: string[] };
+export type SourceDiff = {
+  added: OperationRef[];
+  removed: OperationRef[];
+  changed: OperationChange[];
+  unchanged: number;
+  name?: { from: string; to: string };
+  baseUrl?: { current: string; document: string; used: "current" | "document" };
+  authSchemes: { added: string[]; removed: string[]; changed: string[] };
+  classifications: {
+    kept: Array<{ id: string; class: SideEffect }>;
+    dropped: Array<{ id: string; class: SideEffect }>;
+    nowAutomatic: Array<{ id: string; class: SideEffect }>;
+    automaticChanged: Array<{ id: string; from: SideEffect; to: SideEffect; curated?: SideEffect }>;
+  };
+};
+export type ToolsetUpdateEffect = {
+  toolsetId: string;
+  name: string;
+  removedTools: Array<{ name: string; operationId: string; enabled: boolean }>;
+  renamedTools: Array<{ name: string; from: string; to: string }>;
+  disabledTools: Array<{ name: string; operationId: string; pins: string[] }>;
+  sideEffectChanged: Array<{ name: string; operationId: string; from: SideEffect; to: SideEffect }>;
+  refreshedTexts: number;
+  issues: Array<{ toolName: string; code: string; message: string }>;
+};
+export type ProfileUpdateEffect = { profileId: string; name: string; removedOperations: Array<{ toolsetId: string; operationId: string }>; removedRules: string[] };
+
+/** `POST /tenants/:t/sources/:id/update/preview`: nothing is stored. */
+export type SourceUpdatePreview = {
+  documentUrl: string | null;
+  via: string;
+  /** Pass back to apply; changes if the document, the source, or its toolsets change meanwhile. */
+  digest: string;
+  operations: { before: OperationCounts; after: OperationCounts };
+  diff: SourceDiff;
+  effects: {
+    toolsets: ToolsetUpdateEffect[];
+    profiles: ProfileUpdateEffect[];
+    /** Auth schemes that are gone but still have a stored key (kept, unused). */
+    unusedCredentials: string[];
+  };
+  warnings: IngestWarning[];
+  warningCount: number;
+};
+/** `POST /tenants/:t/sources/:id/update` */
+export type SourceUpdated = { operations: OperationCounts; toolsets: number; profiles: number; /** The replaced version, kept to restore. */ keptVersion: number };
 
 /** `POST /logout` */
 export type LoggedOut = { ok: true };

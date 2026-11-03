@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import type { Me } from "@procura/console-api";
+import type { Me, SourceUpdatePreview, SourceView } from "@procura/console-api";
 import { OidcIdentityProvider } from "@procura/auth";
 import { Toolset, type TenantId, type UserId } from "@procura/core";
 import { addMember, Database, PgVaultStore, putSource, putToolset, setToolsetAccess } from "@procura/db";
@@ -23,6 +23,26 @@ const API = `${BASE}/app/api`;
 const OPENAPI = readFileSync(new URL("../../ingest/fixtures/intervals-icu/openapi.json", import.meta.url), "utf8");
 const SECRET = "fake-console-key-0123456789";
 
+/** A small API whose document changes between versions (source updates, D-048). */
+const shopApi = (paths: Record<string, Record<string, { operationId: string }>>) =>
+  JSON.stringify({
+    openapi: "3.0.3",
+    info: { title: "Shop", version: "1" },
+    servers: [{ url: "https://shop.test/v1" }],
+    paths: Object.fromEntries(
+      Object.entries(paths).map(([path, methods]) => [
+        path,
+        Object.fromEntries(
+          Object.entries(methods).map(([method, op]) => [
+            method,
+            { ...op, ...(path.includes("{id}") ? { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }] } : {}), responses: { "200": { description: "ok" } } },
+          ]),
+        ),
+      ]),
+    ),
+  });
+let shopDocument = "";
+
 /** A fake web for URL ingestion: the Intervals.icu shape (Swagger UI page, config, document). */
 const getDocument: DocumentGetter = async (url) => {
   if (url.includes("internal")) throw new FetchRefused("internal.test points to a private or internal address");
@@ -30,6 +50,7 @@ const getDocument: DocumentGetter = async (url) => {
     "https://api.test/api/v1/docs/swagger-ui/index.html": "<html>Swagger UI</html>",
     "https://api.test/api/v1/docs/swagger-config": JSON.stringify({ url: "/api/v1/docs" }),
     "https://api.test/api/v1/docs": OPENAPI,
+    "https://api.test/shop.json": shopDocument,
   };
   const text = pages[url];
   return text === undefined ? { url, status: 404, contentType: "text/plain", text: "" } : { url, status: 200, contentType: "application/json", text };
@@ -519,6 +540,92 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       const browser = await signIn();
       const huge = await browser.json("POST", `${API}/tenants/alpha/sources/preview`, { document: "x".repeat(11 * 1024 * 1024) });
       expect(huge.status).toBe(400);
+    });
+  });
+
+  describe("source updates (D-048)", () => {
+    it("previews the diff, carries curation over, and applies exactly what was previewed", async () => {
+      shopDocument = shopApi({
+        "/items": { get: { operationId: "listItems" } },
+        "/items/{id}": { get: { operationId: "getItem" }, delete: { operationId: "deleteItem" } },
+        "/items/search": { post: { operationId: "searchItems" } },
+      });
+      const browser = await signIn();
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources`, { id: "shop", url: "https://api.test/shop.json", toolset: { id: "shop-main", name: "Shop" } })).status).toBe(201);
+      // Curation on version 1: search is a read, and a plan lists two operations.
+      await browser.json("PUT", `${API}/tenants/alpha/sources/shop/side-effects`, { changes: [{ operationId: "search_items", class: "read" }] });
+      expect((await browser.json("PUT", `${API}/tenants/alpha/profiles/shop-basic`, { name: "Shop basic", rules: [{ toolsetId: "shop-main", level: "use", operations: ["get_item", "delete_item"] }] })).status).toBe(200);
+
+      // Version 2 at the same URL: delete is gone, getItem is renamed, create is new.
+      shopDocument = shopApi({
+        "/items": { get: { operationId: "listItems" }, post: { operationId: "createItem" } },
+        "/items/{id}": { get: { operationId: "fetchItem" } },
+        "/items/search": { post: { operationId: "searchItems" } },
+      });
+      const previewed = await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, {});
+      expect(previewed.status).toBe(200);
+      const preview = (await previewed.json()) as SourceUpdatePreview;
+      expect(preview.documentUrl).toBe("https://api.test/shop.json");
+      expect(preview.diff.added.map((o) => o.id)).toEqual(["create_item"]);
+      expect(preview.diff.removed.map((o) => o.id)).toEqual(["delete_item"]);
+      expect(preview.diff.changed).toEqual([expect.objectContaining({ id: "fetch_item", renamedFrom: "get_item" })]);
+      expect(preview.diff.classifications.kept).toEqual([{ id: "search_items", class: "read" }]);
+      expect(preview.effects.toolsets).toEqual([expect.objectContaining({ toolsetId: "shop-main", removedTools: [{ name: "delete_item", operationId: "delete_item", enabled: false }], renamedTools: [{ name: "get_item", from: "get_item", to: "fetch_item" }] })]);
+      expect(preview.effects.profiles).toEqual([{ profileId: "shop-basic", name: "Shop basic", removedOperations: [{ toolsetId: "shop-main", operationId: "delete_item" }], removedRules: [] }]);
+      expect(preview.operations).toEqual({ before: { total: 4, read: 3, write: 0, destructive: 1 }, after: { total: 4, read: 3, write: 1, destructive: 0 } });
+      // Previewing stored nothing.
+      expect(((await (await browser.json("GET", `${API}/tenants/alpha/sources/shop`)).json()) as SourceView).operations.destructive).toBe(1);
+
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { digest: "0".repeat(64) })).status).toBe(409);
+      const applied = await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { digest: preview.digest });
+      expect([applied.status, await applied.json()]).toEqual([200, { operations: preview.operations.after, toolsets: 1, profiles: 1, keptVersion: 1 }]);
+
+      const toolset = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/shop-main`)).json()) as {
+        issues: unknown[];
+        toolset: { tools: Array<{ name: string; operationId: string }> };
+        operations: Array<{ id: string; sideEffect: { class: string; basis: string } }>;
+        profiles: Array<{ operations: string[] | null }>;
+      };
+      expect(toolset.issues).toEqual([]);
+      expect(toolset.toolset.tools.find((t) => t.name === "get_item")?.operationId).toBe("fetch_item");
+      expect(toolset.operations.find((o) => o.id === "search_items")?.sideEffect).toMatchObject({ class: "read", basis: "curated" });
+      expect(toolset.profiles).toEqual([expect.objectContaining({ operations: ["fetch_item"] })]);
+      // Applied twice: the digest no longer matches what's stored.
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { digest: preview.digest })).status).toBe(409);
+
+      // The replaced version is kept, and the source counts as up to date (D-049).
+      const view = (await (await browser.json("GET", `${API}/tenants/alpha/sources/shop`)).json()) as SourceView;
+      expect(view.versions).toEqual([{ version: 1, replacedAt: expect.any(String), replacedBy: "alice@example.com", operations: 4 }]);
+      expect(view.check).toMatchObject({ status: "current" });
+
+      // Restoring version 1 is an update like any other: today's classification stays.
+      const back = (await (await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { version: 1 })).json()) as SourceUpdatePreview;
+      expect(back.via).toBe("kept version 1");
+      expect(back.diff.added.map((o) => o.id)).toEqual(["delete_item"]);
+      expect(back.diff.removed.map((o) => o.id)).toEqual(["create_item"]);
+      expect(back.diff.classifications.kept).toEqual([{ id: "search_items", class: "read" }]);
+      const restored = await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { version: 1, digest: back.digest });
+      expect(await restored.json()).toMatchObject({ keptVersion: 2, operations: { destructive: 1 } });
+      // It keeps its document URL, and no longer claims to match what's published there.
+      const afterRestore = (await (await browser.json("GET", `${API}/tenants/alpha/sources/shop`)).json()) as SourceView;
+      expect([afterRestore.documentUrl, afterRestore.check]).toEqual(["https://api.test/shop.json", null]);
+      // Pasted text keeps the URL too.
+      const pastedPreview = (await (await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { document: shopDocument })).json()) as SourceUpdatePreview;
+      expect(pastedPreview.documentUrl).toBe("https://api.test/shop.json");
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { version: 9 })).status).toBe(404);
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { version: 1, document: "x" })).status).toBe(400);
+    });
+
+    it("needs a document for a source added from pasted text, and is for editors only", async () => {
+      const browser = await signIn();
+      const pasted = shopApi({ "/things": { get: { operationId: "listThings" } } });
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources`, { id: "pasted-shop", document: pasted })).status).toBe(201);
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/pasted-shop/update/preview`, {})).status).toBe(422);
+      const withDoc = await browser.json("POST", `${API}/tenants/alpha/sources/pasted-shop/update/preview`, { document: pasted });
+      expect([withDoc.status, ((await withDoc.json()) as SourceUpdatePreview).diff.unchanged]).toEqual([200, 1]);
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/missing/update/preview`, { document: pasted })).status).toBe(404);
+      const vic_ = await signIn({ sub: "vic", email: "vic@example.com" });
+      expect((await vic_.json("POST", `${API}/tenants/alpha/sources/pasted-shop/update/preview`, { document: pasted })).status).toBe(403);
     });
   });
 

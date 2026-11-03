@@ -6,6 +6,7 @@
 //   tenant create  --name <name> --owner <account id> [--id <slug>]
 //   tenant show    --tenant <id>
 //   source add     --tenant <id> --id <slug> [--fixed-username <scheme>=<value>]...   < openapi.json|yaml
+//   source update  --tenant <id> --id <slug> [--url <url> | --version <n> | --stdin < openapi.json] [--base-url current|document] [--apply]
 //   toolset put    --tenant <id> --source <id> --id <slug> [--name <name>] [--definition]  [< toolset.json]
 //   access grant   --tenant <id> --toolset <id> --user <account id> --level use|use_writes|none
 //   credential set --tenant <id> --source <id> --scheme <scheme id> --kind basic|bearer|api_key [--username <u>]   < secret
@@ -13,6 +14,8 @@ import { parseArgs } from "node:util";
 import { acceptLegacyEnvNames, Database, PgVaultStore } from "@procura/db";
 import { LocalKeyWrapper, parseMasterKey, Vault, type CredentialInput } from "@procura/vault";
 import { AdminError, addSource, createTenant, grantAccess, putToolsetFor, setCredential, showTenant } from "../src/admin.ts";
+import { safeGet } from "../src/fetch-document.ts";
+import { updateSourceFromCli } from "../src/source-update.ts";
 
 acceptLegacyEnvNames();
 
@@ -20,6 +23,8 @@ const USAGE = `usage: admin <command> [options]
   tenant create  --name <name> --owner <account id> [--id <slug>]
   tenant show    --tenant <id>
   source add     --tenant <id> --id <slug> [--fixed-username <scheme>=<value>]...   (OpenAPI document on stdin)
+  source update  --tenant <id> --id <slug> [--url <url> | --version <n> | --stdin] [--base-url current|document] [--apply]
+                 (default: the source's own URL; a dry run unless --apply; --version restores a kept one)
   toolset put    --tenant <id> --source <id> --id <slug> [--name <name>] [--definition]   (JSON on stdin with --definition)
   access grant   --tenant <id> --toolset <id> --user <account id> --level use|use_writes|none
   credential set --tenant <id> --source <id> --scheme <scheme id> --kind basic|bearer|api_key [--username <u>]   (secret on stdin)`;
@@ -41,6 +46,11 @@ const { values } = parseArgs({
     kind: { type: "string" },
     username: { type: "string" },
     definition: { type: "boolean" },
+    url: { type: "string" },
+    version: { type: "string" },
+    "base-url": { type: "string" },
+    apply: { type: "boolean" },
+    stdin: { type: "boolean" },
     "fixed-username": { type: "string", multiple: true },
   },
 });
@@ -68,7 +78,7 @@ const env = (name: string) => {
 
 async function main(): Promise<void> {
   const command = `${group ?? ""} ${action ?? ""}`.trim();
-  if (!["tenant create", "tenant show", "source add", "toolset put", "access grant", "credential set"].includes(command)) {
+  if (!["tenant create", "tenant show", "source add", "source update", "toolset put", "access grant", "credential set"].includes(command)) {
     console.error(USAGE);
     process.exitCode = 2;
     return;
@@ -95,6 +105,26 @@ async function main(): Promise<void> {
         }
         const s = await addSource(db, { tenantId: need("tenant"), sourceId: need("id"), openapi: await stdin("an OpenAPI document"), fixedUsernames });
         console.log(`Stored source ${s.id} (${s.name}): ${s.operations} operations, ${s.reads} reads; auth schemes: ${s.authSchemes.join(", ") || "none"}${s.warnings ? `; ${s.warnings} mapping warnings` : ""}.`);
+        break;
+      }
+      case "source update": {
+        const baseUrl = values["base-url"] ?? "current";
+        if (baseUrl !== "current" && baseUrl !== "document") throw new AdminError("--base-url must be current or document");
+        const version = values.version === undefined ? undefined : Number(values.version);
+        if (version !== undefined && !(Number.isInteger(version) && version >= 1)) throw new AdminError("--version must be a kept version's number (see tenant show)");
+        if ([values.url, version, values.stdin].filter((x) => x !== undefined).length > 1) throw new AdminError("give one of --url, --version, or --stdin");
+        // Only when asked: through admin.sh stdin is never a terminal, so guessing would hang or fail.
+        const document = values.stdin ? await stdin("an OpenAPI document") : undefined;
+        const result = await updateSourceFromCli(db, {
+          tenantId: need("tenant"),
+          sourceId: need("id"),
+          from: { url: values.url, document, version },
+          baseUrl,
+          apply: values.apply === true,
+          getDocument: safeGet,
+          now: new Date(),
+        });
+        console.log(result.lines.join("\n"));
         break;
       }
       case "toolset put": {

@@ -1,14 +1,16 @@
 // Adding an API (D-035): find its description, preview, add it with a starter
-// toolset, view it, and set or remove its credentials.
-import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceView } from "@procura/console-api";
-import { countBySideEffect, curateSideEffect, defaultToolset, slugify, type TenantId } from "@procura/core";
-import { getSource, getToolset, listSourceIds, listToolsets, putSource, putToolset, setToolsetAccess, type TenantTx } from "@procura/db";
+// toolset, view it, and set or remove its credentials. Updating it to a new
+// version of its description, with a diff first (D-048).
+import type { CreatedSource, SideEffectsUpdated, SourcePreview, SourceUpdated, SourceUpdatePreview, SourceView } from "@procura/console-api";
+import { countBySideEffect, curateSideEffect, defaultToolset, instantOf, slugify, type TenantId } from "@procura/core";
+import { getSource, getSourceCheck, getToolset, listSourceIds, listSourceVersions, listToolsets, putSource, putToolset, setToolsetAccess, type TenantTx } from "@procura/db";
 import { json } from "@procura/http";
 import { credentialKindsFor } from "@procura/vault";
 import { AdminError, mapSource, summarize, type MappedSource } from "../admin.ts";
 import { discoverDocument, FetchRefused } from "../fetch-document.ts";
-import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SideEffectEdit, SourceInput, SourcePreviewInput } from "./bodies.ts";
-import { asTeam, endpointUrl, teamResponse, type ApiRoute, type ConsoleContext } from "./context.ts";
+import { applyStoredUpdate, loadNextVersion, planStoredUpdate, UpdateProblem, type NextVersion, type UpdateFrom } from "../source-update.ts";
+import { CredentialBody, issuesText, MAX_DOCUMENT_BODY_BYTES, readBody, SideEffectEdit, SourceInput, SourcePreviewInput, SourceUpdateApply, SourceUpdateInput } from "./bodies.ts";
+import { asTeam, endpointUrl, teamResponse, type ApiRequest, type ApiRoute, type ConsoleContext } from "./context.ts";
 import { schemeView } from "./views.ts";
 
 export const sourceRoutes: ApiRoute[] = [
@@ -96,6 +98,57 @@ export const sourceRoutes: ApiRoute[] = [
     },
   },
   {
+    // What updating to the new document (or restoring a kept version) would change; nothing is stored (D-048, D-049).
+    method: "POST",
+    path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/update\/preview$/,
+    handle: async (api, [tenant, sourceId]) => {
+      const body = await readBody(api.request, SourceUpdateInput, MAX_DOCUMENT_BODY_BYTES);
+      if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+      const next = await nextVersion(api, tenant!, sourceId!, body.data);
+      if (next instanceof Response) return next;
+      return teamResponse(api, tenant!, "editor", async (tx, tenantId) => {
+        const planned = await planStoredUpdate(tx, sourceId!, next, body.data.baseUrl);
+        if (!planned) return json(404, { error: "not_found", message: `no source ${sourceId}` });
+        const { plan, current, digest } = planned;
+        const stored = await api.ctx.vault.listCredentials(tenantId, sourceId!);
+        const unusedCredentials = plan.diff.authSchemes.removed.filter((id) => stored.some((c) => c.schemeId === id));
+        return json(200, {
+          documentUrl: next.documentUrl,
+          via: next.via,
+          digest,
+          operations: { before: countBySideEffect(current.operations), after: countBySideEffect(plan.ir.operations) },
+          diff: plan.diff,
+          effects: { ...plan.effects, unusedCredentials },
+          warnings: next.warnings.slice(0, 50),
+          warningCount: next.warnings.length,
+        } satisfies SourceUpdatePreview);
+      });
+    },
+  },
+  {
+    // Apply exactly what was previewed: the plan is made again and must match its digest.
+    method: "POST",
+    path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/update$/,
+    handle: async (api, [tenant, sourceId]) => {
+      const body = await readBody(api.request, SourceUpdateApply, MAX_DOCUMENT_BODY_BYTES);
+      if (!body.success) return json(400, { error: "invalid_request", message: issuesText(body.error) });
+      const next = await nextVersion(api, tenant!, sourceId!, body.data);
+      if (next instanceof Response) return next;
+      return teamResponse(api, tenant!, "editor", async (tx) => {
+        const planned = await planStoredUpdate(tx, sourceId!, next, body.data.baseUrl);
+        if (!planned) return json(404, { error: "not_found", message: `no source ${sourceId}` });
+        if (planned.digest !== body.data.digest) {
+          return json(409, { error: "changed", message: "the document, the source, or its toolsets changed since the preview; preview again" });
+        }
+        // One transaction: the replaced version is kept, then the source, its toolsets and plans.
+        // Each write bumps its version, so MCP endpoints pick up the new tools.
+        const version = await applyStoredUpdate(tx, planned, next, { by: api.user.userId, now: new Date() });
+        const { plan } = planned;
+        return json(200, { operations: countBySideEffect(plan.ir.operations), toolsets: plan.toolsets.length, profiles: plan.profiles.length, keptVersion: version } satisfies SourceUpdated);
+      });
+    },
+  },
+  {
     method: ["PUT", "DELETE"],
     path: /^\/tenants\/([^/]+)\/sources\/([^/]+)\/credentials\/([^/]+)$/,
     handle: async (api, [tenant, sourceId, schemeInput]) => {
@@ -126,6 +179,18 @@ export const sourceRoutes: ApiRoute[] = [
   },
 ];
 
+/** The new version, or the response saying why there isn't one. Fetching happens outside any transaction. */
+async function nextVersion(api: ApiRequest, tenant: string, sourceId: string, from: UpdateFrom): Promise<Response | NextVersion> {
+  const tenantId = await asTeam(api, tenant, "editor", async (_tx, id) => id);
+  if (tenantId instanceof Response) return tenantId;
+  try {
+    return await loadNextVersion(api.ctx.db, tenantId, sourceId, from, api.ctx.getDocument);
+  } catch (e) {
+    if (e instanceof UpdateProblem) return json(e.code === "not_found" ? 404 : 422, { error: e.code, message: e.message });
+    throw e;
+  }
+}
+
 async function sourceView(ctx: ConsoleContext, tx: TenantTx, tenantId: TenantId, sourceId: string): Promise<Response> {
   const source = await getSource(tx, sourceId);
   if (!source) return json(404, { error: "not_found", message: `no source ${sourceId}` });
@@ -144,7 +209,22 @@ async function sourceView(ctx: ConsoleContext, tx: TenantTx, tenantId: TenantId,
       stored: credentials.filter((c) => c.schemeId === scheme.id).map((c) => ({ kind: c.kind })),
     })),
     toolsets,
+    check: checkView(await getSourceCheck(tx, source.id)),
+    versions: (await listSourceVersions(tx, source.id)).map((v) => ({
+      version: v.version,
+      replacedAt: instantOf(v.replacedAt),
+      replacedBy: v.replacedByLabel ?? v.replacedBy,
+      operations: v.operations,
+    })),
   } satisfies SourceView);
+}
+
+function checkView(check: Awaited<ReturnType<typeof getSourceCheck>>): SourceView["check"] {
+  if (!check) return null;
+  const checkedAt = instantOf(check.checkedAt);
+  if (check.status === "changed") return { status: "changed", checkedAt, added: check.added, removed: check.removed, changed: check.changed };
+  if (check.status === "failed") return { status: "failed", checkedAt, message: check.message };
+  return { status: "current", checkedAt };
 }
 
 type LoadedDocument = { text: string; documentUrl?: string; via: string };

@@ -24,7 +24,7 @@ import {
 import type { AuditEvent } from "@procura/runtime";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import type { TenantTx } from "./client.ts";
-import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets, usageCounters, users } from "./schema.ts";
+import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sourceChecks, sources, sourceVersions, tenants, toolsetAccess, toolsets, usageCounters, users } from "./schema.ts";
 
 const currentTenant = sql<string>`cairnmcp.current_tenant_id()`;
 
@@ -541,4 +541,88 @@ export async function listAuditEvents(tx: TenantTx, options: { invocationId?: st
     input: r.input as AuditEvent["input"],
     ...(r.outcome !== null ? { outcome: r.outcome as NonNullable<AuditEvent["outcome"]> } : {}),
   }));
+}
+
+// --- Source history and checks (D-049) ---
+
+/** How many replaced versions are kept per source; older ones are dropped. */
+export const SOURCE_VERSIONS_KEPT = 20;
+
+export type SourceVersionSummary = { version: number; replacedAt: Date; replacedBy: UserId | null; replacedByLabel: string | null; name: string; operations: number };
+
+/** Keep `ir` (the version an update is about to replace) in the source's history. */
+export async function saveSourceVersion(tx: TenantTx, ir: IrDocument, replacedBy: UserId | null): Promise<number> {
+  const sourceId = ir.source.id;
+  const [last] = await tx
+    .select({ version: sourceVersions.version })
+    .from(sourceVersions)
+    .where(eq(sourceVersions.sourceId, sourceId))
+    .orderBy(desc(sourceVersions.version))
+    .limit(1);
+  const version = (last?.version ?? 0) + 1;
+  await tx.insert(sourceVersions).values({ tenantId: currentTenant, sourceId, version, ir, replacedBy });
+  await tx.delete(sourceVersions).where(and(eq(sourceVersions.sourceId, sourceId), sql`${sourceVersions.version} <= ${version - SOURCE_VERSIONS_KEPT}`));
+  return version;
+}
+
+/** A source's kept versions, newest first, without their IR. */
+export async function listSourceVersions(tx: TenantTx, sourceId: string): Promise<SourceVersionSummary[]> {
+  const rows = await tx
+    .select({
+      version: sourceVersions.version,
+      replacedAt: sourceVersions.replacedAt,
+      replacedBy: sourceVersions.replacedBy,
+      label: users.label,
+      name: sql<string>`${sourceVersions.ir} #>> '{source,name}'`,
+      operations: sql<number>`jsonb_array_length(${sourceVersions.ir} -> 'operations')`,
+    })
+    .from(sourceVersions)
+    .leftJoin(users, eq(users.id, sourceVersions.replacedBy))
+    .where(eq(sourceVersions.sourceId, sourceId))
+    .orderBy(desc(sourceVersions.version));
+  return rows.map((r) => ({
+    version: r.version,
+    replacedAt: r.replacedAt,
+    replacedBy: r.replacedBy === null ? null : UserId.parse(r.replacedBy),
+    replacedByLabel: r.label ?? null,
+    name: r.name,
+    operations: Number(r.operations),
+  }));
+}
+
+export async function getSourceVersion(tx: TenantTx, sourceId: string, version: number): Promise<IrDocument | undefined> {
+  const [row] = await tx.select({ ir: sourceVersions.ir }).from(sourceVersions).where(and(eq(sourceVersions.sourceId, sourceId), eq(sourceVersions.version, version)));
+  return row ? IrDocument.parse(row.ir) : undefined;
+}
+
+export type SourceCheck =
+  | { status: "current"; checkedAt: Date; documentSha256: string | null }
+  | { status: "changed"; checkedAt: Date; documentSha256: string | null; added: number; removed: number; changed: number }
+  | { status: "failed"; checkedAt: Date; documentSha256: string | null; message: string };
+
+export async function getSourceCheck(tx: TenantTx, sourceId: string): Promise<SourceCheck | undefined> {
+  const [row] = await tx.select().from(sourceChecks).where(eq(sourceChecks.sourceId, sourceId));
+  if (!row) return undefined;
+  const summary = (row.summary ?? {}) as Record<string, unknown>;
+  const base = { checkedAt: row.checkedAt, documentSha256: row.documentSha256 };
+  const count = (k: string) => (typeof summary[k] === "number" ? (summary[k] as number) : 0);
+  if (row.status === "changed") return { status: "changed", ...base, added: count("added"), removed: count("removed"), changed: count("changed") };
+  if (row.status === "failed") return { status: "failed", ...base, message: typeof summary["message"] === "string" ? summary["message"] : "the check failed" };
+  return { status: "current", ...base };
+}
+
+/** Record a check's result; `at` is when it ran. */
+export async function putSourceCheck(tx: TenantTx, sourceId: string, check: SourceCheck): Promise<void> {
+  const summary =
+    check.status === "changed" ? { added: check.added, removed: check.removed, changed: check.changed } : check.status === "failed" ? { message: check.message.slice(0, 300) } : {};
+  const values = { checkedAt: check.checkedAt, status: check.status, documentSha256: check.documentSha256, summary };
+  await tx
+    .insert(sourceChecks)
+    .values({ tenantId: currentTenant, sourceId, ...values })
+    .onConflictDoUpdate({ target: [sourceChecks.tenantId, sourceChecks.sourceId], set: values });
+}
+
+/** Forget a source's check, so the next run compares its document again. */
+export async function deleteSourceCheck(tx: TenantTx, sourceId: string): Promise<void> {
+  await tx.delete(sourceChecks).where(eq(sourceChecks.sourceId, sourceId));
 }

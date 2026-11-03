@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { countBySideEffect } from "./ir/side-effect.ts";
 import { instantOf } from "./time.ts";
-import { isRecord, omitUndefined, slugify, truncate } from "./util.ts";
+import { canonicalJson, isRecord, omitUndefined, sameJson, slugify, truncate } from "./util.ts";
 
 describe("shared helpers", () => {
   it("isRecord accepts plain objects only", () => {
@@ -33,5 +33,14 @@ describe("shared helpers", () => {
   it("countBySideEffect tallies each class", () => {
     const op = (c: "read" | "write" | "destructive") => ({ sideEffect: { class: c } });
     expect(countBySideEffect([op("read"), op("read"), op("destructive")])).toEqual({ total: 3, read: 2, write: 0, destructive: 1 });
+  });
+});
+
+describe("sameJson", () => {
+  it("ignores object key order, not array order", () => {
+    expect(sameJson({ a: 1, b: { c: [1, { d: 2, e: 3 }] } }, { b: { c: [1, { e: 3, d: 2 }] }, a: 1 })).toBe(true);
+    expect(sameJson([1, 2], [2, 1])).toBe(false);
+    expect(sameJson({ a: undefined }, {})).toBe(true);
+    expect(canonicalJson({ b: 1, a: 2 })).toBe('{"a":2,"b":1}');
   });
 });

@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, CheckCircle2Icon, KeyRoundIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, CheckCircle2Icon, HistoryIcon, KeyRoundIcon, RefreshCwIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,7 +31,7 @@ import { Problem } from "@/pages/shell";
 export function SourcePage() {
   const { tenantId = "", sourceId = "" } = useParams();
   const view = useLoad(() => api.source(tenantId, sourceId), [tenantId, sourceId]);
-  const { isAdmin } = useRole(tenantId);
+  const { isAdmin, canEdit } = useRole(tenantId);
   if (view.error) return <Problem message={view.error.message} />;
   if (!view.data) return <Skeleton className="h-96 w-full" />;
   const source = view.data;
@@ -42,7 +43,16 @@ export function SourcePage() {
         <Link to={`/t/${tenantId}`} className="flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground">
           <ArrowLeftIcon className="size-3.5" /> Back
         </Link>
-        <h1 className="font-heading font-semibold text-2xl">{source.name}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-heading font-semibold text-2xl">{source.name}</h1>
+          {canEdit && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/t/${tenantId}/sources/${sourceId}/update`}>
+                <RefreshCwIcon /> Update from a new version
+              </Link>
+            </Button>
+          )}
+        </div>
         <p className="font-mono text-muted-foreground text-xs">{source.baseUrl}</p>
         <div className="mt-1 flex flex-wrap gap-1.5">
           <Badge variant="secondary">{source.operations.total} operations</Badge>
@@ -53,9 +63,31 @@ export function SourcePage() {
         {source.documentUrl && (
           <p className="text-muted-foreground text-xs">
             From <span className="font-mono">{source.documentUrl}</span>
+            {source.check && ` · checked ${when(source.check.checkedAt)}`}
           </p>
         )}
       </div>
+
+      {source.check?.status === "changed" && (
+        <Alert>
+          <SparklesIcon />
+          <AlertTitle>A new version of this API's description is out</AlertTitle>
+          <AlertDescription>
+            <p>
+              {source.check.added} new, {source.check.removed} removed, {source.check.changed} changed operations since what's in use. Nothing changes until someone reviews and
+              applies it.
+            </p>
+            {canEdit && (
+              <Button size="sm" className="mt-2" asChild>
+                <Link to={`/t/${tenantId}/sources/${sourceId}/update`}>Review the update</Link>
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+      {source.check?.status === "failed" && (
+        <p className="text-muted-foreground text-xs">Couldn't check for a new version {when(source.check.checkedAt)}: {source.check.message}</p>
+      )}
 
       <section className="flex flex-col gap-3">
         <div>
@@ -88,8 +120,47 @@ export function SourcePage() {
           </div>
         )}
       </section>
+
+      {source.versions.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <div>
+            <h2 className="font-medium">History</h2>
+            <p className="text-muted-foreground text-sm">
+              Versions that updates replaced, newest first. Restoring one works like an update: you see what changes first, and your classifications and toolsets carry over.
+            </p>
+          </div>
+          <Card className="gap-0 divide-y p-0">
+            {source.versions.map((v) => (
+              <div key={v.version} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                <span>
+                  <span className="font-medium">Version {v.version}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {v.operations} operations · replaced {when(v.replacedAt)}
+                    {v.replacedBy ? ` by ${v.replacedBy}` : ""}
+                  </span>
+                </span>
+                {canEdit && (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/t/${tenantId}/sources/${sourceId}/update?version=${v.version}`}>
+                      <HistoryIcon /> Restore
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            ))}
+          </Card>
+        </section>
+      )}
     </div>
   );
+}
+
+/** A date for people: "today at 14:05", or the date. */
+function when(iso: string): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? `today at ${time}` : `${d.toLocaleDateString(undefined, { dateStyle: "medium" })} at ${time}`;
 }
 
 function KeyCard(props: { tenantId: string; source: SourceView; scheme: SourceView["authSchemes"][number]; onChanged: (v: SourceView) => void; canManage: boolean }) {

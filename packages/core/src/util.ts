@@ -33,3 +33,18 @@ export function slugify(text: string): string | undefined {
 export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
+
+/**
+ * JSON with object keys sorted, so equal values print the same whatever their key order
+ * (Postgres `jsonb` reorders keys, so stored documents don't match fresh ones byte for byte).
+ */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    isRecord(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]])) : v,
+  );
+}
+
+/** Whether two JSON values are equal, ignoring object key order. */
+export function sameJson(a: unknown, b: unknown): boolean {
+  return canonicalJson(a) === canonicalJson(b);
+}
