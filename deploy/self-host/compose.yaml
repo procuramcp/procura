@@ -21,7 +21,7 @@ x-logging: &logging
 
 services:
   app:
-    image: ${CAIRNMCP_IMAGE:-ghcr.io/cairnmcp/cairnmcp:latest}
+    image: ${CAIRNMCP_IMAGE:-ghcr.io/procuramcp/procura:latest}
     restart: unless-stopped
     environment:
       CAIRNMCP_PUBLIC_URL: ${CAIRNMCP_PUBLIC_URL:-http://localhost:8080}
@@ -44,7 +44,7 @@ services:
   # Runs the database migrations as the owner role, then exits; the app starts only after it
   # succeeds, so `docker compose up` after pulling a new image also upgrades the schema.
   migrate:
-    image: ${CAIRNMCP_IMAGE:-ghcr.io/cairnmcp/cairnmcp:latest}
+    image: ${CAIRNMCP_IMAGE:-ghcr.io/procuramcp/procura:latest}
     command: ["node", "packages/db/scripts/migrate.ts"]
     restart: "no"
     environment:

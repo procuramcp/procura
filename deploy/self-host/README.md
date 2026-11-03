@@ -173,7 +173,7 @@ Images are tagged by version: `0.1.0` (exact), `0.1` (latest patch), `latest` (l
 and `edge` (every change on main, not for servers). Pin one on a server:
 
 ```bash
-CAIRNMCP_IMAGE=ghcr.io/cairnmcp/cairnmcp:0.1
+CAIRNMCP_IMAGE=ghcr.io/procuramcp/procura:0.1
 ```
 
 To upgrade, back up the database, change the tag if you pin a minor version, then:

@@ -981,7 +981,7 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
   code: the licence has to be chosen first.
 - **Decision:** AGPL-3.0-only (`LICENSE`), the licence Speakeasy's Gram uses. Anyone may run,
   change, and host cairnmcp; a hosted copy must offer its changed source to its users. The image
-  is public on GitHub Container Registry (`ghcr.io/cairnmcp/cairnmcp`).
+  is public on GitHub Container Registry (`ghcr.io/procuramcp/procura`).
 - **"-only", not "-or-later":** a future GNU licence doesn't apply without our choosing it.
 - **Still possible later:** a later version under another licence (D-045); what was released
   under AGPL stays AGPL. Taking outside contributions would need a contributor agreement first

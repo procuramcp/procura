@@ -63,7 +63,7 @@ Copy its `.env.example` to `.env` in that folder, set `INTERVALS_API_KEY`, then 
 
 Run your own with Docker: [`deploy/self-host`](deploy/self-host/README.md) has a Compose setup
 (the app, Postgres, and a local sign-in provider for trying it on a laptop) and the guide for
-HTTPS, sign-in, backups, and upgrades. The image is `ghcr.io/cairnmcp/cairnmcp`.
+HTTPS, sign-in, backups, and upgrades. The image is `ghcr.io/procuramcp/procura`.
 
 ## Licence
 
