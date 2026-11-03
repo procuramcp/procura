@@ -17,7 +17,8 @@ export type UpstreamIdentity = {
 export interface IdentityProvider {
   readonly id: string;
   readonly name: string;
-  authorizationUrl(input: { redirectUri: string; state: string; nonce: string; codeVerifier: string }): Promise<URL>;
+  /** `prompt: "login"` asks the provider to show its sign-in page even if it remembers the person. */
+  authorizationUrl(input: { redirectUri: string; state: string; nonce: string; codeVerifier: string; prompt?: "login" }): Promise<URL>;
   finish(input: { callbackUrl: URL; redirectUri: string; expectedState: string; expectedNonce: string; codeVerifier: string }): Promise<UpstreamIdentity>;
 }
 
@@ -29,9 +30,9 @@ export type SignInSecrets = { state: string; nonce: string; verifier: string; br
  * browser secret (for a cookie that proves the callback lands in the same
  * browser), plus where to send the browser.
  */
-export async function startSignIn(provider: IdentityProvider, redirectUri: string): Promise<{ location: URL; secrets: SignInSecrets }> {
+export async function startSignIn(provider: IdentityProvider, redirectUri: string, options: { prompt?: "login" } = {}): Promise<{ location: URL; secrets: SignInSecrets }> {
   const secrets = { state: randomToken(32), nonce: randomToken(32), verifier: randomToken(32), browser: randomToken(32) };
-  const location = await provider.authorizationUrl({ redirectUri, state: secrets.state, nonce: secrets.nonce, codeVerifier: secrets.verifier });
+  const location = await provider.authorizationUrl({ redirectUri, state: secrets.state, nonce: secrets.nonce, codeVerifier: secrets.verifier, ...options });
   return { location, secrets };
 }
 
@@ -77,9 +78,10 @@ export class OidcIdentityProvider implements IdentityProvider {
     this.#fetch = options.fetch;
   }
 
-  async authorizationUrl(input: { redirectUri: string; state: string; nonce: string; codeVerifier: string }): Promise<URL> {
+  async authorizationUrl(input: { redirectUri: string; state: string; nonce: string; codeVerifier: string; prompt?: "login" }): Promise<URL> {
     const config = await this.#configuration();
     return oidc.buildAuthorizationUrl(config, {
+      ...(input.prompt ? { prompt: input.prompt } : {}),
       redirect_uri: input.redirectUri,
       response_type: "code",
       scope: "openid email profile",
