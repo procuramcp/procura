@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
 
@@ -15,6 +15,11 @@ export const CorpusEntry = z.object({
    * so the fetch script never overwrites them.
    */
   refetch: z.boolean().optional(),
+  /**
+   * False for large documents (over 1 MB) kept out of git (D-017): `pnpm eval:ingest` downloads
+   * them into the gitignored `corpus/fetched/` and checks them against `sha256`.
+   */
+  vendored: z.boolean().optional(),
 });
 export type CorpusEntry = z.infer<typeof CorpusEntry>;
 
@@ -30,6 +35,18 @@ export function loadCorpusManifest(manifestPath = DEFAULT_MANIFEST_PATH): Corpus
   return CorpusManifest.parse(raw);
 }
 
-export function resolveCorpusFile(manifestPath: string, relativeFilePath: string): string {
-  return resolve(dirname(manifestPath), relativeFilePath);
+/** Where fetched (not vendored) documents are kept, next to the manifest. Gitignored. */
+export const FETCHED_DIR = "fetched";
+
+export function isVendored(entry: CorpusEntry): boolean {
+  return entry.vendored !== false;
+}
+
+export function resolveCorpusFile(manifestPath: string, entry: Pick<CorpusEntry, "file" | "vendored">): string {
+  return entry.vendored === false ? resolve(dirname(manifestPath), FETCHED_DIR, entry.file) : resolve(dirname(manifestPath), entry.file);
+}
+
+/** Whether the entry's document is on disk (vendored ones always should be). */
+export function isPresent(manifestPath: string, entry: CorpusEntry): boolean {
+  return existsSync(resolveCorpusFile(manifestPath, entry));
 }

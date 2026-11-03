@@ -6,20 +6,20 @@ Rejected: 1
 
 | id | outcome | doc ops | IR ops | skipped | warnings | errors | mean confidence | input Ajv | output Ajv | IR bytes |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| apisguru-digitalocean-v2 | mapped | 290 | 290 | 0 | 16 | 0 | 0.895 | 290/290 | 215/215 | 1885342 |
+| apisguru-digitalocean-v2 | mapped | 290 | 290 | 0 | 16 | 0 | 0.895 | 290/290 | 215/215 | 1885378 |
 | apisguru-listennotes-v2 | mapped | 24 | 24 | 0 | 0 | 0 | 0.900 | 24/24 | 24/24 | 196445 |
 | apisguru-urlbox-v1 | mapped | 1 | 1 | 0 | 0 | 0 | 0.900 | 1/1 | 1/1 | 3871 |
-| box-v2 | mapped | 297 | 297 | 0 | 10 | 0 | 0.895 | 297/297 | 247/247 | 3442394 |
-| discord-v10 | mapped | 250 | 250 | 0 | 6 | 0 | 0.898 | 250/250 | 189/189 | 3246395 |
+| box-v2 | mapped | 297 | 297 | 0 | 10 | 0 | 0.895 | 297/297 | 247/247 | 3442430 |
+| discord-v10 | mapped | 250 | 250 | 0 | 6 | 0 | 0.898 | 250/250 | 189/189 | 3246431 |
 | intervals-icu | mapped | 148 | 148 | 0 | 149 | 0 | 0.800 | 148/148 | 131/131 | 886838 |
 | oai-petstore-expanded-v3-0 | mapped | 4 | 4 | 0 | 0 | 0 | 0.900 | 4/4 | 3/3 | 6180 |
 | oai-petstore-minimal-swagger-2-0 | rejected (unsupported_version) | 1 | 0 | 0 | 0 | 1 | - | 0/0 | 0/0 | 0 |
 | oai-uspto-v3-0 | mapped | 3 | 3 | 0 | 0 | 0 | 0.900 | 3/3 | 3/3 | 6287 |
 | oai-webhook-example-v3-1 | mapped | 0 | 0 | 0 | 0 | 0 | - | 0/0 | 0/0 | 499 |
-| openai-openapi | mapped | 376 | 376 | 0 | 27 | 0 | 0.893 | 376/376 | 367/367 | 5058589 |
-| stripe-v1 | mapped | 612 | 612 | 0 | 1 | 0 | 0.900 | 612/612 | 612/612 | 17501515 |
+| openai-openapi | mapped | 376 | 376 | 0 | 27 | 0 | 0.893 | 376/376 | 367/367 | 5058625 |
+| stripe-v1 | mapped | 612 | 612 | 0 | 1 | 0 | 0.900 | 612/612 | 612/612 | 17501549 |
 | swagger-petstore-v3 | mapped | 19 | 19 | 0 | 16 | 0 | 0.863 | 19/19 | 14/14 | 27736 |
-| twilio-api-v2010-json | mapped | 197 | 197 | 0 | 1 | 0 | 0.899 | 197/197 | 164/164 | 1037120 |
+| twilio-api-v2010-json | mapped | 197 | 197 | 0 | 1 | 0 | 0.899 | 197/197 | 164/164 | 1037156 |
 | twilio-conversations-v2-yaml | mapped | 22 | 22 | 0 | 0 | 0 | 0.900 | 22/22 | 22/22 | 159894 |
 
 ## apisguru-digitalocean-v2
@@ -30,7 +30,7 @@ Rejected: 1
 - side effects: read 141, write 95, destructive 54 (name escalations 6)
 - confidence: mean 0.895, min 0.800
 - strict Ajv: input 290/290, output 215/215
-- compact IR bytes: 1885342
+- compact IR bytes: 1885378
 
 Top diagnostics:
 - warning response_media_type_unspecified: 9
@@ -82,7 +82,7 @@ Error samples:
 - side effects: read 129, write 120, destructive 48 (name escalations 5)
 - confidence: mean 0.895, min 0.700
 - strict Ajv: input 297/297, output 247/247
-- compact IR bytes: 3442394
+- compact IR bytes: 3442430
 
 Top diagnostics:
 - info path_key_fragment: 19
@@ -101,7 +101,7 @@ Error samples:
 - side effects: read 107, write 101, destructive 42 (name escalations 2)
 - confidence: mean 0.898, min 0.700
 - strict Ajv: input 250/250, output 189/189
-- compact IR bytes: 3246395
+- compact IR bytes: 3246431
 
 Top diagnostics:
 - warning binary_request_body: 3
@@ -201,7 +201,7 @@ Error samples:
 - side effects: read 165, write 157, destructive 54 (name escalations 0)
 - confidence: mean 0.893, min 0.700
 - strict Ajv: input 376/376, output 367/367
-- compact IR bytes: 5058589
+- compact IR bytes: 5058625
 
 Top diagnostics:
 - info output_schema_trimmed: 15
@@ -221,7 +221,7 @@ Error samples:
 - side effects: read 273, write 305, destructive 34 (name escalations 2)
 - confidence: mean 0.900, min 0.700
 - strict Ajv: input 612/612, output 612/612
-- compact IR bytes: 17501515
+- compact IR bytes: 17501549
 
 Top diagnostics:
 - info output_schema_trimmed: 364
@@ -258,7 +258,7 @@ Error samples:
 - side effects: read 101, write 64, destructive 32 (name escalations 2)
 - confidence: mean 0.899, min 0.800
 - strict Ajv: input 197/197, output 164/164
-- compact IR bytes: 1037120
+- compact IR bytes: 1037156
 
 Top diagnostics:
 - warning no_success_response: 1

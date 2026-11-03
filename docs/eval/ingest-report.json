@@ -6,13 +6,14 @@
     "operationsInDocuments": 2244,
     "operationsInIr": 2243,
     "operationsSkipped": 0,
-    "operationsInRejectedDocuments": 1
+    "operationsInRejectedDocuments": 1,
+    "notFetched": []
   },
   "documents": [
     {
       "id": "apisguru-digitalocean-v2",
       "file": "apisguru/digitalocean_v2.yaml",
-      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/digitalocean.com/2.0/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/f04b8d0bcd39c52e1cf3ad7a5fe744709832ae49/APIs/digitalocean.com/2.0/openapi.yaml",
       "license": "Apache-2.0",
       "sha256": "5bd3a4800c4396372cb80d99cc82b49463e4a3f136b63d1794c19f13da37cf63",
       "retrievedOn": "2026-11-03",
@@ -58,7 +59,7 @@
           "strictAjvCompiles": 215
         }
       },
-      "compactIrBytes": 1885342,
+      "compactIrBytes": 1885378,
       "topDiagnostics": [
         {
           "code": "response_media_type_unspecified",
@@ -183,7 +184,7 @@
     {
       "id": "box-v2",
       "file": "box/openapi.json",
-      "sourceUrl": "https://raw.githubusercontent.com/box/box-openapi/main/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/box/box-openapi/8464b2265fb8bf6d14feae0f7614e7d5c0084cc5/openapi.json",
       "license": "Apache-2.0",
       "sha256": "47cdf4bcbc7cdebcb042f155f13a8413bf913678489bd15b263b65f49e841ba1",
       "retrievedOn": "2026-10-30",
@@ -228,7 +229,7 @@
           "strictAjvCompiles": 247
         }
       },
-      "compactIrBytes": 3442394,
+      "compactIrBytes": 3442430,
       "topDiagnostics": [
         {
           "code": "path_key_fragment",
@@ -256,7 +257,7 @@
     {
       "id": "discord-v10",
       "file": "discord/openapi.json",
-      "sourceUrl": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
+      "sourceUrl": "https://raw.githubusercontent.com/discord/discord-api-spec/4e75626a4cedfbc397d66f5491c79a9a62a71fd5/specs/openapi.json",
       "license": "MIT",
       "sha256": "281a2bff563d77a19e51fc3bf8bbe3ebcef28e3dc86684ae395b06ac51ba7484",
       "retrievedOn": "2026-10-30",
@@ -299,7 +300,7 @@
           "strictAjvCompiles": 189
         }
       },
-      "compactIrBytes": 3246395,
+      "compactIrBytes": 3246431,
       "topDiagnostics": [
         {
           "code": "binary_request_body",
@@ -580,7 +581,7 @@
     {
       "id": "openai-openapi",
       "file": "openai/openapi.yaml",
-      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/main/openapi.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/openai/openai-openapi/8c668caa924f24baa77679fc6635ed56659fae06/openapi.yaml",
       "license": "MIT",
       "sha256": "aea81bdac8b83352defafcacf548fe859b5005716e64d3e25e6c79489fddd756",
       "retrievedOn": "2026-10-30",
@@ -627,7 +628,7 @@
           "strictAjvCompiles": 367
         }
       },
-      "compactIrBytes": 5058589,
+      "compactIrBytes": 5058625,
       "topDiagnostics": [
         {
           "code": "output_schema_trimmed",
@@ -660,7 +661,7 @@
     {
       "id": "stripe-v1",
       "file": "stripe/spec3.json",
-      "sourceUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "sourceUrl": "https://raw.githubusercontent.com/stripe/openapi/bcfd59f49dcac84a84d63d304c62793dff6e5916/openapi/spec3.json",
       "license": "MIT",
       "sha256": "7cff4cc46d0654101a36a3302f7544640f5f73e4f3cad6f264f0e23c19fa1776",
       "retrievedOn": "2026-11-03",
@@ -703,7 +704,7 @@
           "strictAjvCompiles": 612
         }
       },
-      "compactIrBytes": 17501515,
+      "compactIrBytes": 17501549,
       "topDiagnostics": [
         {
           "code": "output_schema_trimmed",
@@ -799,7 +800,7 @@
     {
       "id": "twilio-api-v2010-json",
       "file": "twilio/twilio_api_v2010.json",
-      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+      "sourceUrl": "https://raw.githubusercontent.com/twilio/twilio-oai/157fb094bd08957183278242d7622c8560b7a4c4/spec/json/twilio_api_v2010.json",
       "license": "MIT",
       "sha256": "bfdf249a129819af274d6bdc7672156ea3416ad48670a6f0544def6ef386ba87",
       "retrievedOn": "2026-10-30",
@@ -840,7 +841,7 @@
           "strictAjvCompiles": 164
         }
       },
-      "compactIrBytes": 1037120,
+      "compactIrBytes": 1037156,
       "topDiagnostics": [
         {
           "code": "no_success_response",

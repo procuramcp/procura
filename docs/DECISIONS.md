@@ -159,8 +159,17 @@ planning handoff are not repeated here unless implementation added something.
   reused by path and marked `refetch: false` so refreshing never overwrites it.
 - **Validity check:** schemas must compile under Ajv 2020 with unknown keywords rejected. Ajv's
   style lints (`strictTypes`, `strictRequired`) are off because they reject valid schemas.
+- **Large documents are fetched, not committed (revised 2026-11-03).** With Stripe the corpus
+  reached 19 MB, which every clone carries forever once it's in history. Documents over 1 MB are
+  marked `vendored: false`: `pnpm eval:ingest` downloads them into the gitignored
+  `corpus/fetched/` and refuses any whose SHA-256 doesn't match the pin. Their URLs name a commit,
+  not a branch, so the pinned bytes stay downloadable (OpenAI's file had already changed on `main`
+  three days after it was pinned). `--offline` skips missing ones and lists them in the report. CI
+  needs none of them: its eval test uses the small vendored files, and the regressions they
+  found have unit tests. 444 KB stays committed.
 - **Rejected:** Pulling a large share of APIs.guru (skews toward one conversion pipeline, and
-  repository bloat); fetching at eval time (non-deterministic, needs network in CI).
+  repository bloat); fetching from branch URLs (they move, so a pin can't be met); Git LFS
+  (another tool for contributors and CI, for files only the eval reads).
 
 ## D-018 Hosting: one container image, hosted first, self-host next
 

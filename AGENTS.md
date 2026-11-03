@@ -22,6 +22,7 @@ If `node -v` is older, use `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` (
 | Both | `pnpm check` |
 | Build the console | `pnpm --filter @cairnmcp/web build` |
 | Run the console locally with fake data | `CAIRNMCP_TEST_DATABASE_URL=postgres://$USER@localhost:5432/postgres pnpm --filter @cairnmcp/server dev:console` (http://localhost:8787/app/) |
+| Ingest eval report (`docs/eval/`) | `pnpm eval:ingest` (downloads large corpus documents on first run; `--offline` skips them) |
 | Migrate a database | `pnpm --filter @cairnmcp/db migrate` (owner role) |
 
 The Postgres tests (`db`, `mcp`, `auth`, `server`) skip unless `CAIRNMCP_TEST_DATABASE_URL` is
@@ -43,7 +44,7 @@ a superuser URL; each test file creates and drops its own database. A local Post
 | `auth` | Embedded OAuth 2.1 authorization server under `/oauth`. | `src/handler.ts` (all endpoints + route table), `identity.ts` (OIDC), `keys.ts`, `pages.ts`, `redirect.ts` |
 | `server` | The app: wires everything, the console API, the admin CLI. | `src/app.ts`, `src/console/*`, `src/admin.ts`, `src/fetch-document.ts`, `scripts/serve.ts`, `scripts/admin.ts` |
 | `web` | The console UI (React, shadcn/ui), built to static files served at `/app`. | `src/lib/api.ts` (every API call; types from `console-api`), `src/lib/act.ts`, `src/lib/hooks.ts`, `src/pages/*` |
-| `eval` | Offline ingest eval over a corpus of public API descriptions. | `src/ingest-eval.ts`, `corpus/` |
+| `eval` | Ingest eval over a corpus of public API descriptions; large ones are downloaded on demand, pinned by hash (D-017). | `src/ingest-eval.ts`, `src/fetch.ts`, `corpus/manifest.json` |
 
 `examples/intervals-icu` calls a real API through the whole pipeline. `deploy/` holds the Oracle
 VM (Docker Compose + Caddy) and Auth0 (Terraform, not OpenTofu) setups.
