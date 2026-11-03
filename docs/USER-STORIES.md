@@ -59,7 +59,7 @@ and up to tens of thousands of the second. They're stored, listed, and managed s
 | Id | Story | Done when | Status |
 | --- | --- | --- | --- |
 | P-30 | I see how my server is used: calls by tool, customer, and plan; errors; limit refusals. | Usage page over a chosen period. | — |
-| P-31 | My billing system gets usage per customer so I can charge for it. | Usage export (API and CSV) and a webhook per period; cairnmcp meters and enforces, it doesn't take payments (D-037). | — |
+| P-31 | My billing system gets usage per customer so I can charge for it. | Usage export (API and CSV) and a webhook per period; cairnmcp meters and enforces, it doesn't take payments (D-037). | parked (D-041) |
 | P-32 | I can answer "what did this customer's agent do?" | Audit log per call: who, tool, inputs, outcome (D-020); retention set by the provider. | partial: recorded, not shown in the console; no retention setting |
 
 ## Customer

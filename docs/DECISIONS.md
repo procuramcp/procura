@@ -811,6 +811,8 @@ planning handoff are not repeated here unless implementation added something.
 
 ## D-040 Our pricing unit: requests that reach the provider's API
 
+- **Parked by D-041:** no pricing work for now. This stays the unit if we ever charge.
+
 - **Context:** cairnmcp needs a unit to charge providers by (D-037), and composite tools (3d)
   raised whether one tool call that makes several API requests counts once or several times.
 - **Decision:** we charge a provider per upstream request: each request cairnmcp sends to their
@@ -828,3 +830,23 @@ planning handoff are not repeated here unless implementation added something.
   pricing needs.
 - **Not decided here:** the prices, the free tier, and tiers or overage.
 - **Rejected:** per MCP tool call (a composite would hide its real cost); per byte (above).
+
+## D-041 Product first: no pricing or billing work; open source stays open
+
+- **Context:** the MCP gateway market is crowded. Gateways (Azure API Management, Kong, Apigee,
+  Google Cloud API Gateway) now turn REST APIs into MCP tools, and Speakeasy's Gram and Zuplo
+  already sell hosting, plans, and metering. cairnmcp has no revenue and no paying users.
+- **Decision:** build the best product we can and find where it breaks, rather than designing
+  pricing or billing. Our own prices, tiers, and a billing export are parked; D-040 stays as the
+  unit if we ever charge. Open sourcing cairnmcp stays possible, decided later along with a
+  licence.
+- **What stays:** plan allowances (D-039) and the usage page. They're product, not billing: they
+  protect a provider's upstream quota and show how the server is used. Usage export and the
+  billing webhook (3c step 4) are parked with pricing.
+- **Where the effort goes:** the quality of what agents get. Real APIs through ingest and the
+  eval corpus to find edge cases, tool curation, safe writes, and whether agents actually succeed
+  with a toolset. Edges come from what that work turns up, not from undercutting on price.
+- **Keeping open source possible:** self-host (2b) is what an open-source release needs, so it
+  moves up if we decide to release. No dependency or design that only works on our deployment.
+- **Rejected:** setting tiers and prices now (no users to ask, D-040's open questions); dropping
+  allowances with billing (they protect upstream quotas whether or not anyone pays).

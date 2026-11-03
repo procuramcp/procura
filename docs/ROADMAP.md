@@ -4,9 +4,10 @@ Milestones from the planning handoff, with status. Numbers are stable: other doc
 them, so new work gets a letter suffix (e.g. 2b) instead of renumbering. What each kind of user
 needs to be able to do is in `docs/USER-STORIES.md` (story ids like P-13 below).
 
-**Order** (D-037: API providers are the main customer): finish 3 (source updates with a diff),
+**Order** (D-037: API providers are the main customer; D-041: product first, no pricing or billing
+work): finish 3 (source updates with a diff),
 then 3c, then the rest of 3b, then 2b. 3d (composite tools) comes after 3c; 4 and 5 wait. 2b moves up if a provider needs to run
-cairnmcp itself.
+cairnmcp itself or we open source it (D-041).
 
 | | Milestone | Status |
 | --- | --- | --- |
@@ -15,7 +16,7 @@ cairnmcp itself.
 | 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | Started: curation console at `/app` (D-033): sign-in, toolset editor (tools, names, descriptions, pins, write tools marked), access, and a tool test panel; access profiles, named permission sets assigned to members (D-034); adding APIs from OpenAPI (URL, Swagger UI page, paste, or file) and their keys (D-035). Next: updating a source with a diff of what changed |
 | 3b | Custom and on-behalf-of upstream auth; provider-hosted servers with per-user credentials (D-032); external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
-| 3c | Provider features: customers separate from the team, plans with per-customer limits and allowances, the provider's own sign-in with plans from claims, usage page and export, draft and published toolsets, branding. Details below | Next after 3 |
+| 3c | Provider features: customers separate from the team, plans with per-customer limits and allowances, the provider's own sign-in with plans from claims, usage page, draft and published toolsets, branding. Details below | Next after 3 |
 | 3d | Composite tools: one tool that runs several API calls in order (P-8). Details below | After 3c |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
@@ -68,9 +69,9 @@ each step is usable on its own:
    turning the upstream's own quota errors into `limit_reached`.
 3. **The provider's sign-in, plans from claims** (P-10, P-12, C-1, C-4): moved here from 3b. The
    tenant names its OIDC or OAuth provider; a claim picks the plan and is re-read on token refresh.
-4. **Usage** (P-30, P-31, P-32): a usage page by tool, customer, and plan; export and a webhook
-   per period for the provider's billing. Small per-call counters, separate from the audit log;
-   audit retention as a setting.
+4. **Usage** (P-30, P-32): a usage page by tool, customer, and plan. Small per-call counters,
+   separate from the audit log; audit retention as a setting. Export and a webhook per period
+   for the provider's billing (P-31) are parked (D-041).
 5. **How the upstream learns the caller** (P-20, C-5): per-user OAuth credentials (D-032) or a
    service key plus a signed identity header; decided in D-037's open question before this step.
 6. **Drafts and branding** (P-5, P-6): draft and published toolset versions; custom domain,
