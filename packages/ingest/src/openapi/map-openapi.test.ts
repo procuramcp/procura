@@ -52,6 +52,13 @@ describe("mapOpenApi: document level", () => {
     expect(r.ok && r.ir.source.baseUrl).toBe("https://sandbox.example.com");
   });
 
+  it("cuts a long title and description instead of refusing the API (DigitalOcean)", () => {
+    const r = mapOk(minimal({}, { info: { title: "T".repeat(300), version: "1", description: "d".repeat(12_000) } }));
+    expect(r.ir.source.name).toHaveLength(200);
+    expect(r.ir.source.description).toHaveLength(10_000);
+    expect(r.diagnostics.map((d) => d.code)).toContain("description_truncated");
+  });
+
   it("slugs the source id from the title unless given", () => {
     expect(mapOk(minimal({})).ir.source.id).toBe("mini-api");
     const r = mapOpenApi(minimal({}), { sourceId: "custom" });

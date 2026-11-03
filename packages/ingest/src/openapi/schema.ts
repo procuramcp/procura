@@ -209,12 +209,29 @@ export class SchemaConverter {
       const at = `${pointer}/${key}`;
       if (SCHEMA_KEYS.has(key) && (isRecord(value) || typeof value === "boolean")) {
         out[key] = this.#node(value, direction, at, refs, depth);
-      } else if (SCHEMA_MAP_KEYS.has(key) && isRecord(value)) {
+      } else if (SCHEMA_MAP_KEYS.has(key) && key !== "patternProperties" && isRecord(value)) {
         out[key] = Object.fromEntries(
           Object.entries(value).map(([k, v]) => [k, this.#node(v, direction, `${at}/${k}`, refs, depth)]),
         );
       } else if (SCHEMA_LIST_KEYS.has(key) && Array.isArray(value)) {
         out[key] = value.map((v, i) => this.#node(v, direction, `${at}/${i}`, refs, depth));
+      } else if (key === "pattern" && typeof value === "string") {
+        const fixed = unicodePattern(value);
+        if (fixed === undefined) this.#noteOnce("pattern_dropped", at, `pattern ${JSON.stringify(value)} is not a valid regular expression; dropped`, at);
+        else {
+          if (fixed !== value) this.#noteOnce("pattern_rewritten", at, `pattern ${JSON.stringify(value)} rewritten as ${JSON.stringify(fixed)} (needless escapes)`, at);
+          out[key] = fixed;
+        }
+      } else if (key === "patternProperties" && isRecord(value)) {
+        const props: Record<string, Schema> = {};
+        for (const [p, v] of Object.entries(value)) {
+          const fixed = unicodePattern(p);
+          // Skip an unusable property pattern. Rare; it only tightens a schema that also
+          // forbids additional properties.
+          if (fixed === undefined) this.#noteOnce("pattern_dropped", `${at}/${p}`, `property pattern ${JSON.stringify(p)} is not a valid regular expression; dropped`, at);
+          else props[fixed] = this.#node(v, direction, `${at}/${p}`, refs, depth);
+        }
+        out[key] = props;
       } else if (key === "enum" && Array.isArray(value) && value.length === 0) {
         // Matches nothing, so it is always a spec bug; usually another keyword carries the values.
         this.#noteOnce("empty_enum", at, "empty enum would accept no value; dropped", at);
@@ -256,6 +273,38 @@ export class SchemaConverter {
     const target = resolvePointer(this.#doc, ref);
     if (target === undefined) throw new MappingError("unresolved_ref", `$ref target not found: ${ref}`, pointer);
     return this.#node(target, direction, ref, refs, depth + 1);
+  }
+}
+
+// Characters a regex may escape in Unicode mode (ECMA-262 SyntaxCharacter, plus "/" and "-").
+const ESCAPABLE = new Set([..."^$\\.*+?()[]{}|/-"]);
+
+/**
+ * A pattern that compiles in Unicode mode, as JSON Schema validators run them. Specs often
+ * escape characters needlessly (DigitalOcean: `^[a-zA-Z0-9_\-\:]+$`), which plain JavaScript
+ * allows and Unicode mode refuses; those escapes are removed, which doesn't change the match.
+ * Undefined if it still doesn't compile.
+ */
+export function unicodePattern(pattern: string): string | undefined {
+  if (compiles(pattern)) return pattern;
+  let out = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    const next = pattern[i + 1];
+    if (c === "\\" && next !== undefined) {
+      out += /[A-Za-z0-9]/.test(next) || ESCAPABLE.has(next) ? c + next : next;
+      i++;
+    } else out += c;
+  }
+  return compiles(out) ? out : undefined;
+}
+
+function compiles(pattern: string): boolean {
+  try {
+    new RegExp(pattern, "u");
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SchemaConverter, type Direction } from "./schema.ts";
+import { SchemaConverter, unicodePattern, type Direction } from "./schema.ts";
 
 const doc = (schemas: Record<string, unknown>) => ({ components: { schemas } });
 
@@ -124,5 +124,28 @@ describe("SchemaConverter (OpenAPI 3.0 → JSON Schema 2020-12)", () => {
       contentMediaType: "application/json",
       contentSchema: { type: ["object", "null"] },
     });
+  });
+});
+
+describe("patterns that only compile outside Unicode mode (DigitalOcean)", () => {
+  it("drops needless escapes, keeping what the pattern matches", () => {
+    const fixed = unicodePattern("^[a-zA-Z0-9_\\-\\:]+$");
+    expect(fixed).toBe("^[a-zA-Z0-9_\\-:]+$");
+    const re = new RegExp(fixed!, "u");
+    expect(["a-b:c", "x_1"].every((s) => re.test(s))).toBe(true);
+    expect(re.test("a b")).toBe(false);
+  });
+
+  it("leaves valid patterns alone and gives up on broken ones", () => {
+    expect(unicodePattern("^\\d{3}\\.\\w+$")).toBe("^\\d{3}\\.\\w+$");
+    expect(unicodePattern("^[a-")).toBeUndefined();
+  });
+
+  it("rewrites or drops them during conversion, with a note", () => {
+    const notes: string[] = [];
+    const c = new SchemaConverter(doc({}), "3.0", (code) => notes.push(code));
+    const root = c.convert({ type: "object", properties: { tag: { type: "string", pattern: "^[\\:a]+$" }, bad: { type: "string", pattern: "(" } } }, "input", "#/t", new Set());
+    expect(root).toEqual({ type: "object", properties: { tag: { type: "string", pattern: "^[:a]+$" }, bad: { type: "string" } } });
+    expect(notes.sort()).toEqual(["pattern_dropped", "pattern_rewritten"]);
   });
 });

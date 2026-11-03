@@ -79,6 +79,16 @@ describe("Runtime with Intervals.icu", () => {
     expect(audit.events).toEqual([]); // reads are not audited
   });
 
+  it("fails closed, with a clear error, when a tool's schema can't be compiled", async () => {
+    const { fetch, calls } = fakeFetch(() => json([]));
+    const t = tool("list_activities");
+    const broken = { ...t, inputSchema: { type: "object", properties: { q: { type: "string", pattern: "^[a\\:]+$" } } } };
+    const result = await runtime(fetch).invoke({ tenantId: TENANT, caller: CALLER, source, tool: broken, args: { q: "a" } });
+    expect(result).toMatchObject({ ok: false, error: { kind: "unsupported", retryable: false } });
+    expect(!result.ok && result.error.message).toContain("can't be checked");
+    expect(calls).toHaveLength(0);
+  });
+
   describe("input validation", () => {
     it.each([
       ["missing a required field", {}, "must have required property 'oldest'"],

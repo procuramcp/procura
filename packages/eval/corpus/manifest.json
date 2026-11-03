@@ -1,6 +1,15 @@
 {
   "entries": [
     {
+      "id": "apisguru-digitalocean-v2",
+      "file": "apisguru/digitalocean_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/digitalocean.com/2.0/openapi.yaml",
+      "license": "Apache-2.0",
+      "sha256": "5bd3a4800c4396372cb80d99cc82b49463e4a3f136b63d1794c19f13da37cf63",
+      "retrievedOn": "2026-11-03",
+      "notes": "DigitalOcean's own description is split across hundreds of files; this is APIs.guru's bundled copy, with every type inlined. Its introduction is over 10,000 characters (D-044)."
+    },
+    {
       "id": "apisguru-listennotes-v2",
       "file": "apisguru/listennotes_v2.yaml",
       "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/listennotes.com/2.0/openapi.yaml",

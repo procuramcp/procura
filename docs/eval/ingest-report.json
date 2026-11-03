@@ -1,14 +1,93 @@
 {
   "summary": {
-    "corpusEntries": 14,
-    "mapped": 13,
+    "corpusEntries": 15,
+    "mapped": 14,
     "rejected": 1,
-    "operationsInDocuments": 1954,
-    "operationsInIr": 1953,
+    "operationsInDocuments": 2244,
+    "operationsInIr": 2243,
     "operationsSkipped": 0,
     "operationsInRejectedDocuments": 1
   },
   "documents": [
+    {
+      "id": "apisguru-digitalocean-v2",
+      "file": "apisguru/digitalocean_v2.yaml",
+      "sourceUrl": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/digitalocean.com/2.0/openapi.yaml",
+      "license": "Apache-2.0",
+      "sha256": "5bd3a4800c4396372cb80d99cc82b49463e4a3f136b63d1794c19f13da37cf63",
+      "retrievedOn": "2026-11-03",
+      "outcome": {
+        "kind": "mapped"
+      },
+      "operations": {
+        "document": 290,
+        "ir": 290,
+        "skipped": 0
+      },
+      "diagnostics": {
+        "warningsByCode": {
+          "output_schema_too_large": 4,
+          "pattern_rewritten": 3,
+          "response_media_type_unspecified": 9
+        },
+        "errorsByCode": {},
+        "infosByCode": {
+          "description_truncated": 1,
+          "reserved_header_ignored": 2
+        }
+      },
+      "sideEffects": {
+        "classCounts": {
+          "read": 141,
+          "write": 95,
+          "destructive": 54
+        },
+        "nameHeuristicEscalations": 6
+      },
+      "confidence": {
+        "mean": 0.895,
+        "min": 0.8
+      },
+      "schemas": {
+        "input": {
+          "total": 290,
+          "strictAjvCompiles": 290
+        },
+        "output": {
+          "total": 215,
+          "strictAjvCompiles": 215
+        }
+      },
+      "compactIrBytes": 1885342,
+      "topDiagnostics": [
+        {
+          "code": "response_media_type_unspecified",
+          "severity": "warning",
+          "count": 9
+        },
+        {
+          "code": "output_schema_too_large",
+          "severity": "warning",
+          "count": 4
+        },
+        {
+          "code": "pattern_rewritten",
+          "severity": "warning",
+          "count": 3
+        },
+        {
+          "code": "reserved_header_ignored",
+          "severity": "info",
+          "count": 2
+        },
+        {
+          "code": "description_truncated",
+          "severity": "info",
+          "count": 1
+        }
+      ],
+      "errorSamples": []
+    },
     {
       "id": "apisguru-listennotes-v2",
       "file": "apisguru/listennotes_v2.yaml",

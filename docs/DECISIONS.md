@@ -884,7 +884,7 @@ Kubernetes) through ingest (D-041).
     toolset offers 5 tools out of 351. Fixed by D-043.
   - **Multi-file descriptions.** DigitalOcean's description splits into 873 files; every
     operation fails with `external_ref`. Bundling relative refs when the document comes from a
-    URL would cover it, with the same fetch limits as the document itself.
+    URL would cover it, with the same fetch limits as the document itself. Not urgent: see D-044.
   - **Relative server URLs with no host.** Kubernetes declares `/`, since every cluster has its own
     address; ingest refuses it without a base URL. The console should ask for one.
 - **Corpus:** Stripe is added (MIT, about 8 MB). The others stay out to limit repository size;
@@ -920,3 +920,27 @@ Kubernetes) through ingest (D-041).
 - **Rejected:** lowering by heuristic at ingest (D-005); a per-toolset override (the class is a
   fact about the API, and access rules across toolsets would disagree); an LLM classifier
   (non-deterministic, and still needs a person to confirm).
+
+## D-044 Long introductions are cut, unusable regex patterns are fixed or dropped
+
+Found running DigitalOcean's bundled description (APIs.guru) after its multi-file source failed.
+
+- **Multi-file descriptions stay unsupported for now.** Splitting a description across files is
+  common where it's written (DigitalOcean's repository, Redocly-style projects), but what
+  providers publish for docs tools and Swagger UI is almost always one bundled file, and that's
+  what the console's URL discovery finds. The `external_ref` message says to bundle first.
+  Revisit if people bring split descriptions.
+- **A long API description no longer rejects the whole API.** DigitalOcean's introduction is over
+  10,000 characters (the IR's limit), so ingest refused all 290 operations. The description and
+  title are now cut to fit, with `description_truncated` (info).
+- **Patterns must compile in Unicode mode.** JSON Schema validators (Ajv, so our runtime)
+  compile `pattern` with the `u` flag, which refuses needless escapes that plain JavaScript
+  allows (DigitalOcean's tags: `^[a-zA-Z0-9_\-\:]+$`). The runtime threw on every call to those
+  tools and reported it as an unexpected network error. Ingest now removes needless escapes,
+  which doesn't change what matches (`pattern_rewritten`), or drops a pattern that still won't
+  compile (`pattern_dropped`; looser, and the API checks its own input). The runtime also fails
+  closed with a clear `unsupported` error if a schema can't be compiled.
+- **Inlined bundles can't be trimmed.** APIs.guru's bundle inlines every type, so D-042's
+  trimming (which opens referenced components) has nothing to open; 4 huge response schemas
+  are left untyped with `output_schema_too_large`. Harmless while outputs only describe.
+- **Corpus:** the bundled DigitalOcean description is added (Apache-2.0, 1.5 MB).

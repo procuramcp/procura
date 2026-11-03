@@ -1,11 +1,12 @@
 # Ingest eval report
 
-Corpus entries: 14
-Mapped: 13
+Corpus entries: 15
+Mapped: 14
 Rejected: 1
 
 | id | outcome | doc ops | IR ops | skipped | warnings | errors | mean confidence | input Ajv | output Ajv | IR bytes |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| apisguru-digitalocean-v2 | mapped | 290 | 290 | 0 | 16 | 0 | 0.895 | 290/290 | 215/215 | 1885342 |
 | apisguru-listennotes-v2 | mapped | 24 | 24 | 0 | 0 | 0 | 0.900 | 24/24 | 24/24 | 196445 |
 | apisguru-urlbox-v1 | mapped | 1 | 1 | 0 | 0 | 0 | 0.900 | 1/1 | 1/1 | 3871 |
 | box-v2 | mapped | 297 | 297 | 0 | 10 | 0 | 0.895 | 297/297 | 247/247 | 3442394 |
@@ -20,6 +21,26 @@ Rejected: 1
 | swagger-petstore-v3 | mapped | 19 | 19 | 0 | 16 | 0 | 0.863 | 19/19 | 14/14 | 27736 |
 | twilio-api-v2010-json | mapped | 197 | 197 | 0 | 1 | 0 | 0.899 | 197/197 | 164/164 | 1037120 |
 | twilio-conversations-v2-yaml | mapped | 22 | 22 | 0 | 0 | 0 | 0.900 | 22/22 | 22/22 | 159894 |
+
+## apisguru-digitalocean-v2
+
+- file: `apisguru/digitalocean_v2.yaml`
+- outcome: mapped
+- operations: 290/290 mapped (skipped 0)
+- side effects: read 141, write 95, destructive 54 (name escalations 6)
+- confidence: mean 0.895, min 0.800
+- strict Ajv: input 290/290, output 215/215
+- compact IR bytes: 1885342
+
+Top diagnostics:
+- warning response_media_type_unspecified: 9
+- warning output_schema_too_large: 4
+- warning pattern_rewritten: 3
+- info reserved_header_ignored: 2
+- info description_truncated: 1
+
+Error samples:
+- none
 
 ## apisguru-listennotes-v2
 

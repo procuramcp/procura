@@ -160,12 +160,16 @@ export function mapOpenApi(raw: unknown, options: MapOpenApiOptions = {}): MapOp
     }
   }
 
+  // Long API introductions (DigitalOcean's runs past 10,000 characters) are cut, not refused.
+  if ((doc.info.description?.length ?? 0) > 10_000) {
+    diagnostics.push({ severity: "info", code: "description_truncated", message: "the API's description is over 10,000 characters; cut to fit", pointer: "#/info/description" });
+  }
   const candidate = {
     irVersion: IR_VERSION,
     source: {
       id: sourceId,
-      name: doc.info.title,
-      ...(doc.info.description ? { description: doc.info.description } : {}),
+      name: truncate(doc.info.title.trim() || sourceId, 200),
+      ...(doc.info.description ? { description: truncate(doc.info.description, 10_000) } : {}),
       baseUrl,
       authSchemes: [...schemes.values()],
       defaultAuth,
