@@ -4,16 +4,15 @@ Milestones from the planning handoff, with status. Numbers are stable: other doc
 them, so new work gets a letter suffix (e.g. 2b) instead of renumbering. What each kind of user
 needs to be able to do is in `docs/USER-STORIES.md` (story ids like P-13 below).
 
-**Order** (D-037: API providers are the main customer; D-041: product first, no pricing or billing
-work): finish 3 (source updates with a diff),
-then 3c, then the rest of 3b, then 2b. 3d (composite tools) comes after 3c; 4 and 5 wait. 2b moves up if a provider needs to run
-cairnmcp itself or we open source it (D-041).
+**Order** (D-045: self-host first; D-041: product first, no pricing or billing work): 2b (self-host),
+then finish 3 (source updates with a diff), then 3c, then the rest of 3b. 3d (composite tools)
+comes after 3c; 4 and 5 wait.
 
 | | Milestone | Status |
 | --- | --- | --- |
 | 1 | IR, OpenAPI ingestor, runtime, vault; single tenant; Intervals.icu end to end | ✅ Done 2026-10-30: first live call read real activities (see `docs/sources/intervals-icu.md`) |
 | 2 | Tenancy (RLS plus isolation tests), per-member toolset access, MCP server with OAuth; the app container image and our hosted deployment of it. Design rules below | Started: `packages/db` with RLS and isolation tests (D-024); MCP endpoint as a resource server (D-025); embedded authorization server with OIDC sign-in (D-026); container image built and smoke-tested in CI (D-027); Neon set up; deployed on an Oracle Cloud Always Free VM behind Caddy, infrastructure in Terraform (D-029); push to main deploys there after CI (D-036). admin CLI for tenants, sources, toolsets, access, and credentials (D-030) |
-| 2b | Self-host: published image, `docker compose`, config and upgrade docs | — |
+| 2b | Self-host: published image, `docker compose`, config and upgrade docs | Next (D-045) |
 | 3 | Curation UI, side-effect classification review, egress hardening (with a configurable egress policy, see 3b) | Started: curation console at `/app` (D-033): sign-in, toolset editor (tools, names, descriptions, pins, write tools marked), access, and a tool test panel; access profiles, named permission sets assigned to members (D-034); adding APIs from OpenAPI (URL, Swagger UI page, paste, or file) and their keys (D-035); classification review, with suggested reads for RPC-style APIs (D-043). Next: updating a source with a diff of what changed, keeping people's classifications |
 | 3b | Custom and on-behalf-of upstream auth; provider-hosted servers with per-user credentials (D-032); external identity providers for the MCP endpoint; claim-based tool policies; private-network targets for self-hosted deployments (D-022, D-023) | — |
 | 3c | Provider features: customers separate from the team, plans with per-customer limits and allowances, the provider's own sign-in with plans from claims, usage page, draft and published toolsets, branding. Details below | Next after 3 |

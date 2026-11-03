@@ -844,7 +844,7 @@ planning handoff are not repeated here unless implementation added something.
 - **What stays:** plan allowances (D-039) and the usage page. They're product, not billing: they
   protect a provider's upstream quota and show how the server is used. Usage export and the
   billing webhook (3c step 4) are parked with pricing.
-- **Where the effort goes:** the quality of what agents get. Real APIs through ingest and the
+- **Where the effort goes:** the quality of what agents get (not a claimed edge, D-045). Real APIs through ingest and the
   eval corpus to find edge cases, tool curation, safe writes, and whether agents actually succeed
   with a toolset. Edges come from what that work turns up, not from undercutting on price.
 - **Keeping open source possible:** self-host (2b) is what an open-source release needs, so it
@@ -944,3 +944,22 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
   trimming (which opens referenced components) has nothing to open; 4 huge response schemas
   are left untyped with `output_schema_too_large`. Harmless while outputs only describe.
 - **Corpus:** the bundled DigitalOcean description is added (Apache-2.0, 1.5 MB).
+
+## D-045 Self-host first; the licence is undecided
+
+- **Context:** cairnmcp is a personal project with no users besides its author. D-037 aimed at API
+  providers, and D-041 parked pricing. The first real step outward is letting someone run it.
+- **Decision:** milestone 2b (self-host) comes next: a published image, a `docker compose` setup
+  that works on a laptop, documented and validated config, and upgrade docs. The hosted
+  deployment stays as the author's own instance.
+- **Self-hosting is not open sourcing.** The repository is private with no licence, so all rights
+  are reserved. An image can be published without the source, or with source under any licence,
+  chosen later. Options, from most to least open: permissive (MIT, Apache-2.0: anyone may copy
+  and sell it, including as a hosted service), copyleft (AGPL-3.0: anyone may, but a hosted copy
+  must publish its changes; Gram uses it), source-available (BSL, FSL, Elastic License: free to
+  self-host, no competing hosted service, some become open after a few years), open core (an open
+  base with paid features), or closed (a free or paid image). A version once released under an
+  open licence stays open; later versions can change.
+- **Not claimed:** that cairnmcp's tools make agents succeed more often than others'. It's
+  tested by one person; D-041's quality work is about finding where it breaks, not a market edge.
+- **Rejected for now:** choosing a licence before anyone outside has run it.
