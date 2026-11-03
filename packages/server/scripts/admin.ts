@@ -1,6 +1,6 @@
 // Operator CLI for setting up tenants until the curation UI exists.
-// Runs where the app runs (it needs CAIRNMCP_DATABASE_URL and, for credentials,
-// CAIRNMCP_MASTER_KEY). On the Oracle VM, use deploy/oracle/admin.sh from your
+// Runs where the app runs (it needs PROCURA_DATABASE_URL and, for credentials,
+// PROCURA_MASTER_KEY). On the Oracle VM, use deploy/oracle/admin.sh from your
 // machine, which runs this inside the app container.
 //
 //   tenant create  --name <name> --owner <account id> [--id <slug>]
@@ -10,9 +10,11 @@
 //   access grant   --tenant <id> --toolset <id> --user <account id> --level use|use_writes|none
 //   credential set --tenant <id> --source <id> --scheme <scheme id> --kind basic|bearer|api_key [--username <u>]   < secret
 import { parseArgs } from "node:util";
-import { Database, PgVaultStore } from "@cairnmcp/db";
-import { LocalKeyWrapper, parseMasterKey, Vault, type CredentialInput } from "@cairnmcp/vault";
+import { acceptLegacyEnvNames, Database, PgVaultStore } from "@procura/db";
+import { LocalKeyWrapper, parseMasterKey, Vault, type CredentialInput } from "@procura/vault";
 import { AdminError, addSource, createTenant, grantAccess, putToolsetFor, setCredential, showTenant } from "../src/admin.ts";
+
+acceptLegacyEnvNames();
 
 const USAGE = `usage: admin <command> [options]
   tenant create  --name <name> --owner <account id> [--id <slug>]
@@ -71,9 +73,9 @@ async function main(): Promise<void> {
     process.exitCode = 2;
     return;
   }
-  const db = await Database.connect({ url: env("CAIRNMCP_DATABASE_URL"), max: 2 });
-  const vault = () => new Vault({ store: new PgVaultStore(db), keyWrapper: new LocalKeyWrapper(parseMasterKey(process.env["CAIRNMCP_MASTER_KEY"])) });
-  const publicUrl = process.env["CAIRNMCP_PUBLIC_URL"]?.replace(/\/+$/, "");
+  const db = await Database.connect({ url: env("PROCURA_DATABASE_URL"), max: 2 });
+  const vault = () => new Vault({ store: new PgVaultStore(db), keyWrapper: new LocalKeyWrapper(parseMasterKey(process.env["PROCURA_MASTER_KEY"])) });
+  const publicUrl = process.env["PROCURA_PUBLIC_URL"]?.replace(/\/+$/, "");
   try {
     switch (command) {
       case "tenant create": {

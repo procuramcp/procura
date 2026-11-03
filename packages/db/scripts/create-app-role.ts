@@ -2,23 +2,26 @@
 // the app's connection URL into an env file. Safe to re-run: roles that exist
 // are kept, and the login role gets a fresh password each time (rotation).
 //
-//   pnpm --filter @cairnmcp/db roles            # writes CAIRNMCP_DATABASE_URL to the repo's .env.local
+//   pnpm --filter @procura/db roles            # writes PROCURA_DATABASE_URL to the repo's .env.local
 //
-// Owner URL: CAIRNMCP_DATABASE_OWNER_URL, or Neon's DATABASE_URL_UNPOOLED (the
+// Owner URL: PROCURA_DATABASE_OWNER_URL, or Neon's DATABASE_URL_UNPOOLED (the
 // branch owner on the direct host). The app URL reuses DATABASE_URL's host when
 // set (Neon's pooled host), otherwise the owner URL's. The password is never printed.
 import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import pg from "pg";
+import { acceptLegacyEnvNames } from "../src/legacy-env.ts";
+
+acceptLegacyEnvNames();
 
 const APP_GROUP = "cairnmcp_app";
-const LOGIN_ROLE = process.env["CAIRNMCP_APP_LOGIN_ROLE"] ?? "cairnmcp_server";
+const LOGIN_ROLE = process.env["PROCURA_APP_LOGIN_ROLE"] ?? "cairnmcp_server";
 const envFile = resolve(import.meta.dirname, "../../..", process.argv[2] ?? ".env.local");
 
-const ownerUrl = process.env["CAIRNMCP_DATABASE_OWNER_URL"] ?? process.env["DATABASE_URL_UNPOOLED"];
+const ownerUrl = process.env["PROCURA_DATABASE_OWNER_URL"] ?? process.env["DATABASE_URL_UNPOOLED"];
 if (!ownerUrl) {
-  console.error("Set CAIRNMCP_DATABASE_OWNER_URL (or Neon's DATABASE_URL_UNPOOLED) to the owner role's direct URL.");
+  console.error("Set PROCURA_DATABASE_OWNER_URL (or Neon's DATABASE_URL_UNPOOLED) to the owner role's direct URL.");
   process.exit(1);
 }
 if (!/^[a-z_][a-z0-9_]{0,62}$/.test(LOGIN_ROLE)) throw new Error("invalid role name");
@@ -61,10 +64,10 @@ try {
 const appUrl = new URL(process.env["DATABASE_URL"] ?? ownerUrl);
 appUrl.username = LOGIN_ROLE;
 appUrl.password = password;
-const line = `CAIRNMCP_DATABASE_URL="${appUrl.toString()}"`;
+const line = `PROCURA_DATABASE_URL="${appUrl.toString()}"`;
 const current = existsSync(envFile) ? readFileSync(envFile, "utf8") : "";
-const next = /^CAIRNMCP_DATABASE_URL=.*$/m.test(current)
-  ? current.replace(/^CAIRNMCP_DATABASE_URL=.*$/m, line)
+const next = /^PROCURA_DATABASE_URL=.*$/m.test(current)
+  ? current.replace(/^PROCURA_DATABASE_URL=.*$/m, line)
   : `${current}${current && !current.endsWith("\n") ? "\n" : ""}${line}\n`;
 writeFileSync(envFile, next, { mode: 0o600 });
-console.log(`Wrote CAIRNMCP_DATABASE_URL (${appUrl.host}) to ${envFile}.`);
+console.log(`Wrote PROCURA_DATABASE_URL (${appUrl.host}) to ${envFile}.`);

@@ -1,4 +1,4 @@
-import { isRecord as isPlainObject, type BodyBinding, type Operation, type ParameterBinding } from "@cairnmcp/core";
+import { isRecord as isPlainObject, type BodyBinding, type Operation, type ParameterBinding } from "@procura/core";
 import { fail } from "./errors.ts";
 
 /** A request ready for auth and sending. Pure data; no secrets yet. */

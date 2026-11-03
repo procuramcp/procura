@@ -1,8 +1,8 @@
 // Plan limits on one tool call (D-039): the daily and monthly allowances,
 // checked and taken before the runtime runs the call.
-import type { PlanLimits, TenantId, UserId } from "@cairnmcp/core";
-import { refundAllowance, takeAllowance, type Database, type UsagePeriods } from "@cairnmcp/db";
-import type { RuntimeError, ToolResult } from "@cairnmcp/runtime";
+import type { PlanLimits, TenantId, UserId } from "@procura/core";
+import { refundAllowance, takeAllowance, type Database, type UsagePeriods } from "@procura/db";
+import type { RuntimeError, ToolResult } from "@procura/runtime";
 
 /**
  * Failures that don't use up an allowance: the call never reached the API

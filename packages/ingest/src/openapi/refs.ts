@@ -1,4 +1,4 @@
-import { isRecord } from "@cairnmcp/core";
+import { isRecord } from "@procura/core";
 import type { z } from "zod";
 
 /** Thrown when an operation cannot be mapped. The operation is skipped with an error diagnostic. */

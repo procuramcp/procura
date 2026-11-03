@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { instantOf, type Caller, type Instant, type JsonSchema, type JsonValue, type ResolvedTool, type Source, type TenantId } from "@cairnmcp/core";
+import { instantOf, type Caller, type Instant, type JsonSchema, type JsonValue, type ResolvedTool, type Source, type TenantId } from "@procura/core";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
-import type { Credential } from "@cairnmcp/vault";
+import type { Credential } from "@procura/vault";
 import { applyAuth } from "./auth.ts";
 import type { AuditEvent, AuditSink } from "./audit.ts";
 import { send, DEFAULT_EGRESS_LIMITS, type EgressGuard, type EgressLimits, type FetchLike } from "./egress.ts";

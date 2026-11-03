@@ -1,9 +1,9 @@
 // End to end: real Intervals.icu IR, real vault, fake upstream.
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { resolveToolset, TenantId, Toolset, UserId, type Caller, type Instant, type IrDocument, type ResolvedTool, type Source } from "@cairnmcp/core";
-import { ingestOpenApiText } from "@cairnmcp/ingest";
-import { InMemoryVaultStore, LocalKeyWrapper, Vault } from "@cairnmcp/vault";
+import { resolveToolset, TenantId, Toolset, UserId, type Caller, type Instant, type IrDocument, type ResolvedTool, type Source } from "@procura/core";
+import { ingestOpenApiText } from "@procura/ingest";
+import { InMemoryVaultStore, LocalKeyWrapper, Vault } from "@procura/vault";
 import { beforeEach, describe, expect, it } from "vitest";
 import { InMemoryAuditSink, type AuditSink } from "./audit.ts";
 import { InMemoryRateLimiter } from "./limiter.ts";

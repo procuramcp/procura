@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { TenantId } from "@cairnmcp/core";
+import { TenantId } from "@procura/core";
 import { newDataKey, open, seal } from "./aead.ts";
 import { CredentialInput, wrapSecrets, type Credential } from "./credentials.ts";
 import type { KeyWrapper, WrappedKey } from "./key-wrapper.ts";

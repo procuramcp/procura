@@ -42,7 +42,7 @@ jobs:
           --health-retries 30
     env:
       # A throwaway superuser on the job's own service container; not a secret.
-      CAIRNMCP_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PROCURA_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       # Actions are pinned to commit SHAs so a moved tag cannot change what runs.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,19 +82,19 @@ jobs:
           --health-retries 30
     env:
       # A throwaway superuser on the job's own service container; not a secret.
-      CAIRNMCP_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PROCURA_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       # Built here for the smoke tests; the publish job builds the multi-arch image it pushes.
-      - run: docker build --tag cairnmcp:ci .
+      - run: docker build --tag procura:ci .
 
-      - run: scripts/image-smoke.sh cairnmcp:ci
+      - run: scripts/image-smoke.sh procura:ci
 
       # The self-host setup end to end: compose up, sign in through Dex, first tenant, upgrade.
-      - run: scripts/compose-smoke.sh cairnmcp:ci
+      - run: scripts/compose-smoke.sh procura:ci
 
   # Publish the image for self-hosting (D-046): `edge` and `sha-…` from main; `0.1.0`, `0.1`,
   # and `latest` from a version tag. amd64 and arm64 (Apple silicon, Graviton, Ampere).
@@ -167,6 +167,7 @@ jobs:
         with:
           persist-credentials: false
 
+      # The VM's receive script expects cairnmcp:<tag> (deploy/oracle, unchanged by D-047).
       - name: Build the image for the VM (x86)
         run: |
           tag="$(git rev-parse --short=12 HEAD)"

@@ -16,7 +16,7 @@ export interface KeyWrapper {
   unwrap(wrapped: WrappedKey, context: string): Promise<Buffer>;
 }
 
-/** KEK from a 32-byte master key (`CAIRNMCP_MASTER_KEY`). For self-hosting and development. */
+/** KEK from a 32-byte master key (`PROCURA_MASTER_KEY`). For self-hosting and development. */
 export class LocalKeyWrapper implements KeyWrapper {
   readonly keyId: string;
   readonly #masterKey: Buffer;
@@ -42,7 +42,7 @@ export class LocalKeyWrapper implements KeyWrapper {
  * Parse a master key from an environment value: 32 random bytes, base64.
  * Generate one with: `openssl rand -base64 32`.
  */
-export function parseMasterKey(value: string | undefined, name = "CAIRNMCP_MASTER_KEY"): Buffer {
+export function parseMasterKey(value: string | undefined, name = "PROCURA_MASTER_KEY"): Buffer {
   if (value === undefined || value.trim() === "") throw new Error(`${name} is not set (generate one with: openssl rand -base64 32)`);
   const trimmed = value.trim();
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)) throw new Error(`${name} must be base64`);

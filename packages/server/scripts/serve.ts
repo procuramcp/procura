@@ -1,10 +1,12 @@
-// Run cairnmcp: the authorization server and the MCP endpoint. Settings come
-// from the environment (see the root .env.example). Run: pnpm --filter @cairnmcp/server start
-import { OidcIdentityProvider, purgeExpiredAuthState } from "@cairnmcp/auth";
-import { Database } from "@cairnmcp/db";
-import { LocalKeyWrapper, parseMasterKey } from "@cairnmcp/vault";
+// Run procura: the authorization server and the MCP endpoint. Settings come
+// from the environment (see the root .env.example). Run: pnpm --filter @procura/server start
+import { OidcIdentityProvider, purgeExpiredAuthState } from "@procura/auth";
+import { acceptLegacyEnvNames, Database } from "@procura/db";
+import { LocalKeyWrapper, parseMasterKey } from "@procura/vault";
 import { fileURLToPath } from "node:url";
 import { createApp, loadConfig, purgeExpiredConsoleState, serve } from "../src/index.ts";
+
+acceptLegacyEnvNames();
 
 let config;
 try {
@@ -17,7 +19,7 @@ try {
 // Connecting also checks the role can't bypass row-level security (D-024).
 // pg's messages name the host or role, never the password.
 const db = await Database.connect({ url: config.databaseUrl }).catch((e: unknown) => {
-  console.error(`can't use CAIRNMCP_DATABASE_URL: ${(e as Error).message}`);
+  console.error(`can't use PROCURA_DATABASE_URL: ${(e as Error).message}`);
   process.exit(1);
 });
 const handler = await createApp({
@@ -32,7 +34,7 @@ const handler = await createApp({
 });
 
 const server = serve(handler, { port: config.port, publicUrl: config.publicUrl });
-console.log(`cairnmcp listening on :${config.port} as ${config.publicUrl}`);
+console.log(`procura listening on :${config.port} as ${config.publicUrl}`);
 
 // Expired sign-in flows, refresh tokens, and console sessions are cleaned up hourly.
 const purge = setInterval(() => void Promise.all([purgeExpiredAuthState(db), purgeExpiredConsoleState(db)]).catch((e: unknown) => console.error("purge failed:", (e as Error).message)), 60 * 60 * 1000);

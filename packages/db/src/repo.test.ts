@@ -1,5 +1,5 @@
 // The lightweight repo queries: they must agree with what the full IR says.
-import { AccessProfile, countBySideEffect, defaultToolset, type TenantId, type UserId } from "@cairnmcp/core";
+import { AccessProfile, countBySideEffect, defaultToolset, type TenantId, type UserId } from "@procura/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import { PG, pgErrorCode } from "./errors.ts";

@@ -1,8 +1,8 @@
 // Request bodies the console API accepts, and how to read them.
-import type * as Contract from "@cairnmcp/console-api";
-import { JsonValue, MemberRole, MemberStatus, OperationId, SideEffect, SourceId, ToolBinding, ToolsetAccessLevel, ToolsetId, UserId } from "@cairnmcp/core";
-import { readJson } from "@cairnmcp/http";
-import { CredentialInput } from "@cairnmcp/vault";
+import type * as Contract from "@procura/console-api";
+import { JsonValue, MemberRole, MemberStatus, OperationId, SideEffect, SourceId, ToolBinding, ToolsetAccessLevel, ToolsetId, UserId } from "@procura/core";
+import { readJson } from "@procura/http";
+import { CredentialInput } from "@procura/vault";
 import { z } from "zod";
 import { MAX_DOCUMENT_FETCH_BYTES } from "../fetch-document.ts";
 
@@ -52,7 +52,7 @@ export const SourcePreviewInput = SourceFields.partial({ id: true }).refine(oneD
 
 /** Fails to compile unless the schema accepts the contract's body shape (the schema also checks limits). */
 type Accepts<Schema extends z.ZodType, _Body extends z.input<Schema>> = true;
-// Every body the web console sends (@cairnmcp/console-api) against the schema that reads it.
+// Every body the web console sends (@procura/console-api) against the schema that reads it.
 export type BodiesMatchContract = [
   Accepts<typeof NewToolset, Contract.NewToolsetInput>,
   Accepts<typeof ToolsetEdit, Contract.ToolsetEdit>,

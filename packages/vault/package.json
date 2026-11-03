@@ -1,5 +1,5 @@
 {
-  "name": "@cairnmcp/vault",
+  "name": "@procura/vault",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cairnmcp/core": "workspace:*",
+    "@procura/core": "workspace:*",
     "zod": "^4.6.7"
   }
 }

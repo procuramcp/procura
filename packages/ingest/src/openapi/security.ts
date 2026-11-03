@@ -1,4 +1,4 @@
-import { AuthScheme, omitUndefined, type AuthRequirement, type AuthUse, type Diagnostic } from "@cairnmcp/core";
+import { AuthScheme, omitUndefined, type AuthRequirement, type AuthUse, type Diagnostic } from "@procura/core";
 import { OaSecurityScheme } from "./document.ts";
 import { escapePointerToken } from "./refs.ts";
 

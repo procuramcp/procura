@@ -19,7 +19,7 @@ comes after 3c; 4 and 5 wait.
 | 3d | Composite tools: one tool that runs several API calls in order (P-8). Details below | After 3c |
 | 4 | GraphQL ingestor | — |
 | 5 | Docs-page ingestor with the verification loop (experimental) | — |
-| 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; cairnmcp returns API output as-is (D-021) |
+| 6 | ~~Analyzer tool pack~~ | Removed: data analysis is a separate project; procura returns API output as-is (D-021) |
 | 7 | Docs: architecture diagram, threat model, decisions doc, eval report | Ingest eval started (`packages/eval`) |
 | — | Hybrid runner: hosted control plane, credential-holding runner in the user's infra | Parked until users ask (D-018) |
 
@@ -33,7 +33,7 @@ Cheap now, expensive to retrofit (D-022, D-023):
 - **Token checking is separate from token issuing.** The MCP endpoint validates tokens as an
   OAuth resource server (with protected-resource metadata, RFC 9728). The embedded authorization
   server is one issuer it trusts; a company's own identity provider can be another.
-- **cairnmcp authorizes every call itself** (D-023). A token resolves to tenant, user, and role;
+- **procura authorizes every call itself** (D-023). A token resolves to tenant, user, and role;
   each member has access per toolset (`use` for reads, `use_writes` to also call write and
   destructive tools that the toolset enables). Checked on `tools/list` (hide what the caller can't
   use) and again on `tools/call` (never trust that the client only calls what it was shown).
@@ -43,7 +43,7 @@ Cheap now, expensive to retrofit (D-022, D-023):
 
 ## Milestone 2b: self-host
 
-Done when someone can run their own cairnmcp with only Docker, a Postgres URL, and a master key:
+Done when someone can run their own procura with only Docker, a Postgres URL, and a master key:
 
 - The same container image we deploy, published with version tags.
 - A `docker compose` file (app and Postgres) that works out of the box on a laptop.

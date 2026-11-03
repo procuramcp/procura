@@ -1,5 +1,5 @@
 {
-  "name": "cairnmcp",
+  "name": "procura",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -12,9 +12,9 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r --no-bail typecheck",
     "check": "pnpm typecheck && pnpm test",
-    "ir:dump": "pnpm --filter @cairnmcp/ingest ir:dump",
-    "eval:ingest": "pnpm --filter @cairnmcp/eval eval:ingest",
-    "example:intervals": "pnpm --filter @cairnmcp/example-intervals-icu start"
+    "ir:dump": "pnpm --filter @procura/ingest ir:dump",
+    "eval:ingest": "pnpm --filter @procura/eval eval:ingest",
+    "example:intervals": "pnpm --filter @procura/example-intervals-icu start"
   },
   "devDependencies": {
     "@neon/config": "^1.10.0",

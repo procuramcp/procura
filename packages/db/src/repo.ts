@@ -20,8 +20,8 @@ import {
   type Instant,
   type SideEffect,
   type SideEffectCounts,
-} from "@cairnmcp/core";
-import type { AuditEvent } from "@cairnmcp/runtime";
+} from "@procura/core";
+import type { AuditEvent } from "@procura/runtime";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import type { TenantTx } from "./client.ts";
 import { accessProfiles, auditEvents, memberProfiles, memberships, profileRules, sources, tenants, toolsetAccess, toolsets, usageCounters, users } from "./schema.ts";

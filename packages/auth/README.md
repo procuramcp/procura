@@ -1,4 +1,4 @@
-# @cairnmcp/auth
+# @procura/auth
 
 The embedded OAuth 2.1 authorization server that issues tokens for the MCP endpoint. Design:
 `docs/DECISIONS.md` D-026.
@@ -7,7 +7,7 @@ The embedded OAuth 2.1 authorization server that issues tokens for the MCP endpo
   metadata names this server.
 - **Clients** register themselves at `POST /oauth/register` (RFC 7591). All are public clients
   (no secret); redirect URIs must be https, loopback http, or a native app's own scheme.
-- **Sign-in** is delegated to the OIDC providers in `CAIRNMCP_OIDC_PROVIDERS`; cairnmcp never
+- **Sign-in** is delegated to the OIDC providers in `PROCURA_OIDC_PROVIDERS`; procura never
   handles passwords. A user is that provider's issuer + subject.
 - **Consent:** after sign-in, the person sees the app, the toolset, their access level, and where
   the app returns, and allows or denies. Only members with access to the toolset get this far.

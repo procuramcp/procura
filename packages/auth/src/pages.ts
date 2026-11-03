@@ -33,8 +33,8 @@ export function escapeHtml(text: string): string {
 
 function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(title)} · cairnmcp</title><style>${STYLE}</style></head>
-<body><main><div class="brand">cairnmcp</div><div class="card">${body}</div></main></body></html>`;
+<title>${escapeHtml(title)} · procura</title><style>${STYLE}</style></head>
+<body><main><div class="brand">procura</div><div class="card">${body}</div></main></body></html>`;
 }
 
 export function htmlResponse(status: number, html: string, headers: Record<string, string> = {}): Response {
@@ -58,7 +58,7 @@ export function chooserPage(input: { clientName: string; providers: Array<{ name
   const buttons = input.providers.map((p) => `<a class="button" href="${escapeHtml(p.href)}">Continue with ${escapeHtml(p.name)}</a>`).join("");
   return page(
     "Sign in",
-    `<h1>Sign in</h1><p><strong>${escapeHtml(input.clientName)}</strong> wants to connect to cairnmcp. Sign in to continue.</p><div class="actions">${buttons}</div>`,
+    `<h1>Sign in</h1><p><strong>${escapeHtml(input.clientName)}</strong> wants to connect to procura. Sign in to continue.</p><div class="actions">${buttons}</div>`,
   );
 }
 

@@ -1,8 +1,8 @@
 // PgVaultStore and PgAuditSink behind the real Vault and Runtime.
 import { randomBytes } from "node:crypto";
-import { resolveToolset, Toolset, type Caller, type Instant, type TenantId, type UserId } from "@cairnmcp/core";
-import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
-import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
+import { resolveToolset, Toolset, type Caller, type Instant, type TenantId, type UserId } from "@procura/core";
+import { InMemoryRateLimiter, Runtime, type FetchLike } from "@procura/runtime";
+import { LocalKeyWrapper, Vault } from "@procura/vault";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Database } from "./client.ts";
 import { listAuditEvents, putSource } from "./repo.ts";

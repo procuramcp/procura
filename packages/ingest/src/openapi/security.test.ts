@@ -1,4 +1,4 @@
-import type { Diagnostic } from "@cairnmcp/core";
+import type { Diagnostic } from "@procura/core";
 import { describe, expect, it } from "vitest";
 import { mapSecurityRequirement, mapSecuritySchemes } from "./security.ts";
 

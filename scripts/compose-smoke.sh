@@ -4,7 +4,7 @@
 # Dex, create the first tenant with admin.sh, then recreate the containers as
 # an upgrade would and check nothing was lost.
 #
-#   scripts/compose-smoke.sh cairnmcp:dev
+#   scripts/compose-smoke.sh procura:dev
 #
 # Needs docker (with compose), curl, python3, and ports 8080 and 5556 free.
 set -euo pipefail
@@ -13,13 +13,13 @@ IMAGE="${1:?usage: scripts/compose-smoke.sh <image>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$root/deploy/self-host"
 work="$(mktemp -d)"
-export COMPOSE_PROJECT_NAME="cairnmcp-smoke"
+export COMPOSE_PROJECT_NAME="procura-smoke"
 BASE="http://localhost:8080"
 
 # Exactly what the README says to do: copy .env.example, fill in the two secrets.
-sed -e "s|^CAIRNMCP_MASTER_KEY=.*|CAIRNMCP_MASTER_KEY=$(openssl rand -base64 32)|" \
-  -e "s|^CAIRNMCP_POSTGRES_PASSWORD=.*|CAIRNMCP_POSTGRES_PASSWORD=$(openssl rand -hex 24)|" \
-  -e "s|^CAIRNMCP_IMAGE=.*|CAIRNMCP_IMAGE=$IMAGE|" \
+sed -e "s|^PROCURA_MASTER_KEY=.*|PROCURA_MASTER_KEY=$(openssl rand -base64 32)|" \
+  -e "s|^PROCURA_POSTGRES_PASSWORD=.*|PROCURA_POSTGRES_PASSWORD=$(openssl rand -hex 24)|" \
+  -e "s|^PROCURA_IMAGE=.*|PROCURA_IMAGE=$IMAGE|" \
   "$dir/.env.example" >"$work/.env"
 compose=(docker compose --project-directory "$dir" --env-file "$work/.env")
 
@@ -55,7 +55,7 @@ step "console sign-in through Dex"
 form=$(curl -fsS -c "$jar" -b "$jar" -L -o "$work/login.html" -w '%{url_effective}' "$BASE/app/login/dex")
 grep -q 'name="password"' "$work/login.html" || fail "no Dex login form at $form"
 landed=$(curl -fsS -c "$jar" -b "$jar" -L -o /dev/null -w '%{url_effective}' \
-  --data-urlencode login=admin@example.com --data-urlencode password=cairnmcp "$form")
+  --data-urlencode login=admin@example.com --data-urlencode password=procura "$form")
 [ "$landed" = "$BASE/app/" ] || fail "sign-in ended at $landed"
 [ "$(me | field 'd["user"]["label"]')" = "admin@example.com" ] || fail "not signed in"
 [ "$(me | field 'len(d["tenants"])')" = "0" ] || fail "expected no tenants yet"

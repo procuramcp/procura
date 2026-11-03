@@ -1,11 +1,11 @@
-# Self-hosting cairnmcp
+# Self-hosting procura
 
-Run your own cairnmcp with Docker: the app (the MCP endpoint, its OAuth authorization server,
+Run your own procura with Docker: the app (the MCP endpoint, its OAuth authorization server,
 and the curation console in one container), Postgres, and a one-off migration step that runs
 before every start. You need Docker with Compose v2.20 or later, and nothing else from this
 repository but this folder.
 
-cairnmcp is licensed under the AGPL-3.0 (`LICENSE`, D-046). If you change it and let others use
+procura is licensed under the AGPL-3.0 (`LICENSE`, D-046). If you change it and let others use
 your copy over a network, offer them your changed source.
 
 | File | What it is |
@@ -26,7 +26,7 @@ cp .env.example .env
 Fill in the two secrets in `.env`:
 
 ```bash
-sed -i.bak -e "s|^CAIRNMCP_MASTER_KEY=.*|CAIRNMCP_MASTER_KEY=$(openssl rand -base64 32)|" -e "s|^CAIRNMCP_POSTGRES_PASSWORD=.*|CAIRNMCP_POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env && rm .env.bak
+sed -i.bak -e "s|^PROCURA_MASTER_KEY=.*|PROCURA_MASTER_KEY=$(openssl rand -base64 32)|" -e "s|^PROCURA_POSTGRES_PASSWORD=.*|PROCURA_POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env && rm .env.bak
 ```
 
 ```bash
@@ -34,7 +34,7 @@ docker compose up -d
 ```
 
 Open <http://localhost:8080/app/> and sign in with **Dex (local demo)**: `admin@example.com`,
-password `cairnmcp`. You land on **No tenants yet**, which shows your account id. Create your
+password `procura`. You land on **No tenants yet**, which shows your account id. Create your
 tenant (the id becomes part of your MCP URLs):
 
 ```bash
@@ -65,17 +65,17 @@ Point a DNS record for your domain at the server, open ports 80 and 443, then se
 
 ```bash
 COMPOSE_PROFILES=postgres,caddy
-CAIRNMCP_DOMAIN=mcp.example.com
-CAIRNMCP_PUBLIC_URL=https://mcp.example.com
+PROCURA_DOMAIN=mcp.example.com
+PROCURA_PUBLIC_URL=https://mcp.example.com
 ```
 
 Caddy gets a certificate from Let's Encrypt on first start and renews it on its own. The app stays
 on `127.0.0.1:8080`; only Caddy listens publicly.
 
 Already running a reverse proxy (nginx, Traefik, a load balancer)? Leave `caddy` out and proxy
-`https://<your domain>` to port 8080 (`CAIRNMCP_BIND=0.0.0.0` if the proxy is on another host).
-Don't buffer responses, and pass the path through unchanged. `CAIRNMCP_PUBLIC_URL` must be the
-https address people use: cairnmcp builds every URL and token issuer from it, never from the
+`https://<your domain>` to port 8080 (`PROCURA_BIND=0.0.0.0` if the proxy is on another host).
+Don't buffer responses, and pass the path through unchanged. `PROCURA_PUBLIC_URL` must be the
+https address people use: procura builds every URL and token issuer from it, never from the
 request's Host header.
 
 ### 2. A real sign-in provider
@@ -91,29 +91,29 @@ Okta, Auth0, Keycloak, or any other.
 2. Put it in `.env`, on one line:
 
    ```bash
-   CAIRNMCP_OIDC_PROVIDERS=[{"id":"google","name":"Google","issuer":"https://accounts.google.com","clientId":"…","clientSecret":"…"}]
+   PROCURA_OIDC_PROVIDERS=[{"id":"google","name":"Google","issuer":"https://accounts.google.com","clientId":"…","clientSecret":"…"}]
    ```
 
    Several providers are allowed; each gets a button on the sign-in page. People are identified
    by provider and subject, never by email, so the same person signing in through two providers
    is two accounts.
 
-**How MCP clients sign in.** cairnmcp is its own OAuth 2.1 authorization server (D-025, D-026),
+**How MCP clients sign in.** procura is its own OAuth 2.1 authorization server (D-025, D-026),
 so MCP clients need no setup: an unauthenticated request to an MCP URL gets a 401 pointing at
-`/.well-known/oauth-protected-resource/…`, which names cairnmcp as the authorization server;
+`/.well-known/oauth-protected-resource/…`, which names procura as the authorization server;
 the client registers itself (`/oauth/register`), sends the user to sign in through your provider,
 shows a consent page, and gets a token for that one toolset. Access is checked on every call:
 signing in gives no access until a tenant owner or admin grants it in the console.
 
 To also accept tokens from another authorization server (e.g. your company's), list it in
-`CAIRNMCP_TRUSTED_ISSUERS`.
+`PROCURA_TRUSTED_ISSUERS`.
 
 ### 3. Your own Postgres (optional)
 
 The bundled Postgres is fine for one server. To use a managed one (RDS, Cloud SQL, Neon, ...),
 remove `postgres` from `COMPOSE_PROFILES`, create the roles as in `packages/db/README.md` (or
-`postgres-init.sh`), and set `CAIRNMCP_DATABASE_URL` (the app role) and
-`CAIRNMCP_DATABASE_OWNER_URL` (the owner, used only by the migration step). The app refuses to
+`postgres-init.sh`), and set `PROCURA_DATABASE_URL` (the app role) and
+`PROCURA_DATABASE_OWNER_URL` (the owner, used only by the migration step). The app refuses to
 start as a superuser, a `BYPASSRLS` role, or the tables' owner: tenant isolation depends on
 row-level security (D-024).
 
@@ -133,13 +133,13 @@ docker compose logs app
 
 Two things to keep, stored apart:
 
-- **The master key** (`CAIRNMCP_MASTER_KEY`). It decrypts the API keys stored in the vault.
+- **The master key** (`PROCURA_MASTER_KEY`). It decrypts the API keys stored in the vault.
   Without it a restored database has every key unreadable, and each has to be entered again.
   Keep a copy in a password manager.
 - **The database.** With the bundled Postgres, a compressed dump:
 
   ```bash
-  docker compose exec -T postgres pg_dump -U postgres -Fc cairnmcp > cairnmcp-$(date +%F).dump
+  docker compose exec -T postgres pg_dump -U postgres -Fc procura > procura-$(date +%F).dump
   ```
 
   Run it from cron and copy the files off the server. Stored API keys are encrypted in it; the
@@ -157,7 +157,7 @@ docker compose up -d --wait postgres
 ```
 
 ```bash
-docker compose exec -T postgres pg_restore -U postgres -d cairnmcp --clean --if-exists --exit-on-error < cairnmcp-<date>.dump
+docker compose exec -T postgres pg_restore -U postgres -d procura --clean --if-exists --exit-on-error < procura-<date>.dump
 ```
 
 ```bash
@@ -173,7 +173,7 @@ Images are tagged by version: `0.1.0` (exact), `0.1` (latest patch), `latest` (l
 and `edge` (every change on main, not for servers). Pin one on a server:
 
 ```bash
-CAIRNMCP_IMAGE=ghcr.io/procuramcp/procura:0.1
+PROCURA_IMAGE=ghcr.io/procuramcp/procura:0.1
 ```
 
 To upgrade, back up the database, change the tag if you pin a minor version, then:
@@ -191,7 +191,7 @@ app doesn't start if they fail (`docker compose logs migrate`). Migrations only 
 **rolling back means restoring the backup** taken before the upgrade, then starting the previous
 tag. Read the release notes before skipping several versions.
 
-Changing `CAIRNMCP_PUBLIC_URL` signs every MCP client out (it's the tokens' issuer); they sign in
+Changing `PROCURA_PUBLIC_URL` signs every MCP client out (it's the tokens' issuer); they sign in
 again on their next connection.
 
 ## Operating it

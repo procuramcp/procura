@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Operation } from "@cairnmcp/core";
+import type { Operation } from "@procura/core";
 import { describe, expect, it } from "vitest";
 import { strictAjv } from "../test-support.ts";
 import { ingestOpenApiText } from "./ingest.ts";

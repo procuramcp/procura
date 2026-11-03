@@ -1,5 +1,5 @@
-import { AuthScheme, type Instant } from "@cairnmcp/core";
-import { Secret, type Credential } from "@cairnmcp/vault";
+import { AuthScheme, type Instant } from "@procura/core";
+import { Secret, type Credential } from "@procura/vault";
 import { describe, expect, it } from "vitest";
 import { applyAuth } from "./auth.ts";
 import { RuntimeFailure } from "./errors.ts";

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { inspect } from "node:util";
-import { TenantId } from "@cairnmcp/core";
+import { TenantId } from "@procura/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LocalKeyWrapper } from "./key-wrapper.ts";
 import { InMemoryVaultStore } from "./store.ts";

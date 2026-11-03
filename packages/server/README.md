@@ -1,11 +1,11 @@
-# @cairnmcp/server
+# @procura/server
 
-The cairnmcp app: the embedded authorization server (`packages/auth`) and the MCP endpoint
+The procura app: the embedded authorization server (`packages/auth`) and the MCP endpoint
 (`packages/mcp`) in one Node process, the one container image of D-018.
 
 ```bash
-pnpm --filter @cairnmcp/db migrate      # as the owner role, see packages/db/README.md
-pnpm --filter @cairnmcp/server start    # as the app role
+pnpm --filter @procura/db migrate      # as the owner role, see packages/db/README.md
+pnpm --filter @procura/server start    # as the app role
 ```
 
 Settings are environment variables, validated at startup; the process refuses to start and lists
@@ -18,11 +18,11 @@ build step, production dependencies only, running as the unprivileged `node` use
 code. It listens on `PORT` (default 8080) and has a `HEALTHCHECK` on `/healthz`.
 
 ```bash
-docker build -t cairnmcp .
+docker build -t procura .
 # Migrate as the owner role (a one-off "release" command on most platforms):
-docker run --rm -e CAIRNMCP_DATABASE_OWNER_URL=postgres://… cairnmcp node packages/db/scripts/migrate.ts
+docker run --rm -e PROCURA_DATABASE_OWNER_URL=postgres://… procura node packages/db/scripts/migrate.ts
 # Run as the app role:
-docker run -p 8080:8080 --env-file .env cairnmcp
+docker run -p 8080:8080 --env-file .env procura
 ```
 
 `scripts/image-smoke.sh <image>` migrates and starts an image against a real Postgres and checks

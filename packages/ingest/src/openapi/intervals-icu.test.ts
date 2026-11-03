@@ -1,7 +1,7 @@
 // Validates the OpenAPI mapper against the real Intervals.icu API description.
 // See fixtures/intervals-icu/PROVENANCE.md for where the fixture came from.
 import { readFileSync } from "node:fs";
-import { defaultToolset, IrDocument, resolveToolset, Toolset, type Operation } from "@cairnmcp/core";
+import { defaultToolset, IrDocument, resolveToolset, Toolset, type Operation } from "@procura/core";
 import { beforeAll, describe, expect, it } from "vitest";
 import { strictAjv } from "../test-support.ts";
 import { ingestOpenApiText } from "./ingest.ts";

@@ -1,6 +1,10 @@
 # Deploying to an Oracle Cloud Always Free VM
 
-cairnmcp on one free Arm VM (D-029): the app image (D-027) in Docker, behind Caddy, which gets and
+> procura was called cairnmcp (D-047). This deployment keeps the old name in its scripts,
+> settings (`CAIRNMCP_*`, still accepted), Compose project, and images, because renaming them
+> means a manual ship and editing the VM's env files. For a new server, use `deploy/self-host`.
+
+procura on one free Arm VM (D-029): the app image (D-027) in Docker, behind Caddy, which gets and
 renews the HTTPS certificate. The database stays on Neon's free plan. The VM's public IP is also a
 **stable outbound IP**, so upstream APIs that rate-limit per IP see only our traffic.
 
@@ -79,7 +83,7 @@ is private) and run `deploy/oracle/deploy.sh`, which builds on the VM.
   hostname that resolves to the IP. It becomes the public URL and the OAuth issuer, so changing it
   later means signing in again.
 - **`CAIRNMCP_DATABASE_URL`** and **`DATABASE_URL_UNPOOLED`** from your local `.env.local`
-  (created by `neon deploy` and `pnpm --filter @cairnmcp/db roles`; see `packages/db/README.md`).
+  (created by `neon deploy` and `pnpm --filter @procura/db roles`; see `packages/db/README.md`).
 - **The Google sign-in JSON** above.
 
 Settings are written to `deploy/oracle/app.env` (the app) and `migrate.env` (only the migration

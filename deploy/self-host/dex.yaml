@@ -1,5 +1,5 @@
-# Dex, a local OpenID Connect provider for trying cairnmcp on a laptop (compose profile
-# "dex"). One demo login, admin@example.com / cairnmcp, kept in memory. Works only with the
+# Dex, a local OpenID Connect provider for trying procura on a laptop (compose profile
+# "dex"). One demo login, admin@example.com / procura, kept in memory. Works only with the
 # app at http://localhost:8080; on a server, use a real provider instead (README.md).
 issuer: http://localhost:5556/dex
 
@@ -15,17 +15,17 @@ oauth2:
 enablePasswordDB: true
 staticPasswords:
   - email: admin@example.com
-    # bcrypt of "cairnmcp"
-    hash: "$2a$10$AGeR9hxtAPuS2zPPH/9x2u3.tGURd01cNVcNouRf1DZ5SU6lyJh8u"
+    # bcrypt of "procura"
+    hash: "$2a$10$5NCgmhuK/st62bNVL1lChegwC8ATduyh/3SAp0AyVPmP9gR4m9lVy"
     username: admin
-    # Fixed, so the account id in cairnmcp stays the same across restarts.
+    # Fixed, so the account id in procura stays the same across restarts.
     userID: "5f4e1d0c-2b3a-4c5d-8e9f-0a1b2c3d4e5f"
 
 staticClients:
-  - id: cairnmcp
-    name: cairnmcp
-    # Matches CAIRNMCP_OIDC_PROVIDERS in .env.example. Only reachable from this machine.
-    secret: cairnmcp-local-dex-not-a-secret
+  - id: procura
+    name: procura
+    # Matches PROCURA_OIDC_PROVIDERS in .env.example. Only reachable from this machine.
+    secret: procura-local-dex-not-a-secret
     redirectURIs:
       - http://localhost:8080/oauth/callback/dex
       - http://localhost:8080/app/callback/dex

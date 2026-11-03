@@ -1,11 +1,11 @@
-# HTTPS for CAIRNMCP_DOMAIN (compose profile "caddy"): Caddy obtains and renews the
+# HTTPS for PROCURA_DOMAIN (compose profile "caddy"): Caddy obtains and renews the
 # certificate from Let's Encrypt. Everything goes to the app.
 {
 	# No admin API listening inside the container.
 	admin off
 }
 
-{$CAIRNMCP_DOMAIN} {
+{$PROCURA_DOMAIN} {
 	reverse_proxy app:8080 {
 		# MCP and OAuth responses are small; never buffer, so nothing waits on the proxy.
 		flush_interval -1

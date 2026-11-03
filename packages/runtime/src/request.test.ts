@@ -1,4 +1,4 @@
-import { classifyHttpOperation, Operation, type HttpMethod } from "@cairnmcp/core";
+import { classifyHttpOperation, Operation, type HttpMethod } from "@procura/core";
 import { describe, expect, it } from "vitest";
 import { RuntimeFailure } from "./errors.ts";
 import { buildRequest } from "./request.ts";

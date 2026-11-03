@@ -1,11 +1,11 @@
 // The MCP endpoint end to end: real Postgres (as the app role), real vault and
 // runtime, the MCP SDK client, a local token issuer, and a fake upstream.
 import { randomBytes } from "node:crypto";
-import { AccessProfile, Toolset, type IrDocument, type TenantId, type UserId } from "@cairnmcp/core";
-import { addMember, Database, listAuditEvents, PgAuditSink, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess, updateMember } from "@cairnmcp/db";
-import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
-import { InMemoryRateLimiter, Runtime, type FetchLike } from "@cairnmcp/runtime";
-import { LocalKeyWrapper, Vault } from "@cairnmcp/vault";
+import { AccessProfile, Toolset, type IrDocument, type TenantId, type UserId } from "@procura/core";
+import { addMember, Database, listAuditEvents, PgAuditSink, PgVaultStore, putProfile, putSource, putToolset, setMemberProfiles, setToolsetAccess, updateMember } from "@procura/db";
+import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@procura/db/test-support";
+import { InMemoryRateLimiter, Runtime, type FetchLike } from "@procura/runtime";
+import { LocalKeyWrapper, Vault } from "@procura/vault";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
@@ -15,7 +15,7 @@ import { createMcpHandler } from "./handler.ts";
 import { TokenVerifier } from "./token.ts";
 
 const adminUrl = testDatabaseUrl();
-const BASE = "https://cairn.test";
+const BASE = "https://procura.test";
 const ISSUER = "https://issuer.test"; // newTenant() creates owners under this issuer
 const API_KEY = "fake-test-api-key-mcp-0123456789";
 
@@ -138,7 +138,7 @@ describe.skipIf(!adminUrl)("MCP endpoint (Postgres)", () => {
         authorization_servers: [ISSUER],
         bearer_methods_supported: ["header"],
         scopes_supported: ["mcp"],
-        resource_name: "cairnmcp",
+        resource_name: "procura",
       });
     });
 

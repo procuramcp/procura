@@ -14,7 +14,7 @@ import {
   type Diagnostic,
   type HttpMethod,
   type JsonSchema,
-} from "@cairnmcp/core";
+} from "@procura/core";
 import { z } from "zod";
 import {
   HTTP_METHODS,

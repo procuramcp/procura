@@ -1,12 +1,12 @@
-# cairnmcp on your own machine or server: the app, its Postgres, a one-off
+# procura on your own machine or server: the app, its Postgres, a one-off
 # migration step, and optionally a local sign-in provider (Dex) for trying it
 # out or Caddy for HTTPS on a domain. See README.md.
 #
-#   cp .env.example .env    # then set CAIRNMCP_MASTER_KEY and CAIRNMCP_POSTGRES_PASSWORD
+#   cp .env.example .env    # then set PROCURA_MASTER_KEY and PROCURA_POSTGRES_PASSWORD
 #   docker compose up -d --wait
 #
 # Which optional parts run is set by COMPOSE_PROFILES in .env: postgres, dex, caddy.
-name: cairnmcp
+name: procura
 
 x-hardened: &hardened
   read_only: true
@@ -21,17 +21,17 @@ x-logging: &logging
 
 services:
   app:
-    image: ${CAIRNMCP_IMAGE:-ghcr.io/procuramcp/procura:latest}
+    image: ${PROCURA_IMAGE:-ghcr.io/procuramcp/procura:latest}
     restart: unless-stopped
     environment:
-      CAIRNMCP_PUBLIC_URL: ${CAIRNMCP_PUBLIC_URL:-http://localhost:8080}
-      CAIRNMCP_DATABASE_URL: ${CAIRNMCP_DATABASE_URL:-postgres://cairnmcp_server:${CAIRNMCP_POSTGRES_PASSWORD:-}@postgres:5432/cairnmcp}
-      CAIRNMCP_MASTER_KEY: ${CAIRNMCP_MASTER_KEY:-}
-      CAIRNMCP_OIDC_PROVIDERS: ${CAIRNMCP_OIDC_PROVIDERS:-}
-      CAIRNMCP_TRUSTED_ISSUERS: ${CAIRNMCP_TRUSTED_ISSUERS:-}
-      CAIRNMCP_ALLOWED_ORIGINS: ${CAIRNMCP_ALLOWED_ORIGINS:-}
+      PROCURA_PUBLIC_URL: ${PROCURA_PUBLIC_URL:-http://localhost:8080}
+      PROCURA_DATABASE_URL: ${PROCURA_DATABASE_URL:-postgres://cairnmcp_server:${PROCURA_POSTGRES_PASSWORD:-}@postgres:5432/procura}
+      PROCURA_MASTER_KEY: ${PROCURA_MASTER_KEY:-}
+      PROCURA_OIDC_PROVIDERS: ${PROCURA_OIDC_PROVIDERS:-}
+      PROCURA_TRUSTED_ISSUERS: ${PROCURA_TRUSTED_ISSUERS:-}
+      PROCURA_ALLOWED_ORIGINS: ${PROCURA_ALLOWED_ORIGINS:-}
     ports:
-      - "${CAIRNMCP_BIND:-127.0.0.1}:${CAIRNMCP_PORT:-8080}:8080"
+      - "${PROCURA_BIND:-127.0.0.1}:${PROCURA_PORT:-8080}:8080"
       # Dex, when the dex profile is on: it shares this container's network, so the app and
       # your browser both reach it as localhost:5556 (an issuer has one URL for everyone).
       - "127.0.0.1:5556:5556"
@@ -44,11 +44,11 @@ services:
   # Runs the database migrations as the owner role, then exits; the app starts only after it
   # succeeds, so `docker compose up` after pulling a new image also upgrades the schema.
   migrate:
-    image: ${CAIRNMCP_IMAGE:-ghcr.io/procuramcp/procura:latest}
+    image: ${PROCURA_IMAGE:-ghcr.io/procuramcp/procura:latest}
     command: ["node", "packages/db/scripts/migrate.ts"]
     restart: "no"
     environment:
-      CAIRNMCP_DATABASE_OWNER_URL: ${CAIRNMCP_DATABASE_OWNER_URL:-postgres://cairnmcp_owner:${CAIRNMCP_POSTGRES_PASSWORD:-}@postgres:5432/cairnmcp}
+      PROCURA_DATABASE_OWNER_URL: ${PROCURA_DATABASE_OWNER_URL:-postgres://cairnmcp_owner:${PROCURA_POSTGRES_PASSWORD:-}@postgres:5432/procura}
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,23 +63,23 @@ services:
     environment:
       # Unset, the image refuses to start ("superuser password is not specified"). No `:?` here:
       # compose would then demand it even when this profile is off and you bring your own Postgres.
-      POSTGRES_PASSWORD: ${CAIRNMCP_POSTGRES_PASSWORD:-}
-      CAIRNMCP_POSTGRES_PASSWORD: ${CAIRNMCP_POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD: ${PROCURA_POSTGRES_PASSWORD:-}
+      PROCURA_POSTGRES_PASSWORD: ${PROCURA_POSTGRES_PASSWORD:-}
     volumes:
       - pgdata:/var/lib/postgresql/data
       # Creates the roles and the database on first start only (an empty data volume).
-      - ./postgres-init.sh:/docker-entrypoint-initdb.d/cairnmcp.sh:ro
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/procura.sh:ro
     # Not published on the host: only the app and the migration step reach it.
     healthcheck:
       # Over TCP: during first-start setup Postgres listens only on its socket, so this waits for the real start.
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "cairnmcp"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "procura"]
       interval: 2s
       timeout: 5s
       retries: 30
     mem_limit: 512m
     <<: *logging
 
-  # A local sign-in provider with one demo login, for trying cairnmcp on a laptop.
+  # A local sign-in provider with one demo login, for trying procura on a laptop.
   # Not for a server: use your own provider (Google, Okta, Entra, Auth0, ...) there.
   dex:
     image: ghcr.io/dexidp/dex:v2.46.1@sha256:65b72ca0f4b0bf6d4ada84ec21da8851782563404ac7b8f926923d27ceced9ab
@@ -91,7 +91,7 @@ services:
       - ./dex.yaml:/etc/dex/config.yaml:ro
     <<: [*hardened, *logging]
 
-  # HTTPS on CAIRNMCP_DOMAIN, with a certificate Caddy obtains and renews from Let's Encrypt.
+  # HTTPS on PROCURA_DOMAIN, with a certificate Caddy obtains and renews from Let's Encrypt.
   caddy:
     image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
     profiles: [caddy]
@@ -101,7 +101,7 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      CAIRNMCP_DOMAIN: ${CAIRNMCP_DOMAIN:-}
+      PROCURA_DOMAIN: ${PROCURA_DOMAIN:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

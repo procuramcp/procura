@@ -1,4 +1,4 @@
-import { splitWords } from "@cairnmcp/core";
+import { splitWords } from "@procura/core";
 
 const MAX_ID = 64;
 

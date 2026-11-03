@@ -1,5 +1,5 @@
-import type { AuthRequirement, AuthScheme, Instant } from "@cairnmcp/core";
-import { Secret, type Credential } from "@cairnmcp/vault";
+import type { AuthRequirement, AuthScheme, Instant } from "@procura/core";
+import { Secret, type Credential } from "@procura/vault";
 import { fail } from "./errors.ts";
 
 /** Credentials applied to a request. Values stay wrapped until the request is sent. */

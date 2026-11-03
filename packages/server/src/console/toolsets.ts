@@ -1,8 +1,8 @@
 // One toolset: view, edit, direct access grants, and test calls.
-import type { TestResult, ToolsetView } from "@cairnmcp/console-api";
-import { canCall, resolveToolset, Toolset, ToolsetId, type Caller, type TenantId } from "@cairnmcp/core";
-import { ensureMember, getToolset, getToolsetWithSource, listProfiles, listTeam, PG, pgErrorCode, putToolset, schema, setToolsetAccess, type TenantTx } from "@cairnmcp/db";
-import { json } from "@cairnmcp/http";
+import type { TestResult, ToolsetView } from "@procura/console-api";
+import { canCall, resolveToolset, Toolset, ToolsetId, type Caller, type TenantId } from "@procura/core";
+import { ensureMember, getToolset, getToolsetWithSource, listProfiles, listTeam, PG, pgErrorCode, putToolset, schema, setToolsetAccess, type TenantTx } from "@procura/db";
+import { json } from "@procura/http";
 import { asc, eq } from "drizzle-orm";
 import { AccessEdit, issuesText, readBody, ToolsetEdit, ToolTest } from "./bodies.ts";
 import { asTeam, endpointUrl, teamResponse, type ApiRequest, type ApiRoute, type ConsoleContext } from "./context.ts";

@@ -3,12 +3,12 @@
 // the real openid-client, consent, tokens, refresh, and MCP calls with the
 // result. Real Postgres as the app role. Last: the MCP SDK's own OAuth client.
 import { randomBytes } from "node:crypto";
-import { OidcIdentityProvider } from "@cairnmcp/auth";
-import { Toolset, type TenantId, type UserId } from "@cairnmcp/core";
-import { addMember, Database, listAuditEvents, putSource, putToolset, schema, setToolsetAccess } from "@cairnmcp/db";
-import { intervalsIr, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@cairnmcp/db/test-support";
-import type { FetchLike } from "@cairnmcp/runtime";
-import { LocalKeyWrapper } from "@cairnmcp/vault";
+import { OidcIdentityProvider } from "@procura/auth";
+import { Toolset, type TenantId, type UserId } from "@procura/core";
+import { addMember, Database, listAuditEvents, putSource, putToolset, schema, setToolsetAccess } from "@procura/db";
+import { intervalsIr, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "@procura/db/test-support";
+import type { FetchLike } from "@procura/runtime";
+import { LocalKeyWrapper } from "@procura/vault";
 import { auth, type OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -20,7 +20,7 @@ import { createApp } from "./app.ts";
 import { FakeOidcProvider, pkce, TestBrowser } from "./test-support.ts";
 
 const adminUrl = testDatabaseUrl();
-const BASE = "https://cairn.test";
+const BASE = "https://procura.test";
 const REDIRECT = "http://localhost:4567/callback";
 
 describe.skipIf(!adminUrl)("embedded authorization server (Postgres)", () => {

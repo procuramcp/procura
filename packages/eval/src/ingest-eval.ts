@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { isRecord, type Diagnostic, type Operation, type SideEffect } from "@cairnmcp/core";
-import { ingestOpenApiText } from "@cairnmcp/ingest";
+import { isRecord, type Diagnostic, type Operation, type SideEffect } from "@procura/core";
+import { ingestOpenApiText } from "@procura/ingest";
 import { parse as parseYaml } from "yaml";
 import { DEFAULT_MANIFEST_PATH, isPresent, loadCorpusManifest, resolveCorpusFile, type CorpusEntry } from "./manifest.ts";
 

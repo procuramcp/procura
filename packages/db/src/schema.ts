@@ -2,7 +2,7 @@
 // The SQL files are the source of truth (constraints, RLS, grants live there);
 // schema.test.ts checks that every column here exists in the migrated database.
 import { bigint, date, foreignKey, integer, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
-import type { WrappedKey } from "@cairnmcp/vault";
+import type { WrappedKey } from "@procura/vault";
 
 export const cairnmcp = pgSchema("cairnmcp");
 

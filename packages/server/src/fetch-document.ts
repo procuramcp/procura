@@ -110,7 +110,7 @@ function getPinned(url: URL, address: string, family: 4 | 6, timeoutMs: number):
       url,
       {
         method: "GET",
-        headers: { accept: "application/json, application/yaml, text/yaml, text/html;q=0.5, */*;q=0.1", "user-agent": "cairnmcp-ingest" },
+        headers: { accept: "application/json, application/yaml, text/yaml, text/html;q=0.5, */*;q=0.1", "user-agent": "procura-ingest" },
         // Connect to the address we checked, whatever DNS says now. TLS still verifies the hostname.
         lookup: ((_host: string, opts: { all?: boolean }, cb: (...args: unknown[]) => void) =>
           opts.all ? cb(null, [{ address, family }]) : cb(null, address, family)) as never,
