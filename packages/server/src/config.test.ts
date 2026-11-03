@@ -27,7 +27,10 @@ describe("loadConfig", () => {
       trustedIssuers: [{ issuer: "https://auth.example.com", jwksUri: "https://auth.example.com/jwks" }],
       allowedOrigins: ["https://a.test", "https://b.test"],
       port: 3000,
+      sourceCheckHours: 24,
     });
+    expect(loadConfig({ ...env, PROCURA_SOURCE_CHECK_HOURS: "0" }).sourceCheckHours).toBe(0);
+    expect(() => loadConfig({ ...env, PROCURA_SOURCE_CHECK_HOURS: "-1" })).toThrow(/PROCURA_SOURCE_CHECK_HOURS/);
   });
 
   it("lists every problem without echoing values", () => {

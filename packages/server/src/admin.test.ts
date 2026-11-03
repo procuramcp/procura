@@ -122,6 +122,35 @@ describe.skipIf(!adminUrl)("admin commands (Postgres)", () => {
       expect(show.out).not.toContain(SECRET);
     });
 
+    it("updates a source from a new document, a dry run first, and restores the kept version (D-048, D-049)", async () => {
+      const doc = JSON.parse(openapi) as { paths: Record<string, unknown> };
+      const gone = Object.keys(doc.paths).find((p) => p.includes("/gear"))!;
+      delete doc.paths[gone];
+      const v2 = JSON.stringify(doc);
+      const update = (args: string[], input?: string) => exec(["source", "update", "--tenant", "club", "--id", "intervals-icu", ...args], input);
+
+      const dry = await update(["--stdin"], v2);
+      expect(dry).toMatchObject({ code: 0 });
+      expect(dry.out).toContain("removed");
+      expect(dry.out).toContain("Dry run");
+      expect(JSON.parse((await exec(["tenant", "show", "--tenant", "club"])).out).sources[0].operations).toBe(148);
+
+      const applied = await update(["--stdin", "--apply"], v2);
+      expect(applied.out).toContain("the previous version is kept as 1");
+      const shown = JSON.parse((await exec(["tenant", "show", "--tenant", "club"])).out).sources[0];
+      expect(shown).toMatchObject({ versions: [{ version: 1, operations: 148 }] });
+      // Text from stdin may not be what the API publishes, so it doesn't count as a check.
+      expect(shown.check).toBeUndefined();
+      expect(shown.operations).toBeLessThan(148);
+
+      expect((await update(["--version", "1", "--apply"])).out).toContain("kept as 2");
+      expect((await update(["--stdin"], openapi)).out).toContain("Already up to date");
+      // Added from pasted text, so there's no URL to fetch: says what to give.
+      expect(await update([])).toMatchObject({ code: 1, err: expect.stringContaining("give a URL or the new document") });
+      expect(await update(["--version", "x"])).toMatchObject({ code: 1, err: expect.stringContaining("--version") });
+      expect(await update(["--version", "1", "--stdin"], v2)).toMatchObject({ code: 1, err: expect.stringContaining("give one of") });
+    });
+
     it("explains mistakes instead of crashing", async () => {
       expect(await exec(["tenant", "create", "--name", "X"])).toMatchObject({ code: 1, err: expect.stringContaining("missing --owner") });
       expect(await exec(["source", "add", "--tenant", "club", "--id", "x"], "")).toMatchObject({ code: 1, err: expect.stringContaining("was empty") });

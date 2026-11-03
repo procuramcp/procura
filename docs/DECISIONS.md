@@ -1051,8 +1051,39 @@ Found running DigitalOcean's bundled description (APIs.guru) after its multi-fil
 - **Stored JSON compares by value:** `jsonb` reorders keys, so comparisons use `sameJson` and the
   digest `canonicalJson`; otherwise every stored operation would look changed.
 - **Not yet:** `admin source update` in the CLI; keeping each version for rollback (re-applying
-  the old document works); a scheduled check that says when the document has changed.
+  the old document works); a scheduled check that says when the document has changed. (All
+  three done in D-049.)
 - **Benchmark:** the dev console's Intervals.icu fixture against the live document: 6 new, 1
   removed, 34 changed (mostly new response fields), 113 unchanged; the 8-tool starter toolset
   kept all its tools and pins.
+
+## D-049 Source history, restoring a version, scheduled checks, and the CLI
+
+- **History:** applying an update first keeps the version it replaces (`source_versions`: the IR,
+  when, and who; the newest 20 per source). Restoring one is an update like any other (D-048):
+  the same preview, flags, digest, and carrying over. The kept version's classifications are set
+  back to ingest's first (`withoutCuration`), so today's classifications win over old ones.
+- **Scheduled checks:** every hour the server checks the sources due (not checked in
+  `PROCURA_SOURCE_CHECK_HOURS`, default 24; 0 turns it off), at most 50 a run, one at a time.
+  It fetches each source's document URL with D-035's checks; if the text's hash matches the last
+  check, nothing is ingested. Otherwise it maps and diffs against the stored version and records
+  `current`, `changed` (with counts), or `failed` (with a message for people: refusals and
+  mapping problems as written, anything else generic). It never applies anything: the source's
+  page says a new version is out, and a person reviews it.
+- **Finding due sources across tenants:** `sources_due_for_check` is a narrow SECURITY DEFINER
+  function returning tenant and source ids only, through owner-only read policies gated by a
+  setting, like `user_tenants` (D-024). The job then reads each source inside its own tenant.
+  Isolation tests check that the setting gives the app role nothing.
+- **What counts as up to date:** only a version fetched from the source's own URL just now. A
+  restored version or pasted text may not be what's published, so applying one clears the check
+  and the next run compares again. Both keep the source's document URL, so checks continue.
+- **CLI:** `admin source update --tenant <t> --id <s> [--url <u> | --version <n> | --stdin]
+  [--base-url current|document] [--apply]`. A dry run unless `--apply`; plan and apply happen in
+  one transaction, so no digest is needed. Stdin is read only with `--stdin`: through `admin.sh`
+  it is never a terminal, so guessing would hang or fail. `tenant show` lists each source's
+  kept versions and latest check.
+- **Rejected:** applying updates automatically (a removed operation or a new write is a person's
+  call, D-048); a separate global table of document URLs for the job (it would put tenants' URLs
+  where any query could reach them); webhooks from providers (not every API has one; polling
+  works for all, and can be added to later).
 

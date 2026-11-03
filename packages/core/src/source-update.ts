@@ -327,3 +327,22 @@ function carryProfile(profile: AccessProfile, onSource: Set<string>, oldToNew: M
   }
   return changed ? { updated: { ...profile, rules }, effect } : { effect };
 }
+
+/** Whether an update would change nothing a person would notice: same operations, name, sign-in, and base URL. */
+export function diffIsEmpty(diff: SourceDiff): boolean {
+  const { added, removed, changed } = diff;
+  const schemes = diff.authSchemes.added.length + diff.authSchemes.removed.length + diff.authSchemes.changed.length;
+  return added.length + removed.length + changed.length + schemes === 0 && !diff.name && !(diff.baseUrl && diff.baseUrl.used === "document");
+}
+
+/**
+ * A kept version as if freshly ingested: people's classifications set back to what ingest said,
+ * so restoring it (as an update) carries today's classifications over instead of old ones.
+ */
+export function withoutCuration(ir: IrDocument): IrDocument {
+  return {
+    ...ir,
+    operations: ir.operations.map((op) => (op.sideEffect.basis === "curated" && op.sideEffect.automatic ? { ...op, sideEffect: op.sideEffect.automatic } : op)),
+  };
+}
+

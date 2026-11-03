@@ -12,24 +12,30 @@ import {
   deleteProfile,
   getMember,
   getSource,
+  getSourceCheck,
+  getSourceVersion,
   getToolset,
   listAuditEvents,
   listCustomers,
   listSources,
+  listSourceVersions,
   listProfiles,
   listToolsets,
   mayCallTool,
   memberRole,
   putProfile,
   putSource,
+  putSourceCheck,
   putToolset,
+  saveSourceVersion,
+  SOURCE_VERSIONS_KEPT,
   setMemberProfiles,
   setMemberRole,
   setToolsetAccess,
   toolsetAccessLevel,
   updateMember,
 } from "./repo.ts";
-import { auditEvents, credentials, dataKeys, memberProfiles, memberships, sources, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
+import { auditEvents, credentials, dataKeys, memberProfiles, memberships, sourceChecks, sources, sourceVersions, tenants, toolsetAccess, toolsets, users } from "./schema.ts";
 import { PgAuditSink, PgVaultStore } from "./stores.ts";
 import { intervalsIr, newTenant, scratchDatabase, testDatabaseUrl, type ScratchDatabase } from "./test-support.ts";
 
@@ -518,3 +524,86 @@ function rowOf(e: AuditEvent): typeof auditEvents.$inferInsert {
     input: e.input,
   };
 }
+
+describe.skipIf(!adminUrl)("source history and checks (D-049, Postgres)", () => {
+  let scratch: ScratchDatabase;
+  let db: Database;
+  let a: { tenantId: TenantId; ownerId: UserId };
+  let b: { tenantId: TenantId; ownerId: UserId };
+  // Both tenants have the source from a document URL; only A has a second one without.
+  const fromUrl = (id = SOURCE_ID) => {
+    const ir = intervalsIr();
+    return { ...ir, source: { ...ir.source, id: id as never, derivation: { ...ir.source.derivation, documentUrl: `https://api.test/${id}.json` } } };
+  };
+  const pasted = () => {
+    const ir = intervalsIr();
+    return { ...ir, source: { ...ir.source, id: "pasted" as never } };
+  };
+
+  beforeAll(async () => {
+    scratch = await scratchDatabase(adminUrl!);
+    db = await Database.connect({ url: scratch.appUrl, max: 2 });
+    a = await newTenant(db, "alpha");
+    b = await newTenant(db, "bravo");
+    for (const t of [a, b]) await db.withTenant(t.tenantId, (tx) => putSource(tx, fromUrl()));
+    await db.withTenant(a.tenantId, (tx) => putSource(tx, pasted()));
+  });
+
+  afterAll(async () => {
+    await db?.close();
+    await scratch?.drop();
+  });
+
+  it("keeps replaced versions per tenant, numbered, the newest few", async () => {
+    await db.withTenant(a.tenantId, async (tx) => {
+      expect(await saveSourceVersion(tx, fromUrl(), a.ownerId)).toBe(1);
+      expect(await saveSourceVersion(tx, fromUrl(), null)).toBe(2);
+    });
+    const listed = await db.withTenant(a.tenantId, (tx) => listSourceVersions(tx, SOURCE_ID));
+    expect(listed.map((v) => [v.version, v.replacedBy, v.operations > 0])).toEqual([
+      [2, null, true],
+      [1, a.ownerId, true],
+    ]);
+    expect((await db.withTenant(a.tenantId, (tx) => getSourceVersion(tx, SOURCE_ID, 1)))?.source.id).toBe(SOURCE_ID);
+    // Tenant B sees none of A's history, even by tenant_id.
+    expect(await db.withTenant(b.tenantId, (tx) => listSourceVersions(tx, SOURCE_ID))).toEqual([]);
+    expect(await db.withTenant(b.tenantId, (tx) => tx.select().from(sourceVersions).where(eq(sourceVersions.tenantId, a.tenantId)))).toEqual([]);
+    expect(await db.withTenant(b.tenantId, (tx) => getSourceVersion(tx, SOURCE_ID, 1))).toBeUndefined();
+
+    await db.withTenant(a.tenantId, async (tx) => {
+      for (let i = 0; i < SOURCE_VERSIONS_KEPT; i++) await saveSourceVersion(tx, fromUrl(), null);
+    });
+    const kept = await db.withTenant(a.tenantId, (tx) => listSourceVersions(tx, SOURCE_ID));
+    expect(kept).toHaveLength(SOURCE_VERSIONS_KEPT);
+    expect(kept[0]!.version).toBe(SOURCE_VERSIONS_KEPT + 2);
+  });
+
+  it("can't write history into another tenant", async () => {
+    const code = await db
+      .withTenant(b.tenantId, (tx) => tx.insert(sourceVersions).values({ tenantId: a.tenantId, sourceId: SOURCE_ID, version: 99, ir: fromUrl() }))
+      .then(() => "inserted", (e: { code?: string }) => e.code);
+    expect(code).not.toBe("inserted");
+  });
+
+  it("lists sources due for a check across tenants, ids only, and only those from a URL", async () => {
+    const due = await db.sourcesDueForCheck(24, 100);
+    expect(due.map((d) => [d.tenantId, d.sourceId]).sort()).toEqual([[a.tenantId, SOURCE_ID], [b.tenantId, SOURCE_ID]].sort());
+
+    const now = new Date();
+    await db.withTenant(a.tenantId, (tx) => putSourceCheck(tx, SOURCE_ID, { status: "changed", checkedAt: now, documentSha256: "a".repeat(64), added: 2, removed: 1, changed: 3 }));
+    expect((await db.sourcesDueForCheck(24, 100)).map((d) => d.tenantId)).toEqual([b.tenantId]);
+    expect(await db.sourcesDueForCheck(24, 0)).toEqual([]);
+    expect(await db.withTenant(a.tenantId, (tx) => getSourceCheck(tx, SOURCE_ID))).toEqual({ status: "changed", checkedAt: now, documentSha256: "a".repeat(64), added: 2, removed: 1, changed: 3 });
+    expect(await db.withTenant(b.tenantId, (tx) => getSourceCheck(tx, SOURCE_ID))).toBeUndefined();
+    expect(await db.withTenant(b.tenantId, (tx) => tx.select().from(sourceChecks))).toEqual([]);
+  });
+
+  it("gives the app role no way around isolation through the check setting", async () => {
+    const rows = await db.withTenant(b.tenantId, async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.source_check', 'on', true)`);
+      return tx.select({ tenantId: sources.tenantId }).from(sources);
+    });
+    expect(rows).toEqual([{ tenantId: b.tenantId }]);
+  });
+});
+

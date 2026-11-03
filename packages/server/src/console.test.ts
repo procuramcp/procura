@@ -578,7 +578,7 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
 
       expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { digest: "0".repeat(64) })).status).toBe(409);
       const applied = await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { digest: preview.digest });
-      expect([applied.status, await applied.json()]).toEqual([200, { operations: preview.operations.after, toolsets: 1, profiles: 1 }]);
+      expect([applied.status, await applied.json()]).toEqual([200, { operations: preview.operations.after, toolsets: 1, profiles: 1, keptVersion: 1 }]);
 
       const toolset = (await (await browser.json("GET", `${API}/tenants/alpha/toolsets/shop-main`)).json()) as {
         issues: unknown[];
@@ -592,6 +592,28 @@ describe.skipIf(!adminUrl)("curation console (Postgres)", () => {
       expect(toolset.profiles).toEqual([expect.objectContaining({ operations: ["fetch_item"] })]);
       // Applied twice: the digest no longer matches what's stored.
       expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { digest: preview.digest })).status).toBe(409);
+
+      // The replaced version is kept, and the source counts as up to date (D-049).
+      const view = (await (await browser.json("GET", `${API}/tenants/alpha/sources/shop`)).json()) as SourceView;
+      expect(view.versions).toEqual([{ version: 1, replacedAt: expect.any(String), replacedBy: "alice@example.com", operations: 4 }]);
+      expect(view.check).toMatchObject({ status: "current" });
+
+      // Restoring version 1 is an update like any other: today's classification stays.
+      const back = (await (await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { version: 1 })).json()) as SourceUpdatePreview;
+      expect(back.via).toBe("kept version 1");
+      expect(back.diff.added.map((o) => o.id)).toEqual(["delete_item"]);
+      expect(back.diff.removed.map((o) => o.id)).toEqual(["create_item"]);
+      expect(back.diff.classifications.kept).toEqual([{ id: "search_items", class: "read" }]);
+      const restored = await browser.json("POST", `${API}/tenants/alpha/sources/shop/update`, { version: 1, digest: back.digest });
+      expect(await restored.json()).toMatchObject({ keptVersion: 2, operations: { destructive: 1 } });
+      // It keeps its document URL, and no longer claims to match what's published there.
+      const afterRestore = (await (await browser.json("GET", `${API}/tenants/alpha/sources/shop`)).json()) as SourceView;
+      expect([afterRestore.documentUrl, afterRestore.check]).toEqual(["https://api.test/shop.json", null]);
+      // Pasted text keeps the URL too.
+      const pastedPreview = (await (await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { document: shopDocument })).json()) as SourceUpdatePreview;
+      expect(pastedPreview.documentUrl).toBe("https://api.test/shop.json");
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { version: 9 })).status).toBe(404);
+      expect((await browser.json("POST", `${API}/tenants/alpha/sources/shop/update/preview`, { version: 1, document: "x" })).status).toBe(400);
     });
 
     it("needs a document for a source added from pasted text, and is for editors only", async () => {

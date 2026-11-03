@@ -1,4 +1,4 @@
-import { TenantId, UserId, type TeamRole } from "@procura/core";
+import { TenantId, UserId, type TeamRole, SourceId } from "@procura/core";
 import { sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
@@ -73,6 +73,18 @@ export class Database {
   }
 
   /** The tenants where `userId` is on the active team, with their role there (for the console, D-033, D-038). */
+  /**
+   * Sources whose document URL is due for a check (D-049), across tenants: ids only.
+   * The caller reads each one inside its own tenant.
+   */
+  async sourcesDueForCheck(olderThanHours: number, max: number): Promise<Array<{ tenantId: TenantId; sourceId: SourceId }>> {
+    const { rows } = await this.#pool.query<{ tenant_id: string; source_id: string }>(
+      "SELECT tenant_id, source_id FROM cairnmcp.sources_due_for_check(make_interval(hours => $1), $2)",
+      [Math.max(0, Math.floor(olderThanHours)), Math.max(0, Math.floor(max))],
+    );
+    return rows.map((r) => ({ tenantId: TenantId.parse(r.tenant_id), sourceId: SourceId.parse(r.source_id) }));
+  }
+
   async userTenants(userId: UserId): Promise<Array<{ tenantId: TenantId; name: string; role: TeamRole }>> {
     const { rows } = await this.#pool.query<{ tenant_id: string; tenant_name: string; role: TeamRole }>(
       "SELECT tenant_id, tenant_name, role FROM cairnmcp.user_tenants($1)",

@@ -30,6 +30,7 @@ services:
       PROCURA_OIDC_PROVIDERS: ${PROCURA_OIDC_PROVIDERS:-}
       PROCURA_TRUSTED_ISSUERS: ${PROCURA_TRUSTED_ISSUERS:-}
       PROCURA_ALLOWED_ORIGINS: ${PROCURA_ALLOWED_ORIGINS:-}
+      PROCURA_SOURCE_CHECK_HOURS: ${PROCURA_SOURCE_CHECK_HOURS:-}
     ports:
       - "${PROCURA_BIND:-127.0.0.1}:${PROCURA_PORT:-8080}:8080"
       # Dex, when the dex profile is on: it shares this container's network, so the app and

@@ -66,6 +66,8 @@ const Env = z.object({
     .optional()
     .transform((s) => (s ?? "").split(",").map((o) => o.trim()).filter(Boolean)),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+  // How often each source's document URL is checked for a new version (D-049); 0 turns it off.
+  PROCURA_SOURCE_CHECK_HOURS: z.coerce.number().int().min(0).max(24 * 30).default(24),
 });
 
 export type ServerConfig = {
@@ -78,6 +80,8 @@ export type ServerConfig = {
   trustedIssuers: Array<{ issuer: string; jwksUri: string }>;
   allowedOrigins: string[];
   port: number;
+  /** Hours between checks of each source's document for a new version; 0: never (D-049). */
+  sourceCheckHours: number;
 };
 
 /**
@@ -104,5 +108,6 @@ export function loadConfig(env: Record<string, string | undefined>): ServerConfi
     trustedIssuers: e.PROCURA_TRUSTED_ISSUERS ?? [],
     allowedOrigins: e.PROCURA_ALLOWED_ORIGINS,
     port: e.PORT,
+    sourceCheckHours: e.PROCURA_SOURCE_CHECK_HOURS,
   };
 }

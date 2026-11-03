@@ -1,6 +1,6 @@
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircle2Icon, ChevronDownIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { type ReactNode, useEffect, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { DocumentFinder } from "@/pages/document-finder";
 import { Endpoint, SideEffectBadge } from "@/pages/parts";
 import { Problem } from "@/pages/shell";
 
-type Found = { input: DocumentInput | Record<string, never>; baseUrl: "current" | "document"; preview: SourceUpdatePreview };
+type Found = { input: DocumentInput | { version: number } | Record<string, never>; baseUrl: "current" | "document"; preview: SourceUpdatePreview };
 
 /**
  * Update an API to a new version of its description (D-048): fetch it again (or give it),
@@ -32,6 +32,13 @@ export function UpdateSourcePage() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [found, setFound] = useState<Found | undefined>();
+  // Restoring a kept version (D-049): previewed as soon as the page opens.
+  const [params] = useSearchParams();
+  const restoring = Number(params.get("version")) || undefined;
+  useEffect(() => {
+    if (restoring) void preview({ version: restoring }, "current");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per version
+  }, [restoring]);
 
   async function preview(input: Found["input"], baseUrl: Found["baseUrl"]) {
     setBusy(true);
@@ -57,13 +64,20 @@ export function UpdateSourcePage() {
         <Link to={back} className="flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground">
           <ArrowLeftIcon className="size-3.5" /> {source.data.name}
         </Link>
-        <h1 className="font-heading font-semibold text-2xl">Update {source.data.name}</h1>
+        <h1 className="font-heading font-semibold text-2xl">{restoring ? `Restore version ${restoring} of ${source.data.name}` : `Update ${source.data.name}`}</h1>
         <p className="text-muted-foreground text-sm">
-          Get the API's new description and see what changes, for the API and for the toolsets and plans built on it. Nothing changes until you apply.
+          {restoring
+            ? "See what going back to this version changes, for the API and for the toolsets and plans built on it. Your current classifications stay. Nothing changes until you apply."
+            : "Get the API's new description and see what changes, for the API and for the toolsets and plans built on it. Nothing changes until you apply."}
         </p>
       </div>
 
-      {source.data.documentUrl && (
+      {restoring && busy && !found && (
+        <p className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Spinner /> Comparing version {restoring} with what's in use…
+        </p>
+      )}
+      {!restoring && source.data.documentUrl && (
         <Card className="flex-row flex-wrap items-center justify-between gap-3 p-4">
           <div className="min-w-0 text-sm">
             <p className="font-medium">From the same place</p>
@@ -74,7 +88,7 @@ export function UpdateSourcePage() {
           </Button>
         </Card>
       )}
-      <Collapsible defaultOpen={!source.data.documentUrl}>
+      {!restoring && <Collapsible defaultOpen={!source.data.documentUrl}>
         {source.data.documentUrl && (
           <CollapsibleTrigger className="flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground">
             <ChevronDownIcon className="size-4" /> Or from another URL, pasted text, or a file
@@ -83,7 +97,7 @@ export function UpdateSourcePage() {
         <CollapsibleContent className="pt-2">
           <DocumentFinder initialUrl={source.data.documentUrl ?? ""} busy={busy} submitLabel="Check for changes" onSubmit={(doc) => void preview(doc, found?.baseUrl ?? "current")} />
         </CollapsibleContent>
-      </Collapsible>
+      </Collapsible>}
       {problem && (
         <Alert variant="destructive">
           <TriangleAlertIcon />
@@ -104,7 +118,8 @@ export function UpdateSourcePage() {
             });
             if (!done) return;
             const adjusted = [done.toolsets && `${done.toolsets} toolset${done.toolsets === 1 ? "" : "s"}`, done.profiles && `${done.profiles} plan${done.profiles === 1 ? "" : "s"}`].filter(Boolean);
-            toast.success(`${source.data!.name} updated`, { description: adjusted.length ? `Adjusted ${adjusted.join(" and ")}.` : undefined });
+            const kept = `The version it replaced is kept as version ${done.keptVersion}.`;
+            toast.success(restoring ? `Version ${restoring} restored` : `${source.data!.name} updated`, { description: [adjusted.length ? `Adjusted ${adjusted.join(" and ")}.` : "", kept].filter(Boolean).join(" ") });
             navigate(back);
           }}
         />

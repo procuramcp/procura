@@ -42,7 +42,7 @@ a superuser URL; each test file creates and drops its own database. A local Post
 | `db` | Postgres with RLS: tenants, sources, toolsets, access, vault and audit storage. | `migrations/*.sql` (source of truth), `src/schema.ts` (Drizzle view), `src/repo.ts` (all tenant queries), `src/client.ts` (`Database`), `src/stores.ts`, `src/errors.ts` |
 | `mcp` | The MCP endpoint `/mcp/{tenant}/{toolset}`: OAuth resource server. | `src/handler.ts`, `src/cache.ts` (`ToolsetCache`), `src/limits.ts` (plan limits), `src/token.ts`, `src/results.ts` |
 | `auth` | Embedded OAuth 2.1 authorization server under `/oauth`. | `src/handler.ts` (all endpoints + route table), `identity.ts` (OIDC), `keys.ts`, `pages.ts`, `redirect.ts` |
-| `server` | The app: wires everything, the console API, the admin CLI. | `src/app.ts`, `src/console/*`, `src/admin.ts`, `src/fetch-document.ts`, `scripts/serve.ts`, `scripts/admin.ts` |
+| `server` | The app: wires everything, the console API, the admin CLI, the scheduled source checks. | `src/app.ts`, `src/console/*`, `src/admin.ts`, `src/source-update.ts`, `src/source-check.ts`, `src/fetch-document.ts`, `scripts/serve.ts`, `scripts/admin.ts` |
 | `web` | The console UI (React, shadcn/ui), built to static files served at `/app`. | `src/lib/api.ts` (every API call; types from `console-api`), `src/lib/act.ts`, `src/lib/hooks.ts`, `src/pages/*` |
 | `eval` | Ingest eval over a corpus of public API descriptions; large ones are downloaded on demand, pinned by hash (D-017). | `src/ingest-eval.ts`, `src/fetch.ts`, `corpus/manifest.json` |
 
@@ -79,7 +79,9 @@ checks of the image and of the self-host setup; run them locally after changing 
 | `Date` → `Instant` | `instantOf` (core); never format ISO strings by hand |
 | Count read/write/destructive | `countBySideEffect` (core) |
 | Compare JSON ignoring key order (values read back from `jsonb`) | `sameJson`, `canonicalJson` (core) |
-| What a new version of a source changes, and its toolsets and plans carried over | `planSourceUpdate` (core, D-048) |
+| What a new version of a source changes, and its toolsets and plans carried over | `planSourceUpdate`, `diffIsEmpty` (core, D-048) |
+| Load, plan, and apply a source update (console, CLI, checks share these) | `loadNextVersion`, `planStoredUpdate`, `applyStoredUpdate` (server `source-update.ts`) |
+| A source's kept versions and latest check | `saveSourceVersion`, `listSourceVersions`, `getSourceVersion`, `getSourceCheck`, `putSourceCheck` (db, D-049) |
 | A person's classification; POSTs that look like reads | `curateSideEffect`, `suggestRead` (core `side-effect.ts`) |
 | Can this level call this tool? | `canCall`, `allowsTool`, `highestLevel` (core `access.ts`) |
 | A call's plan limits (most generous rule) | `callLimits`, `PlanLimits` (core `access.ts`) |
@@ -169,5 +171,5 @@ tables above and to the README.
 ## Docs
 
 `docs/IR.md` (the IR, start here), `docs/USER-STORIES.md` (who it's for, story ids like P-13),
-`docs/DECISIONS.md` (D-001…D-048, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
+`docs/DECISIONS.md` (D-001…D-049, the why), `docs/ROADMAP.md`, `docs/sources/*` (per-API findings), and READMEs in `packages/{auth,db,mcp,server,web}`
 and `deploy/{self-host,oracle,auth0}`.

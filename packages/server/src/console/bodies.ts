@@ -53,11 +53,15 @@ export const SourcePreviewInput = SourceFields.partial({ id: true }).refine(oneD
 const SourceUpdateFields = z.object({
   url: z.string().max(2000).optional(),
   document: z.string().max(MAX_DOCUMENT_FETCH_BYTES).optional(),
+  // A kept version to restore (D-049).
+  version: z.number().int().min(1).optional(),
   baseUrl: z.enum(["current", "document"]).default("current"),
 });
-const atMostOneDocument = (b: { url?: string | undefined; document?: string | undefined }) => !(b.url && b.document);
-export const SourceUpdateInput = SourceUpdateFields.refine(atMostOneDocument, ONE_DOCUMENT);
-export const SourceUpdateApply = SourceUpdateFields.extend({ digest: z.string().regex(/^[0-9a-f]{64}$/) }).refine(atMostOneDocument, ONE_DOCUMENT);
+const atMostOneDocument = (b: { url?: string | undefined; document?: string | undefined; version?: number | undefined }) =>
+  [b.url, b.document, b.version].filter((x) => x !== undefined && x !== "").length <= 1;
+const ONE_SOURCE = { message: "give at most one of url, document, or version" };
+export const SourceUpdateInput = SourceUpdateFields.refine(atMostOneDocument, ONE_SOURCE);
+export const SourceUpdateApply = SourceUpdateFields.extend({ digest: z.string().regex(/^[0-9a-f]{64}$/) }).refine(atMostOneDocument, ONE_SOURCE);
 
 /** Fails to compile unless the schema accepts the contract's body shape (the schema also checks limits). */
 type Accepts<Schema extends z.ZodType, _Body extends z.input<Schema>> = true;

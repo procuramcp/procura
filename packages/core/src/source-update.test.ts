@@ -4,7 +4,7 @@ import { IrDocument } from "./ir/document.ts";
 import { curateSideEffect } from "./ir/side-effect.ts";
 import { rawDocument, rawOperation } from "./ir/test-helpers.ts";
 import { defaultToolset, resolveToolset, Toolset } from "./ir/toolset.ts";
-import { planSourceUpdate } from "./source-update.ts";
+import { diffIsEmpty, planSourceUpdate, withoutCuration } from "./source-update.ts";
 
 type RawOp = ReturnType<typeof rawOperation>;
 const doc = (ops: RawOp[], source: Record<string, unknown> = {}) => {
@@ -179,3 +179,19 @@ describe("planSourceUpdate: plans and source settings", () => {
     expect(() => planSourceUpdate({ current, next: doc([], { id: "other" }), toolsets: [], profiles: [], baseUrl: "current" })).toThrow(/source ids differ/);
   });
 });
+
+describe("diffIsEmpty and withoutCuration", () => {
+  it("says an update to the same document changes nothing, even with curation carried over", () => {
+    const from = curated(current, "search_items", "read");
+    const result = plan(withoutCuration(from), [], [], from);
+    expect(diffIsEmpty(result.diff)).toBe(true);
+    expect(result.ir.operations.find((o) => o.id === "search_items")!.sideEffect.basis).toBe("curated");
+  });
+
+  it("sets classifications back to ingest's, and notices a real change", () => {
+    const from = curated(current, "search_items", "read");
+    expect(withoutCuration(from).operations.find((o) => o.id === "search_items")!.sideEffect).toMatchObject({ class: "write", basis: "http_method" });
+    expect(diffIsEmpty(plan(doc([rawOperation({ id: "get_item" })])).diff)).toBe(false);
+  });
+});
+

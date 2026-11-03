@@ -261,6 +261,32 @@ export const usageCounters = cairnmcp.table(
   (t) => [primaryKey({ columns: [t.tenantId, t.userId, t.period, t.periodStart] })],
 );
 
+export const sourceVersions = cairnmcp.table(
+  "source_versions",
+  {
+    tenantId: text("tenant_id").notNull(),
+    sourceId: text("source_id").notNull(),
+    version: integer("version").notNull(),
+    ir: jsonb("ir").notNull(),
+    replacedAt: timestamp("replaced_at", { withTimezone: true }).notNull().defaultNow(),
+    replacedBy: text("replaced_by"),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.sourceId, t.version] })],
+);
+
+export const sourceChecks = cairnmcp.table(
+  "source_checks",
+  {
+    tenantId: text("tenant_id").notNull(),
+    sourceId: text("source_id").notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull(),
+    status: text("status", { enum: ["current", "changed", "failed"] }).notNull(),
+    documentSha256: text("document_sha256"),
+    summary: jsonb("summary").notNull().default({}),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.sourceId] })],
+);
+
 export const allTables = {
   tenants,
   users,
@@ -281,4 +307,6 @@ export const allTables = {
   profileRules,
   memberProfiles,
   usageCounters,
+  sourceVersions,
+  sourceChecks,
 };

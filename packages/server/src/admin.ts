@@ -4,6 +4,7 @@
 import {
   countBySideEffect,
   defaultToolset,
+  instantOf,
   IrDocument,
   resolveToolset,
   SourceId,
@@ -13,7 +14,7 @@ import {
   ToolsetId,
   UserId,
 } from "@procura/core";
-import { ensureMember, getSource, getToolset, listSourceSummaries, listToolsets, PG, pgErrorCode, putSource, putToolset, schema, setToolsetAccess, type Database } from "@procura/db";
+import { ensureMember, getSource, getSourceCheck, getToolset, listSourceSummaries, listSourceVersions, listToolsets, PG, pgErrorCode, putSource, putToolset, schema, setToolsetAccess, type Database } from "@procura/db";
 import { ingestOpenApiText } from "@procura/ingest";
 import { CredentialInput, type Vault } from "@procura/vault";
 import { eq } from "drizzle-orm";
@@ -184,7 +185,12 @@ export async function showTenant(db: Database, vault: Vault, tenantIdInput: stri
       .from(schema.memberships)
       .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId));
     const access = await tx.select().from(schema.toolsetAccess);
-    const sources = (await listSourceSummaries(tx)).map((s) => ({ id: s.id, name: s.name, operations: s.operations.total }));
+    const sources = [];
+    for (const s of await listSourceSummaries(tx)) {
+      const check = await getSourceCheck(tx, s.id);
+      const versions = (await listSourceVersions(tx, s.id)).map((v) => ({ version: v.version, replacedAt: instantOf(v.replacedAt), operations: v.operations }));
+      sources.push({ id: s.id, name: s.name, operations: s.operations.total, ...(check ? { check: { status: check.status, checkedAt: instantOf(check.checkedAt) } } : {}), ...(versions.length ? { versions } : {}) });
+    }
     const toolsets = (await listToolsets(tx)).map((t) => ({
       id: t.id,
       sourceId: t.sourceId,

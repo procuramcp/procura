@@ -196,6 +196,11 @@ again on their next connection.
 
 ## Operating it
 
+- New versions of your APIs: once a day (`PROCURA_SOURCE_CHECK_HOURS`), procura fetches the
+  document URL each API was added from and, if it changed, says so on that API's page. Updating
+  is always a person's decision, with a preview of what changes. From the command line:
+  `./admin.sh source update --tenant <t> --id <api>` (a dry run; add `--apply`).
+
 - Logs: `docker compose logs -f app` (or `caddy`, `migrate`).
 - Containers restart on failure and after a reboot.
 - Hardening: the app and the migration step run as an unprivileged user with a read-only
