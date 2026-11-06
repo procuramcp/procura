@@ -12,7 +12,7 @@
 #
 # The base image is pinned by digest so a moved tag can't change what we ship;
 # Dependabot updates both FROM lines together.
-FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS deps
+FROM node:26.12.1-trixie-slim@sha256:94816674c62774da0d099a947bf4613b9e1972a2733abd0d0cd80e795f8411d0 AS deps
 WORKDIR /app
 ENV CI=true PNPM_HOME=/pnpm
 # pnpm comes from package.json "packageManager", through Corepack.
@@ -28,7 +28,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 # The curation console (D-033): a browser bundle, the only thing that is built.
 # Its dev dependencies (Vite, Tailwind) stay in this stage.
-FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446 AS web
+FROM node:26.12.1-trixie-slim@sha256:94816674c62774da0d099a947bf4613b9e1972a2733abd0d0cd80e795f8411d0 AS web
 WORKDIR /app
 ENV CI=true PNPM_HOME=/pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
@@ -39,7 +39,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --offline --frozen-lockfile --filter "@procura/web" && \
     pnpm --filter @procura/web build
 
-FROM node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
+FROM node:26.12.1-trixie-slim@sha256:94816674c62774da0d099a947bf4613b9e1972a2733abd0d0cd80e795f8411d0
 LABEL org.opencontainers.image.source="https://github.com/procuramcp/procura" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
