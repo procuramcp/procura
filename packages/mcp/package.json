@@ -17,7 +17,7 @@
     "@procura/runtime": "workspace:*",
     "@procura/vault": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "jose": "^6.2.12"
+    "jose": "^6.2.15"
   },
   "devDependencies": {
     "@procura/ingest": "workspace:*"
